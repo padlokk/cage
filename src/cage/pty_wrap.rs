@@ -75,10 +75,19 @@ impl PtyAgeAutomator {
 
         // Spawn age in PTY - it thinks it has a real terminal!
         let child = pair.slave.spawn_command(cmd)
-            .map_err(|e| AgeError::ProcessExecutionFailed {
-                command: "age".to_string(),
-                exit_code: None,
-                stderr: format!("Failed to spawn age: {}", e),
+            .map_err(|e| {
+                let error_msg = format!("{}", e);
+                if error_msg.contains("No viable candidates found in PATH") ||
+                   error_msg.contains("No such file or directory") ||
+                   error_msg.contains("not found") {
+                    AgeError::AgeBinaryNotFound(format!("age command not found: {}", e))
+                } else {
+                    AgeError::ProcessExecutionFailed {
+                        command: "age".to_string(),
+                        exit_code: None,
+                        stderr: format!("Failed to spawn age: {}", e),
+                    }
+                }
             })?;
 
         drop(pair.slave);  // Close slave end in parent
@@ -262,10 +271,19 @@ impl PtyAgeAutomator {
 
         // Spawn age in PTY
         let child = pair.slave.spawn_command(cmd)
-            .map_err(|e| AgeError::ProcessExecutionFailed {
-                command: "age".to_string(),
-                exit_code: None,
-                stderr: format!("Failed to spawn age: {}", e),
+            .map_err(|e| {
+                let error_msg = format!("{}", e);
+                if error_msg.contains("No viable candidates found in PATH") ||
+                   error_msg.contains("No such file or directory") ||
+                   error_msg.contains("not found") {
+                    AgeError::AgeBinaryNotFound(format!("age command not found: {}", e))
+                } else {
+                    AgeError::ProcessExecutionFailed {
+                        command: "age".to_string(),
+                        exit_code: None,
+                        stderr: format!("Failed to spawn age: {}", e),
+                    }
+                }
             })?;
 
         drop(pair.slave);

@@ -1,39 +1,17 @@
-//! Age Automation Module - Production TTY Automation for Padlock
+//! Cage - Age Encryption Automation Core Module
 //!
 //! This module provides bulletproof Age encryption automation by eliminating TTY interaction
-//! requirements while maintaining cryptographic security standards. Based on proven pilot
+//! requirements while maintaining cryptographic security standards. Based on proven PTY
 //! patterns that successfully eliminated T2.1: TTY Automation Subversion.
 //!
 //! # Features
 //!
-//! - **Dual TTY Methods**: Proven `script` and `expect` automation with fallback
+//! - **PTY Automation**: Native PTY wrapper for seamless Age encryption
 //! - **CRUD Operations**: Complete encryption lifecycle management
 //! - **ASCII Armor Support**: Optional `-a` flag for text-safe environments
 //! - **Batch Processing**: High-performance parallel operations
 //! - **Security Validation**: Comprehensive injection prevention and audit logging
 //! - **Production Ready**: Robust error handling and monitoring integration
-//!
-//! # Quick Start
-//!
-//! ```rust
-//! use padlock::sec::cage::{CrudManager, LockOptions, OutputFormat};
-//!
-//! // Create CRUD manager with defaults
-//! let mut crud_manager = CrudManager::with_defaults()?;
-//!
-//! // Lock (encrypt) a file
-//! let options = LockOptions::default();
-//! crud_manager.lock("input.txt", "passphrase", options)?;
-//!
-//! // Check status
-//! let status = crud_manager.status(".")?;
-//! println!("Encrypted files: {}", status.encrypted_files);
-//! ```
-//!
-//! # Security Guardian
-//!
-//! Edgar - Lord Captain of Superhard Fortress
-//! Mission: Eliminate T2.1 TTY Automation Subversion through proven automation patterns
 
 pub mod adapter;
 pub mod age_engine;
@@ -56,8 +34,8 @@ pub use operations::{
 pub use lifecycle::{CrudManager, LockOptions, UnlockOptions, VerificationResult};
 pub use security::{AuditLogger, SecurityValidator};
 
-/// Module version aligned with padlock versioning
-pub const VERSION: &str = "0.0.1-age-automation";
+/// Module version synchronized with Cargo.toml
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Security clearance level for this module
 pub const SECURITY_LEVEL: &str = "FORTRESS_CLEARED";
@@ -73,7 +51,7 @@ mod tests {
     fn test_module_exports() {
         // Verify all core types are properly exported
         let _config = AgeConfig::default();
-        assert_eq!(VERSION, "0.0.1-age-automation");
+        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
         assert_eq!(SECURITY_LEVEL, "FORTRESS_CLEARED");
         assert_eq!(THREAT_STATUS, "T2.1_ELIMINATED");
     }
