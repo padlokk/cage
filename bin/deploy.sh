@@ -1,15 +1,14 @@
 #!/bin/bash
 set -e
 
-# Padlock CLI Deploy Script - Rust CLI subtools deployment
-# Deploys cli_age and cli_auth binaries to ~/.local/lib/odx/padlock/ and creates bin symlinks
+# Cage Deploy Script - Age Encryption Automation CLI deployment
+# Deploys cage binary to ~/.local/lib/odx/cage/ and creates bin symlink
 
 # Configuration
-LIB_DIR="$HOME/.local/lib/odx/padlock"
-BIN_DIR="$HOME/.local/bin/odx"
+LIB_DIR="$HOME/.local/lib/odx/cage"
+BIN_DIR="$HOME/.local/bin"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-# CLI subtools to deploy
-CLI_TOOLS=("cage" "cli_auth")
+BINARY_NAME="cage"
 
 # Extract version from Cargo.toml at repo root
 VERSION=$(grep '^version' "$ROOT_DIR/Cargo.toml" | head -1 | cut -d'"' -f2)
@@ -41,127 +40,107 @@ step_msg() {
 }
 
 # Welcome ceremony
-ceremony_msg "🔧 PADLOCK CLI DEPLOYMENT CEREMONY v$VERSION" "success"
+ceremony_msg "🔒 CAGE DEPLOYMENT CEREMONY v$VERSION" "success"
 echo
 
-step_msg "Step 1" "Building CLI subtools v$VERSION..."
+step_msg "Step 1" "Building cage v$VERSION..."
 cd "$ROOT_DIR"
-if ! cargo build --release --bin cage --bin cli_auth; then
+if ! cargo build --release --bin cage; then
     ceremony_msg "❌ Build failed!" "error"
     exit 1
 fi
 
-# Check if binaries were created
-for tool in "${CLI_TOOLS[@]}"; do
-    if [ ! -f "$ROOT_DIR/target/release/${tool}" ]; then
-        ceremony_msg "❌ Binary not found at target/release/${tool}" "error"
-        exit 1
-    fi
-done
+# Check if binary was created
+if [ ! -f "$ROOT_DIR/target/release/${BINARY_NAME}" ]; then
+    ceremony_msg "❌ Binary not found at target/release/${BINARY_NAME}" "error"
+    exit 1
+fi
 
 step_msg "Step 2" "Creating lib directory: $LIB_DIR"
 mkdir -p "$LIB_DIR"
 
-step_msg "Step 3" "Deploying CLI tools to lib directory..."
-for tool in "${CLI_TOOLS[@]}"; do
-    if ! cp "$ROOT_DIR/target/release/${tool}" "$LIB_DIR/${tool}"; then
-        ceremony_msg "❌ Failed to copy ${tool} to $LIB_DIR" "error"
-        exit 1
-    fi
+step_msg "Step 3" "Deploying cage to lib directory..."
+if ! cp "$ROOT_DIR/target/release/${BINARY_NAME}" "$LIB_DIR/${BINARY_NAME}"; then
+    ceremony_msg "❌ Failed to copy ${BINARY_NAME} to $LIB_DIR" "error"
+    exit 1
+fi
 
-    if ! chmod +x "$LIB_DIR/${tool}"; then
-        ceremony_msg "❌ Failed to make ${tool} executable" "error"
-        exit 1
-    fi
-done
+if ! chmod +x "$LIB_DIR/${BINARY_NAME}"; then
+    ceremony_msg "❌ Failed to make ${BINARY_NAME} executable" "error"
+    exit 1
+fi
 
 step_msg "Step 4" "Creating bin directory: $BIN_DIR"
 mkdir -p "$BIN_DIR"
 
-step_msg "Step 5" "Creating bin symlinks for CLI tools..."
-for tool in "${CLI_TOOLS[@]}"; do
-    if [[ -L "$BIN_DIR/${tool}" ]] || [[ -f "$BIN_DIR/${tool}" ]]; then
-        rm "$BIN_DIR/${tool}"
-    fi
+step_msg "Step 5" "Creating bin symlink for cage..."
+if [[ -L "$BIN_DIR/${BINARY_NAME}" ]] || [[ -f "$BIN_DIR/${BINARY_NAME}" ]]; then
+    rm "$BIN_DIR/${BINARY_NAME}"
+fi
 
-    if ! ln -s "$LIB_DIR/${tool}" "$BIN_DIR/${tool}"; then
-        ceremony_msg "❌ Failed to create symlink for ${tool}" "error"
-        exit 1
-    fi
-    echo "  Created: $BIN_DIR/${tool} → $LIB_DIR/${tool}"
-done
+if ! ln -s "$LIB_DIR/${BINARY_NAME}" "$BIN_DIR/${BINARY_NAME}"; then
+    ceremony_msg "❌ Failed to create symlink for ${BINARY_NAME}" "error"
+    exit 1
+fi
+echo "  Created: $BIN_DIR/${BINARY_NAME} → $LIB_DIR/${BINARY_NAME}"
 
 step_msg "Step 6" "Verifying deployment..."
-for tool in "${CLI_TOOLS[@]}"; do
-    if [[ ! -x "$LIB_DIR/${tool}" ]]; then
-        ceremony_msg "❌ ${tool} is not executable at $LIB_DIR/${tool}" "error"
-        exit 1
-    fi
+if [[ ! -x "$LIB_DIR/${BINARY_NAME}" ]]; then
+    ceremony_msg "❌ ${BINARY_NAME} is not executable at $LIB_DIR/${BINARY_NAME}" "error"
+    exit 1
+fi
 
-    if [[ ! -L "$BIN_DIR/${tool}" ]]; then
-        ceremony_msg "❌ Symlink not created at $BIN_DIR/${tool}" "error"
-        exit 1
-    fi
-done
+if [[ ! -L "$BIN_DIR/${BINARY_NAME}" ]]; then
+    ceremony_msg "❌ Symlink not created at $BIN_DIR/${BINARY_NAME}" "error"
+    exit 1
+fi
 
-step_msg "Step 7" "Testing CLI tools..."
-# Test cage (we know this works)
+step_msg "Step 7" "Testing cage command..."
 if ! "$BIN_DIR/cage" --help >/dev/null 2>&1; then
     ceremony_msg "❌ cage command test failed!" "error"
     exit 1
 fi
 echo "✅ cage command operational"
 
-# Test cli_auth (but don't fail if it doesn't work since user noted uncertainty)
-if "$BIN_DIR/cli_auth" --help >/dev/null 2>&1; then
-    echo "✅ cli_auth command operational"
-else
-    echo "⚠️  cli_auth command may need development (expected)"
-fi
-
 # Success ceremony
-ceremony_msg "✅ PADLOCK CLI TOOLS v$VERSION DEPLOYED SUCCESSFULLY!" "success"
+ceremony_msg "✅ CAGE v$VERSION DEPLOYED SUCCESSFULLY!" "success"
 echo
 
 if has_boxy; then
     {
-        echo "🔧 Padlock CLI subtools for Age encryption automation"
-        echo "📍 Library: $LIB_DIR/"
-        for tool in "${CLI_TOOLS[@]}"; do
-            echo "📍 Binary: $BIN_DIR/${tool}"
-        done
+        echo "🔒 Cage - Age encryption automation CLI"
+        echo "📍 Library: $LIB_DIR/${BINARY_NAME}"
+        echo "📍 Binary: $BIN_DIR/${BINARY_NAME}"
         echo
         echo "💡 Usage Examples:"
-        echo "   cage encrypt file.txt                    # Age encryption wrapper"
-        echo "   cage decrypt file.txt.age               # Age decryption wrapper"
-        echo "   cage --help                             # Full cage reference"
-        echo "   cli_auth --help                          # Authority chain management"
+        echo "   cage lock file.txt --passphrase secret123    # Encrypt files"
+        echo "   cage unlock file.txt.age --passphrase secret123 # Decrypt files"
+        echo "   cage status /path/to/files                    # Check status"
+        echo "   cage --help                                   # Full reference"
         echo
         echo "🎭 Features:"
         echo "   • PTY automation for Age encryption"
-        echo "   • Authority chain integration"
+        echo "   • Batch processing support"
         echo "   • Secure passphrase handling"
-        echo "   • Timeout-based error recovery"
-        echo "   • Production-grade Age wrapper"
-    } | boxy --theme success --header "🔧 Padlock CLI v$VERSION Deployed" \
+        echo "   • ASCII armor support"
+        echo "   • Production-grade reliability"
+    } | boxy --theme success --header "🔒 Cage v$VERSION Deployed" \
              --status "sr:$(date '+%H:%M:%S')" \
-             --footer "✅ Ready for testing" \
+             --footer "✅ Ready for use" \
              --width max
 else
-    echo "📍 Library location: $LIB_DIR/"
-    for tool in "${CLI_TOOLS[@]}"; do
-        echo "📍 Binary symlink: $BIN_DIR/${tool}"
-    done
+    echo "📍 Library location: $LIB_DIR/${BINARY_NAME}"
+    echo "📍 Binary symlink: $BIN_DIR/${BINARY_NAME}"
     echo
     echo "💡 Usage Examples:"
-    echo "   cage encrypt file.txt                    # Age encryption wrapper"
-    echo "   cage decrypt file.txt.age               # Age decryption wrapper"
-    echo "   cage --help                             # Full cage reference"
-    echo "   cli_auth --help                          # Authority chain management"
+    echo "   cage lock file.txt --passphrase secret123    # Encrypt files"
+    echo "   cage unlock file.txt.age --passphrase secret123 # Decrypt files"
+    echo "   cage status /path/to/files                    # Check status"
+    echo "   cage --help                                   # Full reference"
 fi
 
 echo
-step_msg "🧪 Quick Test" "Running CLI tools functionality test"
+step_msg "🧪 Quick Test" "Running cage functionality test"
 
 # Test cage functionality (basic help command)
 echo "Testing cage help command..."
@@ -172,11 +151,11 @@ else
     exit 1
 fi
 
-# Test if we can create a simple test file and encrypt it
-TEST_FILE="/tmp/padlock_test_$(date '+%s').txt"
-TEST_CONTENT="Padlock deployment test $(date '+%Y-%m-%d %H:%M:%S')"
+# Test if we can create a simple test file
+TEST_FILE="/tmp/cage_test_$(date '+%s').txt"
+TEST_CONTENT="Cage deployment test $(date '+%Y-%m-%d %H:%M:%S')"
 
-echo "Testing basic cage encryption workflow..."
+echo "Testing basic cage workflow..."
 echo "$TEST_CONTENT" > "$TEST_FILE"
 
 # Note: For now we'll just test that the commands exist and respond
@@ -186,24 +165,17 @@ echo "✅ cage deployment verification complete"
 # Clean up test file
 rm -f "$TEST_FILE" 2>/dev/null
 
-echo "Testing cli_auth help command..."
-if "$BIN_DIR/cli_auth" --help >/dev/null 2>&1; then
-    echo "✅ cli_auth help command functional"
-else
-    echo "⚠️  cli_auth help command not yet implemented (expected)"
-fi
-
 # Final ceremony
-ceremony_msg "🎉 PADLOCK CLI TOOLS v$VERSION READY FOR USE!" "success"
+ceremony_msg "🎉 CAGE v$VERSION READY FOR USE!" "success"
 
 if has_boxy; then
     {
-        echo "Run the comprehensive build and test:"
+        echo "Run comprehensive tests:"
         echo "   cd $ROOT_DIR && ./bin/build.sh test"
         echo
         echo "Test immediately:"
-        echo "   cage --help                              # Age encryption wrapper"
-        echo "   cli_auth --help                           # Authority chain management"
-        echo "   $ROOT_DIR/src/age_driver.rs               # Full PTY automation test"
+        echo "   cage --help                              # Show all commands"
+        echo "   cage demo                                # See demonstration"
+        echo "   cage status .                            # Check current directory"
     } | boxy --theme info --header "🚀 Next Steps"
 fi

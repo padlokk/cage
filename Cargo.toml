@@ -1,24 +1,16 @@
 [package]
-name = "padlock"
+name = "cage"
 version = "0.1.0"
 edition = "2021"
-
-[[bin]]
-name = "padlock"
-path = "src/main.rs"
+description = "Age encryption automation CLI with PTY support"
+repository = "https://github.com/padlokk/cage"
+license = "AGPL-3.0"            
+license-file = "LICENSE"  
+publish = false  
 
 [[bin]]
 name = "cage"
 path = "src/bin/cli_age.rs"
-
-[[bin]]
-name = "cli_auth"
-path = "src/bin/cli_auth.rs"
-
-[[bin]]
-name = "age_driver"
-path = "src/age_driver.rs"
-
 
 [dependencies]
 portable-pty = "0.9"
@@ -27,16 +19,10 @@ portable-pty = "0.9"
 tempfile = "3.8"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.4", features = ["derive"] }
-tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2"
 
-# Authority chain dependencies
-sha2 = "0.10"
-hex = "0.4"
-rand = "0.9"
-
 # RSB framework with re-exported dependencies (optional for now)
-# rsb = { git = "https://github.com/oodx/rsb-framework", branch = "main" }
-# xstream = { git = "https://github.com/oodx/xstream", branch = "main" }
+# KEEP THIS!
+rsb = { git = "https://github.com/oodx/rsb-framework", branch = "main" }

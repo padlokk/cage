@@ -2,13 +2,15 @@
 //!
 //! Comprehensive error handling covering all failure scenarios identified in the pilot
 //! implementation. Provides clear error messages with actionable guidance for operators.
-//!
-//! Security Guardian: Edgar - Bulletproof error handling for production deployment
+//! Enhanced with RSB framework utilities for better error reporting.
 
 use std::fmt;
 use std::error::Error;
 use std::io;
 use std::path::PathBuf;
+
+// Import RSB utilities for enhanced error handling
+use rsb::prelude::*;
 
 /// Result type alias for Age automation operations
 pub type AgeResult<T> = Result<T, AgeError>;
@@ -160,7 +162,13 @@ impl fmt::Display for AgeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AgeError::AgeBinaryNotFound(details) => {
-                write!(f, "Age binary not found: {}. Please install Age encryption tool.", details)
+                write!(f, "Age binary not found: {}\n\n\
+                🔧 To install Age encryption tool:\n\
+                • Ubuntu/Debian: sudo apt-get install age\n\
+                • RHEL/CentOS: sudo yum install age\n\
+                • Arch Linux: sudo pacman -S age\n\
+                • macOS: brew install age\n\
+                • Or visit: https://github.com/FiloSottile/age/releases", details)
             }
             
             AgeError::TtyMethodUnavailable { method, reason } => {
