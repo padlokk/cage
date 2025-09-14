@@ -42,6 +42,11 @@ pub enum AgeError {
         reason: String,
         guidance: String,
     },
+
+    /// Passphrase input/processing errors
+    PassphraseError {
+        message: String,
+    },
     
     /// Encryption operation failed
     EncryptionFailed {
@@ -185,6 +190,10 @@ impl fmt::Display for AgeError {
             
             AgeError::PassphraseValidation { reason, guidance } => {
                 write!(f, "Passphrase validation failed: {}. Guidance: {}", reason, guidance)
+            }
+
+            AgeError::PassphraseError { message } => {
+                write!(f, "Passphrase error: {}", message)
             }
             
             AgeError::EncryptionFailed { input, output, reason } => {
