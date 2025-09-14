@@ -100,6 +100,10 @@ enum Commands {
         #[arg(help = "Directory containing encrypted files to re-encrypt")]
         repository: PathBuf,
 
+        /// Current passphrase for decryption
+        #[arg(short = 'o', long, help = "Current passphrase to decrypt existing files")]
+        old_passphrase: String,
+
         /// New passphrase for re-encryption
         #[arg(short = 'n', long, help = "New passphrase for re-encryption")]
         new_passphrase: String,
@@ -190,8 +194,8 @@ impl LifecycleDispatcher {
                 self.execute_status(path)
             }
 
-            Commands::Rotate { repository, new_passphrase, backup: _ } => {
-                self.execute_rotate(&repository, &new_passphrase)
+            Commands::Rotate { repository, old_passphrase, new_passphrase, backup: _ } => {
+                self.execute_rotate(&repository, &old_passphrase, &new_passphrase)
             }
 
             Commands::Verify { path } => {
@@ -333,10 +337,10 @@ impl LifecycleDispatcher {
     }
 
     /// Execute rotate operation
-    fn execute_rotate(&mut self, repository: &Path, new_passphrase: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute_rotate(&mut self, repository: &Path, old_passphrase: &str, new_passphrase: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.log(&format!("🔄 Rotating keys for: {}", repository.display()));
-        
-        let result = self.crud_manager.rotate(repository, new_passphrase)?;
+
+        let result = self.crud_manager.rotate(repository, old_passphrase, new_passphrase)?;
         
         self.log(&format!("    Processed: {} files", result.processed_files.len()));
         self.log(&format!("    Duration: {}ms", result.execution_time_ms));

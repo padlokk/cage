@@ -15,19 +15,24 @@
 //!
 //! # Quick Start
 //!
-//! ```rust
+//! ```rust,no_run
 //! use cage::{CrudManager, LockOptions, OutputFormat};
+//! use std::path::Path;
+//! # use cage::cage::error::AgeResult;
 //!
+//! # fn main() -> AgeResult<()> {
 //! // Create CRUD manager with defaults
 //! let mut crud_manager = CrudManager::with_defaults()?;
 //!
 //! // Lock (encrypt) a file
 //! let options = LockOptions::default();
-//! crud_manager.lock("input.txt", "passphrase", options)?;
+//! crud_manager.lock(Path::new("input.txt"), "passphrase", options)?;
 //!
 //! // Check status
-//! let status = crud_manager.status(".")?;
+//! let status = crud_manager.status(Path::new("."))?;
 //! println!("Encrypted files: {}", status.encrypted_files);
+//! # Ok(())
+//! # }
 //! ```
 
 pub mod cage;

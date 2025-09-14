@@ -6,11 +6,11 @@
 //! Security Guardian: Edgar - Production Age automation coordination
 
 use std::path::Path;
-use super::adapter::{AgeAdapter, AdapterFactory};
-use super::config::{AgeConfig, OutputFormat};
-use super::error::{AgeError, AgeResult};
-use super::security::AuditLogger;
-use super::tty_automation::TtyAutomator;
+use crate::cage::adapter::{AgeAdapter, AdapterFactory};
+use crate::cage::config::{AgeConfig, OutputFormat};
+use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::security::AuditLogger;
+use crate::cage::tty_automation::TtyAutomator;
 
 /// Main Age automation engine coordinating all components
 pub struct AgeAutomator {
@@ -145,7 +145,7 @@ impl AgeAutomator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::adapter::AdapterFactory;
+    use crate::cage::adapter::AdapterFactory;
 
     #[test]
     fn test_automator_creation() {
