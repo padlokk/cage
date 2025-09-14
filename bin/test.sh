@@ -300,10 +300,10 @@ run_test() {
             # PTY driver demonstration
             if [[ "$VERBOSE_MODE" == "true" ]]; then
                 echo "🚀 Running PTY driver demo with verbose output..."
-                cargo run --bin driver
+                cargo run --bin cage
             else
                 echo "🚀 Running PTY driver demo..."
-                cargo run --bin driver
+                cargo run --bin cage
             fi
             ;;
         "pty")
