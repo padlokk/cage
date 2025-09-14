@@ -47,7 +47,8 @@ fn main() {
         "verify" => cmd_verify,
         "batch" => cmd_batch,
         "test" => cmd_test,
-        "demo" => cmd_demo
+        "demo" => cmd_demo,
+        "proxy" => cmd_proxy
     });
 }
 
@@ -668,6 +669,185 @@ fn execute_batch_operation(
         }
     }
 
+    Ok(())
+}
+
+/// Proxy command - Forward arguments to Age binary with PTY automation
+fn cmd_proxy(args: Args) -> i32 {
+    if let Err(e) = execute_proxy_command(args) {
+        echo!("❌ Proxy command failed: {}", e);
+        return 1;
+    }
+    0
+}
+
+fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
+    use std::process::Command;
+
+    echo!("🔗 Cage Age Proxy - PTY automation for direct Age commands");
+
+    // Check if Age binary is available
+    let age_path = which::which("age").map_err(|_| {
+        cage::AgeError::AgeBinaryNotFound("Age binary not found in PATH".to_string())
+    })?;
+
+    // Build Age command arguments from --age-* flags
+    let mut age_args = Vec::new();
+
+    // Check common Age flags using RSB pattern
+    if is_true("opt_age_p") || is_true("opt_age_passphrase") {
+        age_args.push("--passphrase".to_string());
+    }
+    if is_true("opt_age_d") || is_true("opt_age_decrypt") {
+        age_args.push("--decrypt".to_string());
+    }
+    if is_true("opt_age_a") || is_true("opt_age_armor") {
+        age_args.push("--armor".to_string());
+    }
+
+    // Handle flags with values
+    let output_val = get_var("opt_age_o");
+    if !output_val.is_empty() {
+        age_args.push("--output".to_string());
+        age_args.push(output_val);
+    }
+    let output_val = get_var("opt_age_output");
+    if !output_val.is_empty() {
+        age_args.push("--output".to_string());
+        age_args.push(output_val);
+    }
+
+    let identity_val = get_var("opt_age_i");
+    if !identity_val.is_empty() {
+        age_args.push("--identity".to_string());
+        age_args.push(identity_val);
+    }
+    let identity_val = get_var("opt_age_identity");
+    if !identity_val.is_empty() {
+        age_args.push("--identity".to_string());
+        age_args.push(identity_val);
+    }
+
+    let recipient_val = get_var("opt_age_r");
+    if !recipient_val.is_empty() {
+        age_args.push("--recipient".to_string());
+        age_args.push(recipient_val);
+    }
+    let recipient_val = get_var("opt_age_recipient");
+    if !recipient_val.is_empty() {
+        age_args.push("--recipient".to_string());
+        age_args.push(recipient_val);
+    }
+
+
+    // Add remaining positional arguments (files) - only add file paths
+    for remaining_arg in args.remaining() {
+        if !remaining_arg.starts_with("--") &&
+           !remaining_arg.contains("target/debug/cage") &&
+           std::path::Path::new(&remaining_arg).exists() {
+            age_args.push(remaining_arg);
+        }
+    }
+
+    if age_args.is_empty() {
+        echo!("❌ No Age arguments provided. Use --age-* flags to pass arguments to Age.");
+        echo!("Examples:");
+        echo!("  cage proxy --age-p --age-o=/tmp/output.age input.txt");
+        echo!("  cage proxy --age-d --age-i=key.txt encrypted.age");
+        echo!("  cage proxy --age-passphrase --age-output=/tmp/out.age file.txt");
+        return Ok(());
+    }
+
+    echo!("🔧 Age command: {} {}", age_path.display(), age_args.join(" "));
+
+    // Check if this requires PTY automation (passphrase operations)
+    let is_encrypt = age_args.iter().any(|arg| arg == "--passphrase" || arg == "-p");
+    let is_decrypt = age_args.iter().any(|arg| arg == "--decrypt" || arg == "-d");
+    let needs_pty = is_encrypt || is_decrypt; // Both encrypt and decrypt may need PTY for passphrases
+
+    if needs_pty {
+        echo!("🔐 PTY automation required for passphrase operations");
+
+        // Create PTY automator and handle passphrase prompts
+        let passphrase_manager = PassphraseManager::new();
+
+        // Get passphrase from user
+        let passphrase = if is_true("opt_stdin_passphrase") {
+            passphrase_manager.get_passphrase_with_mode(
+                "Enter passphrase for Age operation",
+                false,
+                PassphraseMode::Stdin
+            )?
+        } else {
+            passphrase_manager.get_passphrase("Enter passphrase for Age operation", false)?
+        };
+
+        // Use expect script for PTY automation
+        let temp_script = std::env::temp_dir().join("cage_age_proxy.exp");
+        let expect_script = format!(r#"#!/usr/bin/expect -f
+spawn {} {}
+expect {{
+    "Enter passphrase*" {{
+        send "{}\r"
+        exp_continue
+    }}
+    "Confirm passphrase*" {{
+        send "{}\r"
+        exp_continue
+    }}
+    eof
+}}
+"#, age_path.display(), age_args.join(" "), passphrase, passphrase);
+
+        std::fs::write(&temp_script, expect_script)?;
+        std::fs::set_permissions(&temp_script, std::os::unix::fs::PermissionsExt::from_mode(0o755))?;
+
+        // Execute with expect
+        let output = Command::new(&temp_script)
+            .output()
+            .map_err(|e| cage::AgeError::ProcessExecutionFailed {
+                command: format!("expect {}", temp_script.display()),
+                exit_code: None,
+                stderr: e.to_string(),
+            })?;
+
+        // Clean up temp script
+        let _ = std::fs::remove_file(&temp_script);
+
+        if !output.status.success() {
+            return Err(cage::AgeError::ProcessExecutionFailed {
+                command: format!("age {}", age_args.join(" ")),
+                exit_code: output.status.code(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            });
+        }
+
+        // Print Age output
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+
+    } else {
+        echo!("⚡ Direct Age execution (no PTY needed)");
+
+        // Execute Age directly
+        let status = Command::new(&age_path)
+            .args(&age_args)
+            .status()
+            .map_err(|e| cage::AgeError::ProcessExecutionFailed {
+                command: format!("age {}", age_args.join(" ")),
+                exit_code: None,
+                stderr: e.to_string(),
+            })?;
+
+        if !status.success() {
+            return Err(cage::AgeError::ProcessExecutionFailed {
+                command: format!("age {}", age_args.join(" ")),
+                exit_code: status.code(),
+                stderr: "Age command failed".to_string(),
+            });
+        }
+    }
+
+    echo!("✅ Age proxy command completed successfully");
     Ok(())
 }
 

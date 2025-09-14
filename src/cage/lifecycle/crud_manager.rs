@@ -846,11 +846,7 @@ impl CrudManager {
 
     /// Lock a single file
     fn lock_single_file(&self, file: &Path, passphrase: &str, options: &LockOptions, result: &mut OperationResult) -> AgeResult<()> {
-        let output_path = if options.format == OutputFormat::AsciiArmor {
-            file.with_extension("age")
-        } else {
-            file.with_extension("age")
-        };
+        let output_path = file.with_extension(&self.config.encrypted_file_extension);
 
         let mut backup_info: Option<BackupInfo> = None;
 
@@ -961,8 +957,8 @@ impl CrudManager {
         let mut status = RepositoryStatus::new();
         status.total_files = 1;
 
-        // Simple heuristic: check if file has .age extension
-        if file.extension().and_then(|s| s.to_str()) == Some("age") {
+        // Check if file has configured encrypted extension
+        if self.config.is_encrypted_file(file) {
             status.encrypted_files = 1;
         } else {
             status.unencrypted_files = 1;
@@ -978,11 +974,11 @@ impl CrudManager {
         for entry in std::fs::read_dir(repository)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() {
                 status.total_files += 1;
-                
-                if path.extension().and_then(|s| s.to_str()) == Some("age") {
+
+                if self.config.is_encrypted_file(&path) {
                     status.encrypted_files += 1;
                 } else {
                     status.unencrypted_files += 1;
@@ -1135,15 +1131,15 @@ impl CrudManager {
         Ok(files)
     }
 
-    /// Collect encrypted files (*.age) matching pattern
+    /// Collect encrypted files matching pattern
     fn collect_encrypted_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
 
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let path = entry.path();
-            
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("age") {
+
+            if path.is_file() && self.config.is_encrypted_file(&path) {
                 // Apply pattern filter if specified
                 if let Some(pattern) = pattern {
                     if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {

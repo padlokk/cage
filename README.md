@@ -19,6 +19,9 @@ Cage provides bulletproof encryption automation tools while maintaining cryptogr
 - **🚀 Batch Processing** - High-performance parallel operations on multiple files
 - **🔍 Security Validation** - Comprehensive injection prevention and audit logging
 - **⚙️ RSB Framework** - Modern CLI architecture with built-in help, inspection, and global context
+- **🏷️ Smart Extensions** - Uses `.cage` extension by default, configurable for integration
+- **🔗 Age Proxy** - Direct Age binary access with PTY automation for any Age command
+- **💡 Interactive Passphrases** - Secure terminal input with multiple input modes
 - **🖥️ Cross-Platform** - Linux, macOS support with Windows compatibility planned
 
 ## 🚀 Quick Start
@@ -44,8 +47,8 @@ cage --version
 # Encrypt a file (RSB framework - streamlined syntax)
 cage lock secret.txt mysecretpassword
 
-# Decrypt a file
-cage unlock secret.txt.age mysecretpassword
+# Decrypt a file (note: cage uses .cage extension by default)
+cage unlock secret.txt.cage mysecretpassword
 
 # Check encryption status
 cage status /path/to/files
@@ -137,6 +140,7 @@ sudo cp target/release/cage /usr/local/bin/
 | `rotate` | Rotate encryption keys | ✅ Fully Implemented |
 | `verify` | Verify file integrity | ✅ Fully Implemented |
 | `batch` | Bulk operations | ✅ Fully Implemented |
+| `proxy` | Direct Age commands with PTY | ✅ Fully Implemented |
 | `test` | Run test suite | ⚠️ In Development |
 | `demo` | Show demonstrations | ✅ Fully Implemented |
 
@@ -164,14 +168,20 @@ cage lock important.txt --backup --passphrase "strongpassword"
 #### File Decryption
 
 ```bash
-# Basic decryption
-cage unlock document.pdf.age --passphrase "strongpassword"
+# Basic decryption (cage uses .cage extension by default)
+cage unlock document.pdf.cage --passphrase "strongpassword"
+
+# Interactive passphrase input (secure terminal input)
+cage unlock document.pdf.cage
+
+# Stdin passphrase input (for automation)
+echo "mypassword" | cage unlock document.pdf.cage --stdin-passphrase
 
 # Preserve encrypted files after decryption
-cage unlock document.pdf.age --preserve --passphrase "strongpassword"
+cage unlock document.pdf.cage --preserve --passphrase "strongpassword"
 
 # Selective decryption with patterns
-cage unlock /encrypted-docs --pattern "*.txt.age" --passphrase "strongpassword"
+cage unlock /encrypted-docs --pattern "*.txt.cage" --passphrase "strongpassword"
 ```
 
 #### Status and Management
@@ -201,6 +211,25 @@ cage batch /encrypted --operation unlock --pattern "*.age" --passphrase "secret"
 
 # With audit logging
 cage --audit-log /var/log/cage.log batch /docs --operation lock --passphrase "secret"
+```
+
+#### Age Proxy Commands
+
+```bash
+# Direct Age encryption with PTY automation
+cage proxy --age-p --age-o=/tmp/output.cage input.txt
+
+# Direct Age decryption
+cage proxy --age-d --age-o=/tmp/decrypted.txt encrypted.cage
+
+# Age with custom identity files
+cage proxy --age-d --age-i=private.key encrypted.cage
+
+# ASCII armor encryption
+cage proxy --age-p --age-a --age-o=output.asc input.txt
+
+# Pass passphrase via stdin for automation
+echo "secret" | cage proxy --age-p --age-o=output.cage --stdin-passphrase input.txt
 ```
 
 ### Configuration Options
@@ -375,16 +404,18 @@ Please report security vulnerabilities via private channels:
 
 - Complete CLI interface with comprehensive help
 - PTY automation for Age binary interaction
-- File/directory encryption and decryption
+- File/directory encryption and decryption (`.cage` extension by default)
+- Interactive passphrase prompting with secure terminal input
+- Age proxy commands for direct Age binary access
 - Status checking and reporting
 - Batch operations with pattern matching
 - Security validation and audit logging
 - RSB framework integration
+- Configurable file extensions for library integration
 
 ### ⚠️ In Development
 
-- Interactive passphrase prompting
-- In-place file operations
+- In-place file operations with recovery mechanisms
 - Progress indicators for long operations
 - Configuration file support
 - Windows compatibility
