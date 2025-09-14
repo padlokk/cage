@@ -10,6 +10,7 @@ use crate::cage::adapter::{AgeAdapter, AdapterFactory};
 use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::security::AuditLogger;
+#[allow(unused_imports)]
 use crate::cage::tty_automation::TtyAutomator;
 
 /// Main Age automation engine coordinating all components

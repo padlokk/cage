@@ -8,6 +8,7 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+#[allow(unused_imports)]
 use chrono::{DateTime, Utc};
 use super::error::{AgeError, AgeResult};
 use super::operations::{OperationResult, RepositoryStatus};

@@ -357,6 +357,7 @@ impl Operation for RepositoryDecryptOperation {
 pub struct RepositoryOperationsManager {
     adapter: Box<dyn AgeAdapter>,
     audit_logger: AuditLogger,
+    #[allow(dead_code)]
     validator: SecurityValidator,
     file_manager: FileOperationsManager,
 }

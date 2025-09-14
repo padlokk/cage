@@ -10,6 +10,7 @@ use std::io;
 use std::path::PathBuf;
 
 // Import RSB utilities for enhanced error handling
+#[allow(unused_imports)]
 use rsb::prelude::*;
 
 /// Result type alias for Age automation operations

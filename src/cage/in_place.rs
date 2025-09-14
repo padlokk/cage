@@ -217,9 +217,9 @@ impl InPlaceOperation {
         // Set modification time (if possible)
         #[cfg(unix)]
         {
-            if let Ok(modified) = metadata.modified() {
+            if let Ok(_modified) = metadata.modified() {
                 use std::os::unix::fs::MetadataExt;
-                let atime = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(metadata.atime() as u64);
+                let _atime = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(metadata.atime() as u64);
 
                 // Use filetime crate if available, or ignore if not critical
                 // This is optional metadata preservation

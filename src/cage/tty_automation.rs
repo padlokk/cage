@@ -15,9 +15,12 @@ use super::error::{AgeError, AgeResult};
 use super::config::{OutputFormat, TtyMethod};
 
 /// TTY automation engine using proven pilot methods
+#[allow(dead_code)]
 pub struct TtyAutomator {
     temp_dir: TempDir,
+    #[allow(dead_code)]
     preferred_method: TtyMethod,
+    #[allow(dead_code)]
     timeout: Duration,
 }
 
