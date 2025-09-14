@@ -11,6 +11,7 @@ use cage::{
     CrudManager, LockOptions, UnlockOptions,
     OutputFormat, PassphraseManager, PassphraseMode
 };
+use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
 
 // Import RSB utilities for enhanced CLI experience
 use rsb::prelude::*;
@@ -131,6 +132,7 @@ fn cmd_lock(mut args: Args) -> i32 {
     let pattern = args.has_val("--pattern");
     let backup = args.has("--backup");
     let verbose = is_true("opt_verbose");
+    let show_progress = args.has("--progress");
 
     // In-place operation flags
     let in_place = args.has("--in-place");
@@ -151,7 +153,7 @@ fn cmd_lock(mut args: Args) -> i32 {
 
     // Handle in-place operations with safety checks
     if in_place {
-        match execute_in_place_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose, danger_mode, i_am_sure) {
+        match execute_in_place_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose, danger_mode, i_am_sure, show_progress) {
             Ok(_) => {
                 if verbose { echo!("✅ In-place lock operation completed"); }
                 0
@@ -162,7 +164,7 @@ fn cmd_lock(mut args: Args) -> i32 {
             }
         }
     } else {
-        match execute_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose) {
+        match execute_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose, show_progress) {
             Ok(_) => {
                 if verbose { echo!("✅ Lock operation completed"); }
                 0
@@ -217,6 +219,7 @@ fn cmd_unlock(mut args: Args) -> i32 {
     let pattern = args.has_val("--pattern");
     let preserve = args.has("--preserve");
     let verbose = is_true("opt_verbose");
+    let show_progress = args.has("--progress");
 
     let audit_log = if !get_var("opt_audit_log").is_empty() {
         Some(PathBuf::from(get_var("opt_audit_log")))
@@ -224,7 +227,7 @@ fn cmd_unlock(mut args: Args) -> i32 {
         None
     };
 
-    match execute_unlock_operation(paths, &passphrase, selective, pattern, preserve, audit_log, verbose) {
+    match execute_unlock_operation(paths, &passphrase, selective, pattern, preserve, audit_log, verbose, show_progress) {
         Ok(_) => {
             if verbose { echo!("✅ Unlock operation completed"); }
             0
@@ -468,6 +471,7 @@ fn execute_lock_operation(
     format: OutputFormat,
     _audit_log: Option<PathBuf>,
     verbose: bool,
+    show_progress: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if verbose {
         echo!("🔐 Executing lock operation...");
@@ -491,11 +495,49 @@ fn execute_lock_operation(
 
     let mut crud_manager = CrudManager::with_defaults()?;
 
-    for path in paths {
-        if verbose {
+    // Setup progress reporting if requested
+    let progress_manager = if show_progress {
+        let mut manager = ProgressManager::new();
+        manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
+        Some(std::sync::Arc::new(manager))
+    } else {
+        None
+    };
+
+    for (index, path) in paths.iter().enumerate() {
+        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> = if let Some(ref pm) = progress_manager {
+            let style = if paths.len() > 1 {
+                ProgressStyle::Counter { total: paths.len() as u64 }
+            } else {
+                ProgressStyle::Spinner
+            };
+            Some(pm.start_task(&format!("🔒 Encrypting {}", path.file_name().unwrap_or_default().to_string_lossy()), style))
+        } else {
+            None
+        };
+
+        if verbose && progress_task.is_none() {
             echo!("  Locking: {}", path.display());
         }
-        let result = crud_manager.lock(&path, passphrase, options.clone())?;
+
+        if let Some(ref task) = progress_task {
+            task.update(index as u64 + 1, &format!("Processing {}", path.display()));
+        }
+
+        let result = match crud_manager.lock(&path, passphrase, options.clone()) {
+            Ok(result) => {
+                if let Some(ref task) = progress_task {
+                    task.complete(&format!("✓ Encrypted {} ({} files)", path.display(), result.processed_files.len()));
+                }
+                result
+            }
+            Err(e) => {
+                if let Some(ref task) = progress_task {
+                    task.fail(&format!("✗ Failed to encrypt {}: {}", path.display(), e));
+                }
+                return Err(e.into());
+            }
+        };
 
         if verbose {
             echo!("    Processed: {} files", result.processed_files.len());
@@ -526,6 +568,7 @@ fn execute_in_place_lock_operation(
     verbose: bool,
     danger_mode: bool,
     i_am_sure: bool,
+    show_progress: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use cage::cage::{SafetyValidator, InPlaceOperation};
 
@@ -554,15 +597,52 @@ fn execute_in_place_lock_operation(
 
     let mut crud_manager = CrudManager::with_defaults()?;
 
-    for path in paths {
-        if verbose {
+    // Setup progress reporting if requested
+    let progress_manager = if show_progress {
+        let mut manager = ProgressManager::new();
+        manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
+        Some(std::sync::Arc::new(manager))
+    } else {
+        None
+    };
+
+    for (index, path) in paths.iter().enumerate() {
+        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> = if let Some(ref pm) = progress_manager {
+            let style = if paths.len() > 1 {
+                ProgressStyle::Counter { total: paths.len() as u64 }
+            } else {
+                ProgressStyle::Spinner
+            };
+            Some(pm.start_task(&format!("🔒 In-place encrypting {}", path.file_name().unwrap_or_default().to_string_lossy()), style))
+        } else {
+            None
+        };
+
+        if verbose && progress_task.is_none() {
             echo!("  🔒 In-place locking: {}", path.display());
         }
 
         // If recursive, we need to handle directories differently
         if recursive && path.is_dir() {
+            if let Some(ref task) = progress_task {
+                task.update(index as u64 + 1, &format!("Processing directory {}", path.display()));
+            }
+
             // For recursive in-place, we process each file individually
-            let result = crud_manager.lock(&path, passphrase, options.clone())?;
+            let result = match crud_manager.lock(&path, passphrase, options.clone()) {
+                Ok(result) => {
+                    if let Some(ref task) = progress_task {
+                        task.complete(&format!("✓ Directory encrypted {} ({} files)", path.display(), result.processed_files.len()));
+                    }
+                    result
+                }
+                Err(e) => {
+                    if let Some(ref task) = progress_task {
+                        task.fail(&format!("✗ Failed to encrypt directory {}: {}", path.display(), e));
+                    }
+                    return Err(e.into());
+                }
+            };
 
             if verbose {
                 echo!("    Processed: {} files", result.processed_files.len());
@@ -571,14 +651,31 @@ fn execute_in_place_lock_operation(
         } else if path.is_file() {
             // Single file in-place operation
 
+            if let Some(ref task) = progress_task {
+                task.update(index as u64 + 1, "Validating safety checks");
+            }
+
             // 1. Safety validation
-            safety_validator.validate_in_place_operation(&path)?;
+            if let Err(e) = safety_validator.validate_in_place_operation(&path) {
+                if let Some(ref task) = progress_task {
+                    task.fail(&format!("✗ Safety validation failed: {}", e));
+                }
+                return Err(e.into());
+            }
+
+            if let Some(ref task) = progress_task {
+                task.update_message("Creating in-place operation");
+            }
 
             // 2. Create in-place operation
             let mut in_place_op = InPlaceOperation::new(&path);
 
+            if let Some(ref task) = progress_task {
+                task.update_message("Executing atomic encryption");
+            }
+
             // 3. Execute with atomic replacement
-            in_place_op.execute_lock(passphrase, danger_mode, |src, dst, pass| {
+            if let Err(e) = in_place_op.execute_lock(passphrase, danger_mode, |src, dst, pass| {
                 // Use the CrudManager's encrypt_to_path method
                 match crud_manager.encrypt_to_path(src, dst, pass, format) {
                     Ok(_) => {
@@ -589,7 +686,21 @@ fn execute_in_place_lock_operation(
                     }
                     Err(e) => Err(e),
                 }
-            })?;
+            }) {
+                if let Some(ref task) = progress_task {
+                    task.fail(&format!("✗ In-place operation failed: {}", e));
+                }
+                return Err(e.into());
+            }
+
+            if let Some(ref task) = progress_task {
+                let recovery_msg = if !danger_mode {
+                    format!("✓ File encrypted in-place {} (recovery file created)", path.display())
+                } else {
+                    format!("✓ File encrypted in-place {} (danger mode)", path.display())
+                };
+                task.complete(&recovery_msg);
+            }
 
             if verbose {
                 echo!("    ✅ In-place operation completed for {}", path.display());
@@ -619,6 +730,7 @@ fn execute_unlock_operation(
     preserve: bool,
     _audit_log: Option<PathBuf>,
     verbose: bool,
+    show_progress: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if verbose {
         echo!("🔓 Executing unlock operation...");
@@ -642,11 +754,49 @@ fn execute_unlock_operation(
 
     let mut crud_manager = CrudManager::with_defaults()?;
 
-    for path in paths {
-        if verbose {
+    // Setup progress reporting if requested
+    let progress_manager = if show_progress {
+        let mut manager = ProgressManager::new();
+        manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
+        Some(std::sync::Arc::new(manager))
+    } else {
+        None
+    };
+
+    for (index, path) in paths.iter().enumerate() {
+        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> = if let Some(ref pm) = progress_manager {
+            let style = if paths.len() > 1 {
+                ProgressStyle::Counter { total: paths.len() as u64 }
+            } else {
+                ProgressStyle::Spinner
+            };
+            Some(pm.start_task(&format!("🔓 Decrypting {}", path.file_name().unwrap_or_default().to_string_lossy()), style))
+        } else {
+            None
+        };
+
+        if verbose && progress_task.is_none() {
             echo!("  Unlocking: {}", path.display());
         }
-        let result = crud_manager.unlock(&path, passphrase, options.clone())?;
+
+        if let Some(ref task) = progress_task {
+            task.update(index as u64 + 1, &format!("Processing {}", path.display()));
+        }
+
+        let result = match crud_manager.unlock(&path, passphrase, options.clone()) {
+            Ok(result) => {
+                if let Some(ref task) = progress_task {
+                    task.complete(&format!("✓ Decrypted {} ({} files)", path.display(), result.processed_files.len()));
+                }
+                result
+            }
+            Err(e) => {
+                if let Some(ref task) = progress_task {
+                    task.fail(&format!("✗ Failed to decrypt {}: {}", path.display(), e));
+                }
+                return Err(e.into());
+            }
+        };
 
         if verbose {
             echo!("    Processed: {} files", result.processed_files.len());
