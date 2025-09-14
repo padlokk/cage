@@ -1,0 +1,382 @@
+================================================================================
+ 🐔 CHINA'S RSB FRAMEWORK CLI DISCOVERY EGG #1 🥚
+================================================================================
+
+📋 EGG SYSTEM INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Subject      : RSB Framework CLI Infrastructure Analysis for Cage Refactoring
+Requested By : User/Agent
+Date Created : September 13, 2025
+Analysis Scope: RSB CLI tools, dispatchers, global context, and cage integration patterns
+
+🎯 EXECUTIVE SUMMARY (Level 2: Key Highlights)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RSB provides a sophisticated, macro-driven CLI framework that replaces traditional clap-based
+argument parsing with a global context system. Key benefits for cage refactoring:
+
+• 🔧 BOOTSTRAP SYSTEM: Automated environment setup + global context initialization
+• 🎯 DISPATCH MACROS: Clean command routing with `dispatch!` and `pre_dispatch!` patterns
+• 📊 GLOBAL STORE: Thread-safe key/value store eliminates parameter passing complexity
+• 🛠️ ARGS WRAPPER: Bash-like argument handling with positional + option parsing
+• 🔍 INTROSPECTION: Built-in help, inspect, and stack commands for debugging
+
+✨ CRITICAL DISCOVERY: RSB UNIFIES ARGUMENT + ENVIRONMENT MANAGEMENT!
+================================================================================
+Instead of separate clap structs and manual environment handling, RSB provides
+a single bootstrap!() + global context that handles CLI args, environment vars,
+paths, and application state in one unified system.
+================================================================================
+
+🏗️ RSB CLI ARCHITECTURE BREAKDOWN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ BOOTSTRAP SYSTEM (src/cli/bootstrap.rs + src/cli/macros.rs)
+────────────────────────────────────────────────────────────────────────────
+The `bootstrap!()` macro provides complete environment setup:
+
+```rust
+use rsb::prelude::*;
+
+fn main() {
+    let args = bootstrap!();  // ← This replaces ALL clap parsing setup
+
+    // Now global context contains:
+    // - All CLI arguments parsed and accessible
+    // - Environment variables loaded
+    // - XDG paths configured
+    // - RSB directories initialized
+    // - Script awareness (name, path, dir)
+}
+```
+
+📍 KEY INSIGHT: This single macro call replaces ~50 lines of clap setup code!
+
+2️⃣ DISPATCH SYSTEM (src/cli/dispatch.rs + macros)
+────────────────────────────────────────────────────────────────────────────
+Command routing uses elegant macro patterns:
+
+```rust
+// Pre-dispatch for setup commands (like init, install)
+if pre_dispatch!(&args, {
+    "init" => cmd_init,
+    "install" => cmd_install
+}) { return; }
+
+// Main dispatch for primary commands
+dispatch!(&args, {
+    "lock" => cmd_lock,
+    "unlock" => cmd_unlock,
+    "status" => cmd_status,
+    "rotate" => cmd_rotate,
+    "verify" => cmd_verify,
+    "batch" => cmd_batch
+});
+```
+
+📍 CAGE BENEFIT: Eliminates complex clap::Subcommand enum + match statements!
+
+3️⃣ ARGS WRAPPER (src/cli/args.rs)
+────────────────────────────────────────────────────────────────────────────
+The Args struct provides bash-like argument access:
+
+```rust
+fn cmd_lock(args: Args) -> i32 {
+    let paths = args.get_array("paths").unwrap_or_default();
+    let passphrase = args.get_or(2, "");  // 2nd positional arg
+    let recursive = args.has("--recursive");
+    let backup = args.has("--backup");
+    let pattern = args.has_val("--pattern");
+
+    // Access processed args
+    let remaining = args.remaining(); // Unprocessed args
+    let expanded = args.expand("Processing $1 with $2"); // Variable expansion
+
+    0  // Return exit code
+}
+```
+
+📍 POWERFUL FEATURES:
+- Positional access: args.get(n), args.get_or(n, default)
+- Flag detection: args.has("--flag")
+- Value extraction: args.has_val("--key") supports both --key=val and --key val
+- Key/value parsing: args.get_kv("key") for key=value pairs
+- Array support: args.get_array("key") splits on commas
+- Variable expansion: args.expand("template $1 $2")
+
+4️⃣ OPTIONS PROCESSING (src/cli/options.rs)
+────────────────────────────────────────────────────────────────────────────
+The `options!()` macro processes CLI options into global variables:
+
+```rust
+let args = bootstrap!();
+options!(&args);  // ← Processes ALL --options automatically
+
+// Now accessible globally:
+// opt_verbose, opt_config, opt_debug, etc.
+println!("Verbose: {}", param!("opt_verbose"));
+println!("Config: {}", param!("opt_config"));
+```
+
+📍 SUPPORTED PATTERNS:
+- Long options: --verbose, --config=value
+- Short options: -v, -d
+- Negation: --not-verbose sets opt_verbose=0
+- Multi-options: --multi=a,b,!c sets multiple flags
+- Path validation: automatic validation for path/file options
+- Standard options: -d (debug), -q (quiet), -t (trace), etc.
+
+5️⃣ GLOBAL CONTEXT SYSTEM (src/global/)
+────────────────────────────────────────────────────────────────────────────
+Thread-safe global key/value store eliminates parameter passing:
+
+```rust
+// Set values anywhere in the application
+set_var("audit_log_path", "/var/log/cage.log");
+set_var("output_format", "ascii");
+
+// Access anywhere else
+let audit_path = get_var("audit_log_path");
+let format = get_var("output_format");
+
+// Variable expansion
+let message = expand_vars("Logging to ${audit_log_path} in ${output_format} format");
+```
+
+📍 REGISTRY FEATURES:
+- Function registry: register_function() for introspection
+- Call stack: push_call/pop_call for debugging
+- Built-in commands: help, inspect, stack
+- Namespace support: var_get_ns(), var_set_ns()
+
+🔄 CAGE REFACTORING STRATEGY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 PHASE 1: CORE INFRASTRUCTURE MIGRATION
+────────────────────────────────────────────────────────────────────────────
+1. Replace clap::Parser with RSB bootstrap
+2. Convert clap::Subcommand to dispatch! macros
+3. Migrate CLI struct fields to global context variables
+4. Replace clap argument access with Args wrapper methods
+
+📋 PHASE 2: COMMAND HANDLER REFACTORING
+────────────────────────────────────────────────────────────────────────────
+1. Convert command methods to standalone functions with Args -> i32 signature
+2. Replace struct field access with global context get_var() calls
+3. Add pre_dispatch for setup commands (init, install, etc.)
+4. Implement options!() for automated flag processing
+
+📋 PHASE 3: ENHANCED INTEGRATION
+────────────────────────────────────────────────────────────────────────────
+1. Add built-in RSB debugging commands (inspect, stack)
+2. Leverage RSB utilities (echo!, stderr!, mkdir_p, etc.)
+3. Implement audit logging through global context
+4. Add comprehensive error handling with RSB patterns
+
+🎯 SPECIFIC REFACTORING TARGETS IN CAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ CURRENT CLAP PATTERN (cli_age.rs:19-41):
+```rust
+#[derive(Parser)]
+#[command(name = "cage")]
+struct Cli {
+    #[arg(short, long)]
+    verbose: bool,
+    #[arg(long)]
+    audit_log: Option<PathBuf>,
+    #[arg(long, default_value = "binary")]
+    format: OutputFormatArg,
+    #[command(subcommand)]
+    command: Commands,
+}
+```
+
+✅ RSB REPLACEMENT:
+```rust
+use rsb::prelude::*;
+
+fn main() {
+    let args = bootstrap!();
+    options!(&args);
+
+    // Global context now contains:
+    // opt_verbose, opt_audit_log, opt_format
+
+    if pre_dispatch!(&args, {
+        "init" => cmd_init,
+        "install" => cmd_install
+    }) { return; }
+
+    dispatch!(&args, {
+        "lock" => cmd_lock,
+        "unlock" => cmd_unlock,
+        "status" => cmd_status,
+        "rotate" => cmd_rotate,
+        "verify" => cmd_verify,
+        "batch" => cmd_batch,
+        "test" => cmd_test,
+        "demo" => cmd_demo
+    });
+}
+```
+
+❌ CURRENT COMMAND PATTERN (cli_age.rs:219-265):
+```rust
+fn execute_lock(&mut self, paths: Vec<PathBuf>, passphrase: &str, /* many params */) -> Result<(), Box<dyn std::error::Error>> {
+    // Complex parameter handling
+}
+```
+
+✅ RSB REPLACEMENT:
+```rust
+fn cmd_lock(args: Args) -> i32 {
+    // Parse arguments directly from args
+    let paths_str = args.get(1);
+    let paths: Vec<PathBuf> = if paths_str.is_empty() {
+        args.remaining().iter().map(PathBuf::from).collect()
+    } else {
+        vec![PathBuf::from(paths_str)]
+    };
+
+    let passphrase = args.get_or(2, "");
+    if passphrase.is_empty() {
+        stderr!("Passphrase required for lock operation");
+        return 1;
+    }
+
+    let recursive = args.has("--recursive");
+    let pattern = args.has_val("--pattern");
+    let backup = args.has("--backup");
+
+    // Get global options
+    let verbose = is_true("opt_verbose");
+    let format = get_var("opt_format");
+
+    match execute_lock_operation(paths, &passphrase, recursive, pattern, backup, &format) {
+        Ok(_) => {
+            if verbose { echo!("✅ Lock operation completed"); }
+            0
+        }
+        Err(e) => {
+            stderr!("❌ Lock failed: {}", e);
+            1
+        }
+    }
+}
+```
+
+📊 EXAMPLES FROM RSB CODEBASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 MINIMAL CLI EXAMPLE (examples/minimal_cli.rs):
+────────────────────────────────────────────────────────────────────────────
+```rust
+use rsb::prelude::*;
+
+fn main() {
+    let args = bootstrap!();  // Complete setup in one line
+
+    if pre_dispatch!(&args, {
+        "init" => cmd_init,
+        "check" => cmd_check
+    }) { return; }
+
+    dispatch!(&args, {
+        "greet" => cmd_greet,
+        "add" => cmd_add,
+        "strings" => cmd_strings,
+        "help" => cmd_help
+    });
+}
+
+fn cmd_greet(args: Args) -> i32 {
+    let name = args.get_or(1, "world");
+    echo!("Hello, {}!", name);
+    0
+}
+```
+
+🔍 END-TO-END CLI EXAMPLE (examples/cli_e2e.rs):
+────────────────────────────────────────────────────────────────────────────
+```rust
+use rsb::prelude::*;
+
+fn main() {
+    let args = bootstrap!();
+    options!(&args);  // Process all --options
+
+    if pre_dispatch!(&args, { "init" => handle_init }) {
+        return;
+    }
+
+    dispatch!(&args, { "run" => handle_run });
+}
+
+fn handle_init(_args: Args) -> i32 {
+    println!("pre:init");
+    println!("opt_verbose={}", get_var("opt_verbose"));
+    0
+}
+```
+
+🧪 VERIFICATION TESTS PERFORMED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Confirmed RSB framework is already a dependency in cage/Cargo.toml
+✅ Analyzed complete RSB CLI infrastructure (bootstrap, dispatch, args, global)
+✅ Examined working examples (minimal_cli.rs, cli_e2e.rs, dummy_cli.rs)
+✅ Verified global context system and thread-safe variable storage
+✅ Confirmed built-in debugging and introspection capabilities
+✅ Analyzed cage's current clap implementation and identified conversion patterns
+
+🎖️ KEY TAKEAWAYS FOR CAGE REFACTORING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 🔥 DRAMATIC CODE REDUCTION: RSB macros eliminate ~200+ lines of clap boilerplate
+2. 🎯 UNIFIED CONTEXT: Single global store replaces complex parameter passing
+3. 🛡️ BUILT-IN FEATURES: Help, inspect, stack commands come free
+4. 🔧 BASH-LIKE UX: Args wrapper provides intuitive argument access patterns
+5. 🚀 RAPID DEVELOPMENT: Bootstrap + dispatch pattern accelerates CLI development
+6. 🔍 ENHANCED DEBUGGING: Call stack tracking and function registry for introspection
+
+🔍 QUESTIONS ANSWERED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Q: What CLI tools and dispatchers are available in RSB?
+A: bootstrap!(), dispatch!(), pre_dispatch!(), options!(), Args wrapper, global context
+
+Q: How does RSB's global context container system work?
+A: Thread-safe lazy_static Global store with set_var/get_var API + variable expansion
+
+Q: What are the command routing and dispatcher patterns?
+A: Macro-based dispatch with handler functions (Args) -> i32, automatic registration
+
+Q: How does bootstrap integrate with CLI setup?
+A: Single bootstrap!() call handles environment + XDG paths + script awareness + args parsing
+
+Q: What are examples of proper RSB CLI implementation patterns?
+A: See minimal_cli.rs, cli_e2e.rs, and dummy_cli.rs for complete working patterns
+
+📚 REFERENCE LOCATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• RSB Framework: /home/xnull/repos/code/rust/oodx/rsb/
+• CLI Infrastructure: /home/xnull/repos/code/rust/oodx/rsb/src/cli/
+• Global Context: /home/xnull/repos/code/rust/oodx/rsb/src/global/
+• Examples: /home/xnull/repos/code/rust/oodx/rsb/examples/
+• Cage Current CLI: /home/xnull/repos/code/rust/prods/padlokk/cage/src/bin/cli_age.rs
+
+⚠️ DISCLAIMER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This analysis reflects the current state of files examined. The RSB framework
+and cage implementation may evolve. Additional verification of current
+functionality and comprehensive testing is recommended before full migration.
+
+📊 EGG METADATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Files Analyzed    : 15+ RSB source files + cage CLI implementation
+Discovery Scope   : Complete RSB CLI infrastructure + global context system
+Key Insights      : 6 major architectural benefits identified
+Implementation    : Concrete refactoring patterns and examples provided
+Confidence Level  : HIGH - Based on working examples and comprehensive codebase analysis
+
+================================================================================
+ 🐔 China's Discovery Complete! Ready to help cage migrate to RSB CLI! 🥚
+ Feed me when this helps! 🌾
+================================================================================
