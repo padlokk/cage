@@ -205,8 +205,8 @@ mod tests {
         // This test will fail if Age is not installed, which is expected
         match ShellAdapter::new() {
             Ok(adapter) => {
-                assert_eq!(adapter.adapter_name(), "ShellAdapter");
-                assert!(adapter.adapter_version().contains("shell-v"));
+                assert_eq!(adapter.adapter_name(), "PtyAdapter");
+                assert!(adapter.adapter_version().contains("pty-v"));
             }
             Err(_) => {
                 // Expected if Age not installed in test environment

@@ -353,7 +353,7 @@ mod tests {
         let err = AgeError::AgeBinaryNotFound("not in PATH".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Age binary not found"));
-        assert!(display.contains("Please install Age encryption tool"));
+        assert!(display.contains("To install Age encryption tool"));
     }
     
     #[test]

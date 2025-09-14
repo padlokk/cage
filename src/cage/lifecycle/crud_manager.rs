@@ -10,12 +10,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::collections::HashMap;
 
-use super::super::error::{AgeError, AgeResult};
-use super::super::config::{AgeConfig, OutputFormat};
-use super::super::adapter::AgeAdapter;
-use super::super::tty_automation::TtyAutomator;
-use super::super::security::AuditLogger;
-use super::super::operations::{
+use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::config::{AgeConfig, OutputFormat};
+use crate::cage::adapter::AgeAdapter;
+use crate::cage::tty_automation::TtyAutomator;
+use crate::cage::security::AuditLogger;
+use crate::cage::operations::{
     RepositoryStatus, OperationResult
 };
 
@@ -189,14 +189,12 @@ impl CrudManager {
     }
 
     /// UPDATE: Rotate - Key rotation while maintaining access
-    pub fn rotate(&mut self, repository: &Path, new_passphrase: &str) -> AgeResult<OperationResult> {
+    pub fn rotate(&mut self, repository: &Path, old_passphrase: &str, new_passphrase: &str) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
         self.audit_logger.log_operation_start_single("rotate", repository)?;
-        
-        // This is a placeholder for key rotation functionality
-        // In practice, this would coordinate with authority management
+
         let mut result = OperationResult::new();
-        
+
         // Validate inputs
         if !repository.exists() || !repository.is_dir() {
             return Err(AgeError::InvalidOperation {
@@ -205,22 +203,217 @@ impl CrudManager {
             });
         }
 
+        // Validate both passphrases
+        self.validate_passphrase(old_passphrase)?;
         self.validate_passphrase(new_passphrase)?;
 
-        // Key rotation would involve:
-        // 1. Validate current authority chain
-        // 2. Generate new keys
-        // 3. Re-encrypt repository with new keys
-        // 4. Update authority chain
-        // 5. Validate new configuration
+        if old_passphrase == new_passphrase {
+            return Err(AgeError::InvalidOperation {
+                operation: "rotate".to_string(),
+                reason: "New passphrase must be different from old passphrase".to_string(),
+            });
+        }
 
-        // For now, record the operation intent
-        result.add_success(format!("Key rotation initiated for: {}", repository.display()));
+        // Get repository status to find encrypted files
+        let status = self.status(repository)?;
+        if status.encrypted_files == 0 {
+            return Err(AgeError::InvalidOperation {
+                operation: "rotate".to_string(),
+                reason: "No encrypted files found to rotate".to_string(),
+            });
+        }
+
+        self.audit_logger.log_info(&format!("Starting key rotation for {} encrypted files", status.encrypted_files))?;
+
+        // Collect all encrypted files for rotation
+        let mut encrypted_files = Vec::new();
+        self.collect_encrypted_files(repository, &mut encrypted_files)?;
+
+        // Create backup directory for atomic operation
+        let backup_dir = repository.join(".cage_rotation_backup");
+        if backup_dir.exists() {
+            std::fs::remove_dir_all(&backup_dir)
+                .map_err(|e| AgeError::file_error("remove_backup_dir", backup_dir.clone(), e))?;
+        }
+        std::fs::create_dir(&backup_dir)
+            .map_err(|e| AgeError::file_error("create_backup_dir", backup_dir.clone(), e))?;
+
+        let mut successful_rotations = 0;
+        let mut failed_rotations = Vec::new();
+
+        // Process each encrypted file
+        for file_path in &encrypted_files {
+            match self.rotate_single_file(file_path, old_passphrase, new_passphrase, &backup_dir) {
+                Ok(_) => {
+                    successful_rotations += 1;
+                    result.add_success(file_path.to_string_lossy().to_string());
+                    self.audit_logger.log_info(&format!("Rotated key for: {}", file_path.display()))?;
+                }
+                Err(e) => {
+                    failed_rotations.push(format!("{}: {}", file_path.display(), e));
+                    result.add_failure(file_path.to_string_lossy().to_string());
+                    self.audit_logger.log_error(&format!("Failed to rotate key for {}: {}", file_path.display(), e))?;
+                }
+            }
+        }
+
+        // Handle results
+        if failed_rotations.is_empty() {
+            // All successful - clean up backup
+            std::fs::remove_dir_all(&backup_dir)
+                .map_err(|e| AgeError::file_error("cleanup_backup", backup_dir, e))?;
+
+            self.audit_logger.log_info(&format!("Key rotation completed successfully for {} files", successful_rotations))?;
+        } else {
+            // Partial failure - rollback successful rotations
+            self.audit_logger.log_error(&format!("Key rotation failed for {} files, rolling back {} successful rotations",
+                failed_rotations.len(), successful_rotations))?;
+
+            if let Err(rollback_err) = self.rollback_rotation(&encrypted_files, &backup_dir) {
+                self.audit_logger.log_error(&format!("CRITICAL: Rollback failed: {}", rollback_err))?;
+                return Err(AgeError::RepositoryOperationFailed {
+                    operation: "rotate_rollback".to_string(),
+                    repository: repository.to_path_buf(),
+                    reason: format!("Rotation failed and rollback failed: {}", rollback_err),
+                });
+            }
+
+            return Err(AgeError::BatchOperationFailed {
+                operation: "rotate".to_string(),
+                successful_count: 0, // All rolled back
+                failed_count: failed_rotations.len(),
+                failures: failed_rotations,
+            });
+        }
+
         self.record_operation("rotate", repository, true, &result);
         result.finalize(start_time);
-        
+
         self.audit_logger.log_operation_complete("rotate", repository, &result)?;
         Ok(result)
+    }
+
+    /// Helper method to collect all encrypted files in a directory
+    fn collect_encrypted_files(&self, directory: &Path, files: &mut Vec<PathBuf>) -> AgeResult<()> {
+        let entries = std::fs::read_dir(directory)
+            .map_err(|e| AgeError::file_error("read_dir", directory.to_path_buf(), e))?;
+
+        for entry in entries {
+            let entry = entry.map_err(|e| AgeError::file_error("read_entry", directory.to_path_buf(), e))?;
+            let path = entry.path();
+
+            if path.is_file() {
+                // Check if file is encrypted by checking Age header
+                if self.is_encrypted_file(&path)? {
+                    files.push(path);
+                }
+            } else if path.is_dir() {
+                // Always recurse for key rotation - we want to find all encrypted files
+                self.collect_encrypted_files(&path, files)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if a file is encrypted (basic heuristic)
+    fn is_encrypted_file(&self, path: &Path) -> AgeResult<bool> {
+        if !path.exists() {
+            return Ok(false);
+        }
+
+        let content = std::fs::read(path)
+            .map_err(|e| AgeError::file_error("read", path.to_path_buf(), e))?;
+
+        // Check for Age headers
+        Ok(content.starts_with(b"age-encryption.org/v1") ||
+           content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----"))
+    }
+
+    /// Rotate key for a single file with backup
+    fn rotate_single_file(
+        &self,
+        file_path: &Path,
+        old_passphrase: &str,
+        new_passphrase: &str,
+        backup_dir: &Path,
+    ) -> AgeResult<()> {
+        // Create backup of original file
+        let file_name = file_path.file_name()
+            .ok_or_else(|| AgeError::file_error("get_filename", file_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename")))?;
+
+        let backup_path = backup_dir.join(file_name);
+        std::fs::copy(file_path, &backup_path)
+            .map_err(|e| AgeError::file_error("backup_file", backup_path, e))?;
+
+        // Create temporary decrypted file
+        let temp_decrypted = backup_dir.join(format!("{}.tmp_decrypted", file_name.to_string_lossy()));
+
+        // Step 1: Decrypt with old passphrase
+        self.adapter.decrypt(file_path, &temp_decrypted, old_passphrase)
+            .map_err(|e| AgeError::DecryptionFailed {
+                input: file_path.to_path_buf(),
+                output: temp_decrypted.clone(),
+                reason: format!("Failed to decrypt with old passphrase: {}", e),
+            })?;
+
+        // Step 2: Re-encrypt with new passphrase
+        self.adapter.encrypt(&temp_decrypted, file_path, new_passphrase, self.config.output_format)
+            .map_err(|e| AgeError::EncryptionFailed {
+                input: temp_decrypted.clone(),
+                output: file_path.to_path_buf(),
+                reason: format!("Failed to encrypt with new passphrase: {}", e),
+            })?;
+
+        // Step 3: Verify the re-encrypted file can be decrypted
+        let temp_verify = backup_dir.join(format!("{}.tmp_verify", file_name.to_string_lossy()));
+        self.adapter.decrypt(file_path, &temp_verify, new_passphrase)
+            .map_err(|e| AgeError::DecryptionFailed {
+                input: file_path.to_path_buf(),
+                output: temp_verify.clone(),
+                reason: format!("Verification failed with new passphrase: {}", e),
+            })?;
+
+        // Step 4: Verify content integrity
+        let original_content = std::fs::read(&temp_decrypted)
+            .map_err(|e| AgeError::file_error("read_original", temp_decrypted.clone(), e))?;
+        let verified_content = std::fs::read(&temp_verify)
+            .map_err(|e| AgeError::file_error("read_verified", temp_verify.clone(), e))?;
+
+        if original_content != verified_content {
+            return Err(AgeError::SecurityValidationFailed {
+                validation_type: "content_integrity".to_string(),
+                details: "Content mismatch after key rotation".to_string(),
+            });
+        }
+
+        // Clean up temporary files
+        let _ = std::fs::remove_file(&temp_decrypted);
+        let _ = std::fs::remove_file(&temp_verify);
+
+        Ok(())
+    }
+
+    /// Rollback failed rotation by restoring from backups
+    fn rollback_rotation(&self, files: &[PathBuf], backup_dir: &Path) -> AgeResult<()> {
+        for file_path in files {
+            let file_name = file_path.file_name()
+                .ok_or_else(|| AgeError::file_error("get_filename", file_path.to_path_buf(),
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename")))?;
+
+            let backup_path = backup_dir.join(file_name);
+            if backup_path.exists() {
+                std::fs::copy(&backup_path, file_path)
+                    .map_err(|e| AgeError::file_error("restore_backup", backup_path, e))?;
+            }
+        }
+
+        // Clean up backup directory
+        std::fs::remove_dir_all(backup_dir)
+            .map_err(|e| AgeError::file_error("cleanup_backup", backup_dir.to_path_buf(), e))?;
+
+        Ok(())
     }
 
     /// DELETE: Unlock (decrypt) files with controlled access
@@ -672,7 +865,7 @@ impl CrudManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::config::OutputFormat;
+    use crate::cage::config::OutputFormat;
     use tempfile::TempDir;
 
     #[test]
@@ -712,5 +905,39 @@ mod tests {
         assert!(options.verify_before_unlock);
         assert!(options.pattern_filter.is_none());
         assert!(!options.preserve_encrypted);
+    }
+
+    #[test]
+    fn test_key_rotation_validation() {
+        // Test basic validation logic
+        if let Ok(mut crud_manager) = CrudManager::with_defaults() {
+            // Test same passphrase rejection
+            let temp_dir = TempDir::new().unwrap();
+            let result = crud_manager.rotate(temp_dir.path(), "same_pass", "same_pass");
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("must be different"));
+        } else {
+            // Skip test if Age not available
+            println!("Skipping key rotation test - Age not available");
+        }
+    }
+
+    #[test]
+    fn test_encrypted_file_detection() {
+        if let Ok(crud_manager) = CrudManager::with_defaults() {
+            // Test with non-existent file
+            let fake_path = std::path::Path::new("/non/existent/file");
+            let result = crud_manager.is_encrypted_file(fake_path).unwrap();
+            assert!(!result);
+
+            // Test with temporary non-encrypted file
+            let temp_file = tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(temp_file.path(), b"plain text content").unwrap();
+            let result = crud_manager.is_encrypted_file(temp_file.path()).unwrap();
+            assert!(!result);
+
+        } else {
+            println!("Skipping encrypted file detection test - Age not available");
+        }
     }
 }

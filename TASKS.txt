@@ -1,0 +1,155 @@
+# Cage Development Tasks
+
+**Created:** 2025-09-13
+**Current Version:** 0.1.0
+**Status:** Ready for P0 Implementation
+
+## Story Point Scale
+- 1 pt = 1-2 hours (simple fix/addition)
+- 3 pts = 4-6 hours (moderate implementation)
+- 5 pts = 1-2 days (complex feature)
+- 8 pts = 3-5 days (major system component)
+
+---
+
+## P0 - BLOCKING PRODUCTION (Must Complete First)
+
+### TASK-001: Implement Key Rotation Logic [8 pts]
+**Location:** `src/cage/lifecycle/crud_manager.rs:196-224`
+**Current Status:** Stub implementation only
+**Requirements:**
+- [ ] Complete re-encryption with new passphrase
+- [ ] Validation of old passphrase before rotation
+- [ ] Atomic operation with rollback capability
+- [ ] Handle file permission preservation
+- [ ] Add comprehensive error handling
+- [ ] Unit tests for rotation logic
+- [ ] Integration test with actual files
+**Definition of Done:** Key rotation works end-to-end with rollback on failure
+
+### TASK-002: Implement File Verification System [5 pts]
+**Location:** `src/cage/lifecycle/crud_manager.rs:577-581`
+**Current Status:** Placeholder method only
+**Requirements:**
+- [ ] Verify encrypted files can be decrypted with correct passphrase
+- [ ] Check file integrity after encryption/decryption
+- [ ] Validate Age headers and format correctness
+- [ ] Performance optimization for large files
+- [ ] Add verification result reporting
+- [ ] Unit tests for verification logic
+- [ ] Error handling for corrupted files
+**Definition of Done:** Verification detects corruption and validates integrity
+
+### TASK-003: Implement Backup System Logic [5 pts]
+**Location:** Throughout codebase (`--backup` flag exists but no implementation)
+**Current Status:** CLI flag exists, no backend logic
+**Requirements:**
+- [ ] Create backup files before operations (.bak extension)
+- [ ] Configurable backup location and naming
+- [ ] Backup cleanup on successful operations
+- [ ] Restore capability on operation failure
+- [ ] Handle backup conflicts (existing .bak files)
+- [ ] Add backup size estimation
+- [ ] Unit tests for backup operations
+**Definition of Done:** --backup flag creates/manages backups safely
+
+### TASK-004: Fix Integration Tests [3 pts]
+**Location:** `tests/` directory
+**Current Status:** References wrong project (padlock)
+**Requirements:**
+- [ ] Update test imports to use cage modules
+- [ ] Remove padlock-specific test cases
+- [ ] Add cage-specific integration scenarios
+- [ ] Update test runner configuration
+- [ ] Verify all tests pass with current codebase
+**Definition of Done:** All integration tests pass and test cage functionality
+
+---
+
+## P1 - HIGH PRIORITY (After P0 Complete)
+
+### TASK-005: Interactive Passphrase Prompting [3 pts]
+**Location:** `src/bin/cli_age.rs` and command handlers
+**Current Status:** Requires passphrase as CLI argument (security risk)
+**Requirements:**
+- [ ] Add secure terminal passphrase input (rpassword crate)
+- [ ] Remove passphrase from command line arguments
+- [ ] Add passphrase confirmation for critical operations
+- [ ] Handle TTY detection for automated scenarios
+- [ ] Add --stdin-passphrase option for scripts
+**Definition of Done:** No passphrases visible in process list or history
+
+### TASK-006: In-place File Operations [5 pts]
+**Location:** File operation handlers throughout codebase
+**Current Status:** Requires separate input/output files
+**Requirements:**
+- [ ] Detect when input == output path
+- [ ] Use temporary files for atomic in-place operations
+- [ ] Preserve original file metadata and permissions
+- [ ] Handle edge cases (readonly files, symlinks)
+- [ ] Add --in-place flag for explicit control
+- [ ] Rollback on failure to preserve original
+**Definition of Done:** `cage lock file.txt` encrypts file.txt directly and safely
+
+### TASK-007: Progress Indicators for Long Operations [3 pts]
+**Location:** Operation execution loops
+**Current Status:** No user feedback during operations
+**Requirements:**
+- [ ] Add progress bars for file operations (indicatif crate)
+- [ ] Show current file being processed
+- [ ] Display time estimates and speed
+- [ ] Handle progress for batch operations
+- [ ] Respect --quiet flag to suppress progress
+**Definition of Done:** Users see progress for operations >2 seconds
+
+### TASK-008: Configuration File Support [5 pts]
+**Location:** `src/cage/config.rs`
+**Current Status:** Only command-line configuration
+**Requirements:**
+- [ ] Support ~/.cagerc configuration file
+- [ ] TOML format with sensible defaults
+- [ ] Environment variable override support
+- [ ] Per-project configuration (.cage.toml)
+- [ ] Configuration validation and error reporting
+- [ ] Add config subcommands (show, edit, validate)
+**Definition of Done:** Config file works with priority: CLI > project > user > defaults
+
+### TASK-009: Complete RageAdapter Implementation [8 pts]
+**Location:** `src/cage/adapter.rs:117-157`
+**Current Status:** Stub returning not-implemented errors
+**Requirements:**
+- [ ] Add rage crate dependency
+- [ ] Implement encrypt/decrypt using rage library
+- [ ] Add rage-specific configuration options
+- [ ] Performance comparison with shell adapter
+- [ ] Error mapping from rage to AgeError types
+- [ ] Feature parity with ShellAdapter
+- [ ] Adapter selection logic and auto-detection
+**Definition of Done:** RageAdapter works as drop-in replacement for ShellAdapter
+
+---
+
+## IMPLEMENTATION NOTES
+
+**Testing Strategy:**
+- Unit tests for each task component
+- Integration tests with real files
+- UAT tests for user scenarios
+- Performance benchmarks for critical paths
+
+**Commit Strategy:**
+- One commit per completed task
+- Include tests in the same commit
+- Use conventional commit format
+- Add CHANGELOG.md entries for user-facing changes
+
+**Dependencies to Add:**
+- `rpassword` for secure input (TASK-005)
+- `indicatif` for progress bars (TASK-007)
+- `toml` for config files (TASK-008)
+- `rage` for RageAdapter (TASK-009)
+
+**Total Effort Estimate:**
+- P0 Tasks: 21 story points (~2-3 weeks)
+- P1 Tasks: 24 story points (~3-4 weeks)
+- **Total: 45 story points (~5-7 weeks)**
