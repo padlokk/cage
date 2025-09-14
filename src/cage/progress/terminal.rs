@@ -448,13 +448,20 @@ impl TerminalReporter {
 
     /// Write output to appropriate stream
     fn write_output(&self, text: &str) {
+        self.write_output_with_ending(text, false);
+    }
+
+    /// Write output with control over line ending
+    fn write_output_with_ending(&self, text: &str, use_newline: bool) {
+        let ending = if use_newline { b"\n" } else { b"\r" };
+
         if self.config.use_stderr {
             let _ = io::stderr().write_all(text.as_bytes());
-            let _ = io::stderr().write_all(b"\n");
+            let _ = io::stderr().write_all(ending);
             let _ = io::stderr().flush();
         } else {
             let _ = io::stdout().write_all(text.as_bytes());
-            let _ = io::stdout().write_all(b"\n");
+            let _ = io::stdout().write_all(ending);
             let _ = io::stdout().flush();
         }
     }
@@ -470,7 +477,10 @@ impl ProgressReporter for TerminalReporter {
         let formatted = self.format_event(event);
 
         if !formatted.is_empty() {
-            self.write_output(&formatted);
+            // Use newline for completed/failed/cancelled states, carriage return for running
+            let use_newline = matches!(event.state,
+                ProgressState::Complete | ProgressState::Failed | ProgressState::Cancelled);
+            self.write_output_with_ending(&formatted, use_newline);
         }
 
         // Clean up completed tasks if configured
