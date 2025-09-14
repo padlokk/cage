@@ -414,8 +414,8 @@ dependencies = [
 
 [[package]]
 name = "rsb"
-version = "0.15.1"
-source = "git+https://github.com/oodx/rsb-framework?branch=main#282af9dbc895f02735e39e94fb1c0209963ca11b"
+version = "0.16.0"
+source = "git+https://github.com/oodx/rsb-framework?branch=main#a7237c9270eae9d199cb7c89d2bff661467a0e4b"
 dependencies = [
  "base64",
  "chrono",
