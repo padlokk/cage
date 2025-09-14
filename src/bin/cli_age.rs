@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 // Import cage library modules
 use cage::{
     CrudManager, LockOptions, UnlockOptions,
-    OutputFormat
+    OutputFormat, PassphraseManager, PassphraseMode
 };
 
 // Import RSB utilities for enhanced CLI experience
@@ -83,12 +83,48 @@ fn cmd_lock(mut args: Args) -> i32 {
         vec![PathBuf::from(paths_str)]
     };
 
-    let passphrase = args.get_or(2, "");
-    if passphrase.is_empty() {
-        stderr!("❌ Passphrase required for lock operation");
-        stderr!("Usage: cage lock <path> <passphrase> [options]");
+    if paths.is_empty() {
+        stderr!("❌ No files specified for lock operation");
+        stderr!("Usage: cage lock <path> [options]");
         return 1;
     }
+
+    // Check for insecure command-line passphrase usage
+    let cmd_args: Vec<String> = std::env::args().collect();
+    if let Some(insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+        stderr!("⚠️  WARNING: Passphrase detected on command line!");
+        stderr!("   This is insecure and visible in process list.");
+        if !args.has("--i-am-sure") {
+            stderr!("   Use interactive prompt instead, or add --i-am-sure to override");
+            return 1;
+        }
+    }
+
+    // Get passphrase securely
+    let passphrase_manager = PassphraseManager::new();
+    let passphrase = if args.has("--stdin-passphrase") {
+        match passphrase_manager.get_passphrase_with_mode("Enter passphrase", false, PassphraseMode::Stdin) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                return 1;
+            }
+        }
+    } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
+        env_pass
+    } else if let Some(insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+        // Already checked for --i-am-sure above
+        insecure_pass
+    } else {
+        // Interactive prompt (secure default)
+        match passphrase_manager.get_passphrase("Enter passphrase for encryption", false) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to get passphrase: {}", e);
+                return 1;
+            }
+        }
+    };
 
     let recursive = args.has("--recursive");
     let pattern = args.has_val("--pattern");
@@ -128,12 +164,34 @@ fn cmd_unlock(mut args: Args) -> i32 {
         vec![PathBuf::from(paths_str)]
     };
 
-    let passphrase = args.get_or(2, "");
-    if passphrase.is_empty() {
-        stderr!("❌ Passphrase required for unlock operation");
-        stderr!("Usage: cage unlock <path> <passphrase> [options]");
+    if paths.is_empty() {
+        stderr!("❌ No files specified for unlock operation");
+        stderr!("Usage: cage unlock <path> [options]");
         return 1;
     }
+
+    // Get passphrase securely (same pattern as lock)
+    let passphrase_manager = PassphraseManager::new();
+    let passphrase = if args.has("--stdin-passphrase") {
+        match passphrase_manager.get_passphrase_with_mode("Enter passphrase", false, PassphraseMode::Stdin) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                return 1;
+            }
+        }
+    } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
+        env_pass
+    } else {
+        // Interactive prompt (secure default)
+        match passphrase_manager.get_passphrase("Enter passphrase for decryption", false) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to get passphrase: {}", e);
+                return 1;
+            }
+        }
+    };
 
     let selective = args.has("--selective");
     let pattern = args.has_val("--pattern");
@@ -186,14 +244,52 @@ fn cmd_rotate(mut args: Args) -> i32 {
         return 1;
     }
 
-    let old_passphrase = args.has_val("--old-passphrase").unwrap_or_default();
-    let new_passphrase = args.has_val("--new-passphrase").unwrap_or_default();
+    // Get old passphrase securely
+    let passphrase_manager = PassphraseManager::new();
+    let old_passphrase = if let Some(pass) = args.has_val("--old-passphrase") {
+        // Command line provided (warn but allow)
+        stderr!("⚠️  Warning: Old passphrase on command line is insecure");
+        pass
+    } else if args.has("--stdin-passphrase") {
+        match passphrase_manager.get_passphrase_with_mode("Enter old passphrase", false, PassphraseMode::Stdin) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to read old passphrase from stdin: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        match passphrase_manager.get_passphrase("Enter current passphrase", false) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to get old passphrase: {}", e);
+                return 1;
+            }
+        }
+    };
 
-    if old_passphrase.is_empty() || new_passphrase.is_empty() {
-        stderr!("❌ Both old and new passphrases required");
-        stderr!("Usage: cage rotate <repository> --old-passphrase <old> --new-passphrase <new>");
-        return 1;
-    }
+    // Get new passphrase securely with confirmation
+    let new_passphrase = if let Some(pass) = args.has_val("--new-passphrase") {
+        // Command line provided (warn but allow)
+        stderr!("⚠️  Warning: New passphrase on command line is insecure");
+        pass
+    } else if args.has("--stdin-passphrase") {
+        match passphrase_manager.get_passphrase_with_mode("Enter new passphrase", false, PassphraseMode::Stdin) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to read new passphrase from stdin: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        match passphrase_manager.get_passphrase("Enter new passphrase", true) {  // confirm=true for new passphrase
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to get new passphrase: {}", e);
+                return 1;
+            }
+        }
+    };
 
     let backup = args.has("--backup");
     let verbose = is_true("opt_verbose");
@@ -242,14 +338,43 @@ fn cmd_batch(mut args: Args) -> i32 {
     }
 
     let operation = args.has_val("--operation").unwrap_or_default();
-    let passphrase = args.has_val("--passphrase").unwrap_or_default();
     let pattern = args.has_val("--pattern");
 
-    if operation.is_empty() || passphrase.is_empty() {
-        stderr!("❌ Operation type and passphrase required");
-        stderr!("Usage: cage batch <directory> --operation <lock|unlock> --passphrase <pass>");
+    if operation.is_empty() {
+        stderr!("❌ Operation type required");
+        stderr!("Usage: cage batch <directory> --operation <lock|unlock> [options]");
         return 1;
     }
+
+    // Get passphrase securely for batch operations
+    let passphrase_manager = PassphraseManager::new();
+    let passphrase = if let Some(pass) = args.has_val("--passphrase") {
+        // Command line provided (warn but allow with confirmation)
+        stderr!("⚠️  Warning: Batch passphrase on command line is insecure");
+        stderr!("   This will be applied to multiple files!");
+        if !args.has("--i-am-sure") {
+            stderr!("   Add --i-am-sure to confirm or use interactive prompt");
+            return 1;
+        }
+        pass
+    } else if args.has("--stdin-passphrase") {
+        match passphrase_manager.get_passphrase_with_mode("Enter passphrase for batch operation", false, PassphraseMode::Stdin) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        echo!("⚠️  Batch operation will apply to multiple files in {}", directory.display());
+        match passphrase_manager.get_passphrase(&format!("Enter passphrase for batch {}", operation), false) {
+            Ok(pass) => pass,
+            Err(e) => {
+                stderr!("❌ Failed to get passphrase: {}", e);
+                return 1;
+            }
+        }
+    };
 
     let verbose = is_true("opt_verbose");
 
@@ -267,39 +392,47 @@ fn cmd_batch(mut args: Args) -> i32 {
 
 /// Run test suite using RSB dispatch
 fn cmd_test(_args: Args) -> i32 {
-    echo!("🧪 Running Age Automation Test Suite...");
-    echo!("  Note: Comprehensive testing implementation pending");
-    echo!("  This would include:");
-    echo!("    - Security validation tests");
-    echo!("    - Injection prevention tests");
-    echo!("    - Authority chain tests");
-    echo!("    - Performance benchmarks");
-    echo!("    - Compatibility tests");
-    echo!("✅ Test suite framework ready for implementation");
+    echo!(r#"🧪 Running Age Automation Test Suite...
+  Note: Comprehensive testing implementation pending
+  This would include:
+    - Security validation tests
+    - Injection prevention tests
+    - Authority chain tests
+    - Performance benchmarks
+    - Compatibility tests
+✅ Test suite framework ready for implementation"#);
     0
 }
 
 /// Show demonstration using RSB dispatch
 fn cmd_demo(_args: Args) -> i32 {
-    echo!("🎭 Cage - Age Encryption Demonstration");
-    echo!("🔒 Secure Age automation with PTY support");
-    echo!("");
-    echo!("This demonstration showcases Age encryption operations:");
-    echo!("  🔐 LOCK: Encrypt files and directories");
-    echo!("  🔓 UNLOCK: Decrypt files and directories");
-    echo!("  📊 STATUS: Check encryption status");
-    echo!("  🔄 ROTATE: Rotate encryption keys");
-    echo!("  🔍 VERIFY: Verify file integrity");
-    echo!("  📦 BATCH: Bulk process multiple files");
-    echo!("");
-    echo!("Example Commands:");
-    echo!("  cage lock file.txt secret123");
-    echo!("  cage unlock file.txt.age secret123");
-    echo!("  cage status /path/to/files");
-    echo!("  cage verify /path/to/files");
-    echo!("  cage batch /repo --operation lock --passphrase secret");
-    echo!("");
-    echo!("✅ Cage Age encryption automation ready");
+    echo!(r#"🎭 Cage - Age Encryption Demonstration
+🔒 Secure Age automation with PTY support
+
+This demonstration showcases Age encryption operations:
+  🔐 LOCK: Encrypt files and directories
+  🔓 UNLOCK: Decrypt files and directories
+  📊 STATUS: Check encryption status
+  🔄 ROTATE: Rotate encryption keys
+  🔍 VERIFY: Verify file integrity
+  📦 BATCH: Bulk process multiple files
+
+🔐 Secure Usage Examples:
+  cage lock file.txt                    # Interactive passphrase prompt (recommended)
+  cage unlock file.txt.age              # Interactive passphrase prompt
+  cage status /path/to/files            # No passphrase needed
+  cage verify /path/to/files            # No passphrase needed
+  cage batch /repo --operation lock     # Interactive prompt for batch operations
+
+🛠️  Advanced Usage:
+  CAGE_PASSPHRASE=secret cage lock file.txt          # Environment variable (secure)
+  echo 'secret' | cage lock file.txt --stdin-passphrase  # Stdin input (automation)
+  cage rotate /repo                                   # Interactive with confirmation
+
+⚠️  Insecure (not recommended):
+  cage lock file.txt --passphrase secret --i-am-sure  # Visible in process list!
+
+✅ Cage Age encryption automation ready"#);
     0
 }
 
@@ -418,19 +551,26 @@ fn execute_status_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
     let crud_manager = CrudManager::with_defaults()?;
     let status = crud_manager.status(path)?;
 
-    echo!("📊 Repository Status:");
-    echo!("  Total files: {}", status.total_files);
-    echo!("  Encrypted files: {}", status.encrypted_files);
-    echo!("  Unencrypted files: {}", status.unencrypted_files);
-    echo!("  Encryption percentage: {:.1}%", status.encryption_percentage());
-
-    if status.is_fully_encrypted() {
-        echo!("  🔒 Repository is fully encrypted");
+    let status_text = if status.is_fully_encrypted() {
+        "🔒 Repository is fully encrypted"
     } else if status.is_fully_decrypted() {
-        echo!("  🔓 Repository is fully decrypted");
+        "🔓 Repository is fully decrypted"
     } else {
-        echo!("  ⚠️  Repository has mixed encryption state");
-    }
+        "⚠️  Repository has mixed encryption state"
+    };
+
+    echo!("📊 Repository Status:
+  Total files: {}
+  Encrypted files: {}
+  Unencrypted files: {}
+  Encryption percentage: {:.1}%
+  {}",
+        status.total_files,
+        status.encrypted_files,
+        status.unencrypted_files,
+        status.encryption_percentage(),
+        status_text
+    );
 
     if !status.failed_files.is_empty() {
         echo!("  ❌ Failed files:");
@@ -474,10 +614,14 @@ fn execute_verify_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
     let crud_manager = CrudManager::with_defaults()?;
     let result = crud_manager.verify(path)?;
 
-    echo!("🔍 Verification Result:");
-    echo!("  Verified files: {}", result.verified_files.len());
-    echo!("  Failed files: {}", result.failed_files.len());
-    echo!("  Overall status: {}", result.overall_status);
+    echo!("🔍 Verification Result:
+  Verified files: {}
+  Failed files: {}
+  Overall status: {}",
+        result.verified_files.len(),
+        result.failed_files.len(),
+        result.overall_status
+    );
 
     if !result.failed_files.is_empty() {
         echo!("  ❌ Failed verification:");
@@ -504,12 +648,18 @@ fn execute_batch_operation(
     let mut crud_manager = CrudManager::with_defaults()?;
     let result = crud_manager.batch_process(directory, pattern.as_deref(), operation, passphrase)?;
 
-    echo!("📦 Batch Operation Result:");
-    echo!("  Operation: {}", operation);
-    echo!("  Processed files: {}", result.processed_files.len());
-    echo!("  Failed files: {}", result.failed_files.len());
-    echo!("  Success rate: {:.1}%", result.success_rate());
-    echo!("  Duration: {}ms", result.execution_time_ms);
+    echo!("📦 Batch Operation Result:
+  Operation: {}
+  Processed files: {}
+  Failed files: {}
+  Success rate: {:.1}%
+  Duration: {}ms",
+        operation,
+        result.processed_files.len(),
+        result.failed_files.len(),
+        result.success_rate(),
+        result.execution_time_ms
+    );
 
     if !result.failed_files.is_empty() {
         echo!("  ❌ Failed files:");

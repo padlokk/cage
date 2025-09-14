@@ -42,7 +42,7 @@ pub use cage::{
     AgeAdapter, AdapterFactory, AgeAutomator, AgeConfig, OutputFormat, TtyMethod,
     AgeError, AgeResult, Operation, FileEncryption, RepositoryOperations,
     RepositoryStatus, OperationResult, CrudManager, LockOptions, UnlockOptions,
-    VerificationResult, AuditLogger, SecurityValidator
+    VerificationResult, AuditLogger, SecurityValidator, PassphraseManager, PassphraseMode
 };
 
 /// Library version - synchronized with Cargo.toml
