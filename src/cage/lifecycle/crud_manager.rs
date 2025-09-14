@@ -77,6 +77,23 @@ pub struct VerificationResult {
     pub overall_status: String,
 }
 
+/// File verification status with detailed information
+#[derive(Debug, Clone)]
+pub struct FileVerificationStatus {
+    pub file_path: PathBuf,
+    pub is_encrypted: bool,
+    pub format_valid: bool,
+    pub header_valid: bool,
+    pub size_check: bool,
+    pub error_message: Option<String>,
+}
+
+impl FileVerificationStatus {
+    pub fn is_valid(&self) -> bool {
+        self.is_encrypted && self.format_valid && self.header_valid && self.size_check && self.error_message.is_none()
+    }
+}
+
 /// Emergency operation result
 #[derive(Debug, Clone)]
 pub struct EmergencyResult {
@@ -554,8 +571,17 @@ impl CrudManager {
         if path.is_file() {
             // Verify single file
             match self.verify_file_integrity(path) {
-                Ok(_) => verified_files.push(path.display().to_string()),
-                Err(_) => failed_files.push(path.display().to_string()),
+                Ok(status) => {
+                    if status.is_valid() {
+                        verified_files.push(path.display().to_string());
+                    } else {
+                        let error_msg = status.error_message.unwrap_or_else(||
+                            format!("Verification failed: encrypted={}, format={}, header={}, size={}",
+                                status.is_encrypted, status.format_valid, status.header_valid, status.size_check));
+                        failed_files.push(format!("{}: {}", path.display(), error_msg));
+                    }
+                }
+                Err(e) => failed_files.push(format!("{}: {}", path.display(), e)),
             }
         } else {
             // Verify repository
@@ -768,23 +794,117 @@ impl CrudManager {
     }
 
     /// Verify integrity of a single file
-    fn verify_file_integrity(&self, _file: &Path) -> AgeResult<()> {
-        // Placeholder for file integrity verification
-        // In practice, this would attempt to decrypt and verify
-        Ok(())
+    fn verify_file_integrity(&self, file: &Path) -> AgeResult<FileVerificationStatus> {
+        // Check if file exists and is readable
+        if !file.exists() {
+            return Err(AgeError::file_error("verify", file.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found")));
+        }
+
+        if !file.is_file() {
+            return Err(AgeError::file_error("verify", file.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Path is not a file")));
+        }
+
+        // Check if file appears to be encrypted
+        if !self.is_encrypted_file(file)? {
+            return Ok(FileVerificationStatus {
+                file_path: file.to_path_buf(),
+                is_encrypted: false,
+                format_valid: false,
+                header_valid: false,
+                size_check: true,
+                error_message: Some("File does not appear to be Age encrypted".to_string()),
+            });
+        }
+
+        // Read file content for verification
+        let content = std::fs::read(file)
+            .map_err(|e| AgeError::file_error("read", file.to_path_buf(), e))?;
+
+        let mut status = FileVerificationStatus {
+            file_path: file.to_path_buf(),
+            is_encrypted: true,
+            format_valid: false,
+            header_valid: false,
+            size_check: content.len() > 0,
+            error_message: None,
+        };
+
+        // Verify Age header format
+        if content.starts_with(b"age-encryption.org/v1") {
+            status.format_valid = true;
+            status.header_valid = self.verify_age_binary_header(&content)?;
+        } else if content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----") {
+            status.format_valid = true;
+            status.header_valid = self.verify_age_ascii_header(&content)?;
+        } else {
+            status.error_message = Some("Invalid Age format header".to_string());
+        }
+
+        Ok(status)
+    }
+
+    /// Verify Age binary format header
+    fn verify_age_binary_header(&self, content: &[u8]) -> AgeResult<bool> {
+        // Age binary format starts with "age-encryption.org/v1" followed by newline
+        if content.len() < 22 {
+            return Ok(false);
+        }
+
+        // Check for proper header structure
+        let header_end = content.iter().position(|&b| b == b'\n');
+        if let Some(pos) = header_end {
+            if pos >= 21 && pos < 100 { // Reasonable header length
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Verify Age ASCII armor format header
+    fn verify_age_ascii_header(&self, content: &[u8]) -> AgeResult<bool> {
+        let content_str = String::from_utf8_lossy(content);
+        let lines: Vec<&str> = content_str.lines().collect();
+
+        if lines.is_empty() {
+            return Ok(false);
+        }
+
+        // Check for proper ASCII armor structure
+        let has_begin = lines[0] == "-----BEGIN AGE ENCRYPTED FILE-----";
+        let has_end = lines.iter().any(|line| *line == "-----END AGE ENCRYPTED FILE-----");
+
+        Ok(has_begin && has_end)
     }
 
     /// Verify integrity of repository
     fn verify_repository_integrity(&self, repository: &Path, verified: &mut Vec<String>, failed: &mut Vec<String>) -> AgeResult<()> {
         for entry in std::fs::read_dir(repository)? {
-            let entry = entry?;
+            let entry = entry.map_err(|e| AgeError::file_error("read_dir", repository.to_path_buf(), e))?;
             let path = entry.path();
-            
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("age") {
-                match self.verify_file_integrity(&path) {
-                    Ok(_) => verified.push(path.display().to_string()),
-                    Err(_) => failed.push(path.display().to_string()),
+
+            if path.is_file() {
+                // Check if file appears to be encrypted (any format)
+                if self.is_encrypted_file(&path)? {
+                    match self.verify_file_integrity(&path) {
+                        Ok(status) => {
+                            if status.is_valid() {
+                                verified.push(path.display().to_string());
+                            } else {
+                                let error_msg = status.error_message.unwrap_or_else(||
+                                    format!("Verification failed: encrypted={}, format={}, header={}, size={}",
+                                        status.is_encrypted, status.format_valid, status.header_valid, status.size_check));
+                                failed.push(format!("{}: {}", path.display(), error_msg));
+                            }
+                        }
+                        Err(e) => failed.push(format!("{}: {}", path.display(), e)),
+                    }
                 }
+            } else if path.is_dir() {
+                // Recursively verify subdirectories
+                self.verify_repository_integrity(&path, verified, failed)?;
             }
         }
 
@@ -938,6 +1058,61 @@ mod tests {
 
         } else {
             println!("Skipping encrypted file detection test - Age not available");
+        }
+    }
+
+    #[test]
+    fn test_file_verification_system() {
+        if let Ok(crud_manager) = CrudManager::with_defaults() {
+            // Test verification of non-encrypted file
+            let temp_file = tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(temp_file.path(), b"plain text content").unwrap();
+
+            let result = crud_manager.verify_file_integrity(temp_file.path()).unwrap();
+            assert!(!result.is_encrypted);
+            assert!(!result.is_valid());
+            assert!(result.error_message.is_some());
+
+            // Test verification of file with Age binary header
+            let temp_age_file = tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(temp_age_file.path(), b"age-encryption.org/v1\ntest encrypted content").unwrap();
+
+            let result = crud_manager.verify_file_integrity(temp_age_file.path()).unwrap();
+            assert!(result.is_encrypted);
+            assert!(result.format_valid);
+            assert!(result.header_valid);
+
+            // Test verification of file with Age ASCII header
+            let temp_ascii_file = tempfile::NamedTempFile::new().unwrap();
+            let ascii_content = b"-----BEGIN AGE ENCRYPTED FILE-----\nencrypted content here\n-----END AGE ENCRYPTED FILE-----";
+            std::fs::write(temp_ascii_file.path(), ascii_content).unwrap();
+
+            let result = crud_manager.verify_file_integrity(temp_ascii_file.path()).unwrap();
+            assert!(result.is_encrypted);
+            assert!(result.format_valid);
+            assert!(result.header_valid);
+
+        } else {
+            println!("Skipping file verification test - Age not available");
+        }
+    }
+
+    #[test]
+    fn test_verification_result_creation() {
+        if let Ok(crud_manager) = CrudManager::with_defaults() {
+            // Test verification of non-existent path
+            let fake_path = std::path::Path::new("/non/existent/path");
+            let result = crud_manager.verify(fake_path);
+            assert!(result.is_err());
+
+            // Test verification of empty directory
+            let temp_dir = TempDir::new().unwrap();
+            let result = crud_manager.verify(temp_dir.path()).unwrap();
+            assert!(result.verified_files.is_empty());
+            assert!(result.failed_files.is_empty());
+
+        } else {
+            println!("Skipping verification result test - Age not available");
         }
     }
 }
