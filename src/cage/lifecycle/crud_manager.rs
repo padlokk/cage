@@ -77,6 +77,158 @@ pub struct VerificationResult {
     pub overall_status: String,
 }
 
+/// Backup management for safe file operations
+#[derive(Debug, Clone)]
+pub struct BackupManager {
+    backup_dir: Option<PathBuf>,
+    backup_extension: String,
+    cleanup_on_success: bool,
+}
+
+impl BackupManager {
+    /// Create new backup manager with default settings
+    pub fn new() -> Self {
+        Self {
+            backup_dir: None, // Use same directory as original file
+            backup_extension: ".bak".to_string(),
+            cleanup_on_success: true,
+        }
+    }
+
+    /// Create backup manager with custom backup directory
+    pub fn with_backup_dir(backup_dir: PathBuf) -> Self {
+        Self {
+            backup_dir: Some(backup_dir),
+            backup_extension: ".bak".to_string(),
+            cleanup_on_success: true,
+        }
+    }
+
+    /// Set backup extension (default: .bak)
+    pub fn with_extension(mut self, extension: String) -> Self {
+        self.backup_extension = if extension.starts_with('.') {
+            extension
+        } else {
+            format!(".{}", extension)
+        };
+        self
+    }
+
+    /// Set cleanup behavior
+    pub fn with_cleanup(mut self, cleanup: bool) -> Self {
+        self.cleanup_on_success = cleanup;
+        self
+    }
+
+    /// Create backup of a file
+    pub fn create_backup(&self, file_path: &Path) -> AgeResult<BackupInfo> {
+        if !file_path.exists() {
+            return Err(AgeError::file_error("backup", file_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found")));
+        }
+
+        let backup_path = self.generate_backup_path(file_path)?;
+
+        // Handle backup conflicts
+        if backup_path.exists() {
+            let conflict_path = self.generate_conflict_path(&backup_path)?;
+            std::fs::rename(&backup_path, &conflict_path)
+                .map_err(|e| AgeError::file_error("move_existing_backup", backup_path.clone(), e))?;
+        }
+
+        // Create backup directory if needed
+        if let Some(parent) = backup_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| AgeError::file_error("create_backup_dir", parent.to_path_buf(), e))?;
+            }
+        }
+
+        // Copy file to backup location
+        std::fs::copy(file_path, &backup_path)
+            .map_err(|e| AgeError::file_error("create_backup", backup_path.clone(), e))?;
+
+        Ok(BackupInfo {
+            original_path: file_path.to_path_buf(),
+            backup_path,
+            created_at: std::time::SystemTime::now(),
+            size_bytes: std::fs::metadata(file_path)
+                .map(|m| m.len())
+                .unwrap_or(0),
+        })
+    }
+
+    /// Restore from backup
+    pub fn restore_backup(&self, backup_info: &BackupInfo) -> AgeResult<()> {
+        if !backup_info.backup_path.exists() {
+            return Err(AgeError::file_error("restore", backup_info.backup_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Backup file not found")));
+        }
+
+        std::fs::copy(&backup_info.backup_path, &backup_info.original_path)
+            .map_err(|e| AgeError::file_error("restore_backup", backup_info.original_path.clone(), e))?;
+
+        Ok(())
+    }
+
+    /// Clean up backup file
+    pub fn cleanup_backup(&self, backup_info: &BackupInfo) -> AgeResult<()> {
+        if backup_info.backup_path.exists() {
+            std::fs::remove_file(&backup_info.backup_path)
+                .map_err(|e| AgeError::file_error("cleanup_backup", backup_info.backup_path.clone(), e))?;
+        }
+        Ok(())
+    }
+
+    /// Generate backup path for a file
+    fn generate_backup_path(&self, file_path: &Path) -> AgeResult<PathBuf> {
+        let file_name = file_path.file_name()
+            .ok_or_else(|| AgeError::file_error("get_filename", file_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename")))?;
+
+        let backup_filename = format!("{}{}", file_name.to_string_lossy(), self.backup_extension);
+
+        let backup_path = if let Some(ref backup_dir) = self.backup_dir {
+            backup_dir.join(backup_filename)
+        } else {
+            file_path.parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(backup_filename)
+        };
+
+        Ok(backup_path)
+    }
+
+    /// Generate conflict resolution path
+    fn generate_conflict_path(&self, backup_path: &Path) -> AgeResult<PathBuf> {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let conflict_name = format!("{}.conflict.{}", backup_path.to_string_lossy(), timestamp);
+        Ok(PathBuf::from(conflict_name))
+    }
+}
+
+/// Information about a created backup
+#[derive(Debug, Clone)]
+pub struct BackupInfo {
+    pub original_path: PathBuf,
+    pub backup_path: PathBuf,
+    pub created_at: std::time::SystemTime,
+    pub size_bytes: u64,
+}
+
+impl BackupInfo {
+    pub fn age_seconds(&self) -> u64 {
+        self.created_at
+            .elapsed()
+            .unwrap_or_default()
+            .as_secs()
+    }
+}
+
 /// File verification status with detailed information
 #[derive(Debug, Clone)]
 pub struct FileVerificationStatus {
@@ -700,13 +852,61 @@ impl CrudManager {
             file.with_extension("age")
         };
 
+        let mut backup_info: Option<BackupInfo> = None;
+
+        // Create backup if requested
+        if options.backup_before_lock {
+            let backup_manager = BackupManager::new();
+            match backup_manager.create_backup(file) {
+                Ok(info) => {
+                    backup_info = Some(info);
+                    self.audit_logger.log_info(&format!("Created backup: {} -> {}",
+                        file.display(), backup_info.as_ref().unwrap().backup_path.display()))?;
+                }
+                Err(e) => {
+                    self.audit_logger.log_error(&format!("Failed to create backup for {}: {}", file.display(), e))?;
+                    result.add_failure(file.display().to_string());
+                    return Err(e);
+                }
+            }
+        }
+
+        // Perform encryption
         match self.adapter.encrypt(file, &output_path, passphrase, options.format) {
             Ok(_) => {
                 result.add_success(file.display().to_string());
+
+                // Clean up backup on success if configured
+                if let Some(backup) = backup_info {
+                    let backup_manager = BackupManager::new();
+                    if backup_manager.cleanup_on_success {
+                        if let Err(e) = backup_manager.cleanup_backup(&backup) {
+                            self.audit_logger.log_warning(&format!("Failed to cleanup backup {}: {}",
+                                backup.backup_path.display(), e))?;
+                        } else {
+                            self.audit_logger.log_info(&format!("Cleaned up backup: {}",
+                                backup.backup_path.display()))?;
+                        }
+                    }
+                }
+
                 Ok(())
             }
             Err(e) => {
                 result.add_failure(file.display().to_string());
+
+                // Restore from backup on failure
+                if let Some(backup) = backup_info {
+                    let backup_manager = BackupManager::new();
+                    if let Err(restore_err) = backup_manager.restore_backup(&backup) {
+                        self.audit_logger.log_error(&format!("CRITICAL: Failed to restore backup {}: {}",
+                            backup.backup_path.display(), restore_err))?;
+                    } else {
+                        self.audit_logger.log_info(&format!("Restored from backup: {}",
+                            backup.backup_path.display()))?;
+                    }
+                }
+
                 Err(e)
             }
         }
@@ -1114,5 +1314,71 @@ mod tests {
         } else {
             println!("Skipping verification result test - Age not available");
         }
+    }
+
+    #[test]
+    fn test_backup_manager_creation() {
+        let backup_manager = BackupManager::new();
+        assert!(backup_manager.backup_dir.is_none());
+        assert_eq!(backup_manager.backup_extension, ".bak");
+        assert!(backup_manager.cleanup_on_success);
+
+        let custom_manager = BackupManager::new()
+            .with_extension("backup".to_string())
+            .with_cleanup(false);
+        assert_eq!(custom_manager.backup_extension, ".backup");
+        assert!(!custom_manager.cleanup_on_success);
+    }
+
+    #[test]
+    fn test_backup_system() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, b"test content").unwrap();
+
+        let backup_manager = BackupManager::new();
+
+        // Test backup creation
+        let backup_info = backup_manager.create_backup(&test_file).unwrap();
+        assert_eq!(backup_info.original_path, test_file);
+        assert_eq!(backup_info.size_bytes, 12); // "test content".len()
+        assert!(backup_info.backup_path.exists());
+        assert!(backup_info.backup_path.to_string_lossy().contains(".bak"));
+
+        // Test backup content
+        let backup_content = std::fs::read(&backup_info.backup_path).unwrap();
+        assert_eq!(backup_content, b"test content");
+
+        // Test backup restoration
+        std::fs::write(&test_file, b"modified content").unwrap();
+        backup_manager.restore_backup(&backup_info).unwrap();
+        let restored_content = std::fs::read(&test_file).unwrap();
+        assert_eq!(restored_content, b"test content");
+
+        // Test cleanup
+        backup_manager.cleanup_backup(&backup_info).unwrap();
+        assert!(!backup_info.backup_path.exists());
+    }
+
+    #[test]
+    fn test_backup_conflict_handling() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, b"original").unwrap();
+
+        let backup_manager = BackupManager::new();
+
+        // Create first backup
+        let backup_info1 = backup_manager.create_backup(&test_file).unwrap();
+        assert!(backup_info1.backup_path.exists());
+
+        // Modify file and create second backup (should handle conflict)
+        std::fs::write(&test_file, b"modified").unwrap();
+        let backup_info2 = backup_manager.create_backup(&test_file).unwrap();
+        assert!(backup_info2.backup_path.exists());
+
+        // Both backups should exist in some form
+        let backup_content = std::fs::read(&backup_info2.backup_path).unwrap();
+        assert_eq!(backup_content, b"modified");
     }
 }
