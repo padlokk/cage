@@ -167,6 +167,9 @@ pub struct AgeConfig {
     
     /// Temporary directory override (None for system default)
     pub temp_dir_override: Option<String>,
+
+    /// File extension for encrypted files (default: "cage")
+    pub encrypted_file_extension: String,
 }
 
 impl AgeConfig {
@@ -304,6 +307,43 @@ impl AgeConfig {
         self.age_binary_path = Some(path.into());
         self
     }
+
+    /// Set encrypted file extension
+    pub fn with_extension<S: Into<String>>(mut self, extension: S) -> Self {
+        self.encrypted_file_extension = extension.into();
+        self
+    }
+
+    /// Create configuration for padlock integration
+    pub fn for_padlock() -> Self {
+        Self {
+            encrypted_file_extension: "padlock".to_string(),
+            audit_logging: true,
+            security_validation: true,
+            health_checks: true,
+            secure_deletion: true,
+            ..Default::default()
+        }
+    }
+
+    /// Get file extension with dot prefix
+    pub fn extension_with_dot(&self) -> String {
+        if self.encrypted_file_extension.starts_with('.') {
+            self.encrypted_file_extension.clone()
+        } else {
+            format!(".{}", self.encrypted_file_extension)
+        }
+    }
+
+    /// Check if a file has the configured encrypted extension
+    pub fn is_encrypted_file(&self, path: &std::path::Path) -> bool {
+        if let Some(ext) = path.extension() {
+            if let Some(ext_str) = ext.to_str() {
+                return ext_str == self.encrypted_file_extension;
+            }
+        }
+        false
+    }
 }
 
 impl Default for AgeConfig {
@@ -325,6 +365,7 @@ impl Default for AgeConfig {
             retry_delay: Duration::from_secs(1),
             secure_deletion: true,
             temp_dir_override: None,
+            encrypted_file_extension: "cage".to_string(),
         }
     }
 }
