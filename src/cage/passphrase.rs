@@ -26,6 +26,7 @@ pub enum PassphraseMode {
 /// Secure passphrase manager with multiple input methods
 pub struct PassphraseManager {
     tty_available: bool,
+    #[allow(dead_code)]
     stdin_is_tty: bool,
 }
 
@@ -96,7 +97,7 @@ impl PassphraseManager {
     /// Detect the best passphrase input mode based on environment
     fn detect_best_mode(&self) -> AgeResult<PassphraseMode> {
         // Check for explicit environment variable
-        if let Ok(pass) = std::env::var("CAGE_PASSPHRASE") {
+        if let Ok(_pass) = std::env::var("CAGE_PASSPHRASE") {
             return Ok(PassphraseMode::Environment("CAGE_PASSPHRASE".to_string()));
         }
 

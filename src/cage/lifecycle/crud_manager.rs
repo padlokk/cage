@@ -7,12 +7,14 @@
 //! Security Guardian: Edgar - Production CRUD coordination with authority integration
 
 use std::path::{Path, PathBuf};
+#[allow(unused_imports)]
 use std::time::{Duration, Instant};
 use std::collections::HashMap;
 
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::adapter::AgeAdapter;
+#[allow(unused_imports)]
 use crate::cage::tty_automation::TtyAutomator;
 use crate::cage::security::AuditLogger;
 use crate::cage::operations::{
@@ -265,11 +267,17 @@ pub struct CrudManager {
 
 /// Record of performed operations for audit and recovery
 #[derive(Debug, Clone)]
-struct OperationRecord {
+#[allow(dead_code)]
+pub struct OperationRecord {
+    #[allow(dead_code)]
     operation_type: String,
+    #[allow(dead_code)]
     target_path: PathBuf,
+    #[allow(dead_code)]
     timestamp: Instant,
+    #[allow(dead_code)]
     success: bool,
+    #[allow(dead_code)]
     details: HashMap<String, String>,
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "cage"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Age encryption automation CLI with PTY support"
 repository = "https://github.com/padlokk/cage"

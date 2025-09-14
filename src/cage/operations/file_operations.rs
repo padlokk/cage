@@ -286,6 +286,7 @@ impl Operation for FileDecryptOperation {
 pub struct FileOperationsManager {
     adapter: Box<dyn AgeAdapter>,
     audit_logger: AuditLogger,
+    #[allow(dead_code)]
     validator: SecurityValidator,
 }
 

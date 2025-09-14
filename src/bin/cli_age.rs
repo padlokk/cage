@@ -93,7 +93,7 @@ fn cmd_lock(mut args: Args) -> i32 {
 
     // Check for insecure command-line passphrase usage
     let cmd_args: Vec<String> = std::env::args().collect();
-    if let Some(insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+    if let Some(_insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
         stderr!("⚠️  WARNING: Passphrase detected on command line!");
         stderr!("   This is insecure and visible in process list.");
         if !args.has("--i-am-sure") {
@@ -506,7 +506,7 @@ fn execute_lock_operation(
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
-        let mut manager = ProgressManager::new();
+        let manager = ProgressManager::new();
         manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
         Some(std::sync::Arc::new(manager))
     } else {
@@ -608,7 +608,7 @@ fn execute_in_place_lock_operation(
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
-        let mut manager = ProgressManager::new();
+        let manager = ProgressManager::new();
         manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
         Some(std::sync::Arc::new(manager))
     } else {
@@ -765,7 +765,7 @@ fn execute_unlock_operation(
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
-        let mut manager = ProgressManager::new();
+        let manager = ProgressManager::new();
         manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
         Some(std::sync::Arc::new(manager))
     } else {
@@ -1138,9 +1138,9 @@ fn run_progress_demo() -> i32 {
 
     // Create progress manager with terminal reporter
     let manager = Arc::new({
-        let mut mgr = ProgressManager::new();
-        mgr.add_reporter(Arc::new(TerminalReporter::new()));
-        mgr
+        let manager = ProgressManager::new();
+        manager.add_reporter(Arc::new(TerminalReporter::new()));
+        manager
     });
 
     // Demo 1: Simple Spinner

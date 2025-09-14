@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use std::collections::HashMap;
 
 use super::core::{ProgressReporter, ProgressEvent, ProgressState};
+#[allow(unused_imports)]
 use super::styles::{ProgressStyle, SpinnerStyle, BarStyle, MessagePosition};
 
 /// Configuration for terminal progress display
@@ -449,6 +450,7 @@ impl TerminalReporter {
     }
 
     /// Write output to appropriate stream
+    #[allow(dead_code)]
     fn write_output(&self, text: &str) {
         self.write_output_with_ending(text, false);
     }
@@ -520,16 +522,8 @@ impl ProgressReporter for TerminalReporter {
             self.write_output_with_ending(&formatted, is_finished);
         }
 
-        // Show cursor when task finishes and it's the last active task
+        // Show cursor when task finishes
         if is_finished {
-            let task_states = self.task_states.lock().unwrap();
-            let has_running_tasks = task_states.values().any(|display| {
-                // Check if this task display represents a running task
-                // We'll consider any task that hasn't been marked as finished
-                true // For now, we'll show cursor after each completion
-            });
-            drop(task_states);
-
             // Show cursor when task completes
             let mut cursor_hidden = self.cursor_hidden.lock().unwrap();
             if *cursor_hidden {
