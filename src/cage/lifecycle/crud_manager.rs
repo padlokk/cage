@@ -1176,6 +1176,11 @@ impl CrudManager {
     pub fn get_operation_history(&self) -> &[OperationRecord] {
         &self.operation_history
     }
+
+    /// Encrypt a single file to a specific output path (for in-place operations)
+    pub fn encrypt_to_path(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+        self.adapter.encrypt(input, output, passphrase, format)
+    }
 }
 
 #[cfg(test)]

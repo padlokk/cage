@@ -132,6 +132,11 @@ fn cmd_lock(mut args: Args) -> i32 {
     let backup = args.has("--backup");
     let verbose = is_true("opt_verbose");
 
+    // In-place operation flags
+    let in_place = args.has("--in-place");
+    let danger_mode = args.has("--danger-mode");
+    let i_am_sure = args.has("--i-am-sure");
+
     let format = match get_var("opt_format").as_str() {
         "ascii" => OutputFormat::AsciiArmor,
         _ => OutputFormat::Binary,
@@ -144,14 +149,28 @@ fn cmd_lock(mut args: Args) -> i32 {
         None
     };
 
-    match execute_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose) {
-        Ok(_) => {
-            if verbose { echo!("✅ Lock operation completed"); }
-            0
+    // Handle in-place operations with safety checks
+    if in_place {
+        match execute_in_place_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose, danger_mode, i_am_sure) {
+            Ok(_) => {
+                if verbose { echo!("✅ In-place lock operation completed"); }
+                0
+            }
+            Err(e) => {
+                stderr!("❌ In-place lock failed: {}", e);
+                1
+            }
         }
-        Err(e) => {
-            stderr!("❌ Lock failed: {}", e);
-            1
+    } else {
+        match execute_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose) {
+            Ok(_) => {
+                if verbose { echo!("✅ Lock operation completed"); }
+                0
+            }
+            Err(e) => {
+                stderr!("❌ Lock failed: {}", e);
+                1
+            }
         }
     }
 }
@@ -490,6 +509,102 @@ fn execute_lock_operation(
                 }
             }
         }
+    }
+
+    Ok(())
+}
+
+/// Execute in-place lock operation with safety layers
+fn execute_in_place_lock_operation(
+    paths: Vec<PathBuf>,
+    passphrase: &str,
+    recursive: bool,
+    pattern: Option<String>,
+    backup: bool,
+    format: OutputFormat,
+    _audit_log: Option<PathBuf>,
+    verbose: bool,
+    danger_mode: bool,
+    i_am_sure: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use cage::cage::{SafetyValidator, InPlaceOperation};
+
+    if verbose {
+        echo!("🔐 Executing in-place lock operation with safety checks...");
+    }
+
+    // Enhanced validation
+    if paths.is_empty() {
+        return Err("No paths provided for in-place lock operation".into());
+    }
+
+    if passphrase.len() < 8 {
+        stderr!("⚠️  Warning: Passphrase is less than 8 characters. Consider using a stronger passphrase.");
+    }
+
+    // Safety validation
+    let safety_validator = SafetyValidator::new(danger_mode, i_am_sure);
+
+    let options = LockOptions {
+        recursive,
+        format,
+        pattern_filter: pattern,
+        backup_before_lock: backup,
+    };
+
+    let mut crud_manager = CrudManager::with_defaults()?;
+
+    for path in paths {
+        if verbose {
+            echo!("  🔒 In-place locking: {}", path.display());
+        }
+
+        // If recursive, we need to handle directories differently
+        if recursive && path.is_dir() {
+            // For recursive in-place, we process each file individually
+            let result = crud_manager.lock(&path, passphrase, options.clone())?;
+
+            if verbose {
+                echo!("    Processed: {} files", result.processed_files.len());
+                echo!("    Failed: {} files", result.failed_files.len());
+            }
+        } else if path.is_file() {
+            // Single file in-place operation
+
+            // 1. Safety validation
+            safety_validator.validate_in_place_operation(&path)?;
+
+            // 2. Create in-place operation
+            let mut in_place_op = InPlaceOperation::new(&path);
+
+            // 3. Execute with atomic replacement
+            in_place_op.execute_lock(passphrase, danger_mode, |src, dst, pass| {
+                // Use the CrudManager's encrypt_to_path method
+                match crud_manager.encrypt_to_path(src, dst, pass, format) {
+                    Ok(_) => {
+                        if verbose {
+                            echo!("    ✅ Encrypted {} -> {}", src.display(), dst.display());
+                        }
+                        Ok(())
+                    }
+                    Err(e) => Err(e),
+                }
+            })?;
+
+            if verbose {
+                echo!("    ✅ In-place operation completed for {}", path.display());
+                if !danger_mode {
+                    echo!("    📝 Recovery file created: {}.tmp.recover", path.display());
+                    echo!("    ⚠️  Delete recovery file once you've verified encryption!");
+                }
+            }
+        } else {
+            return Err(format!("Path does not exist or is not a file: {}", path.display()).into());
+        }
+    }
+
+    if verbose {
+        echo!("✅ All in-place lock operations completed");
     }
 
     Ok(())

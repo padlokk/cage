@@ -23,6 +23,7 @@ pub mod security;
 pub mod error;
 pub mod config;
 pub mod passphrase;
+pub mod in_place;
 
 // Re-export core types for convenience
 pub use adapter::{AgeAdapter, AdapterFactory};
@@ -35,6 +36,7 @@ pub use operations::{
 pub use lifecycle::{CrudManager, LockOptions, UnlockOptions, VerificationResult};
 pub use security::{AuditLogger, SecurityValidator};
 pub use passphrase::{PassphraseManager, PassphraseMode};
+pub use in_place::{InPlaceOperation, InPlaceOptions, SafetyValidator, RecoveryManager};
 
 /// Module version synchronized with Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
