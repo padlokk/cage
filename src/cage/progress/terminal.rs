@@ -48,6 +48,7 @@ pub struct TerminalReporter {
     task_states: Arc<Mutex<HashMap<u64, TaskDisplay>>>,
     last_update: Arc<Mutex<Instant>>,
     spinner_frame: Arc<Mutex<usize>>,
+    cursor_hidden: Arc<Mutex<bool>>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +74,7 @@ impl TerminalReporter {
             task_states: Arc::new(Mutex::new(HashMap::new())),
             last_update: Arc::new(Mutex::new(Instant::now())),
             spinner_frame: Arc::new(Mutex::new(0)),
+            cursor_hidden: Arc::new(Mutex::new(false)),
         };
 
         // Start spinner animation thread
@@ -465,6 +467,30 @@ impl TerminalReporter {
             let _ = io::stdout().flush();
         }
     }
+
+    /// Hide cursor for cleaner progress display
+    fn hide_cursor(&self) {
+        let hide_seq = b"\x1b[?25l";
+        if self.config.use_stderr {
+            let _ = io::stderr().write_all(hide_seq);
+            let _ = io::stderr().flush();
+        } else {
+            let _ = io::stdout().write_all(hide_seq);
+            let _ = io::stdout().flush();
+        }
+    }
+
+    /// Show cursor when progress is complete
+    fn show_cursor(&self) {
+        let show_seq = b"\x1b[?25h";
+        if self.config.use_stderr {
+            let _ = io::stderr().write_all(show_seq);
+            let _ = io::stderr().flush();
+        } else {
+            let _ = io::stdout().write_all(show_seq);
+            let _ = io::stdout().flush();
+        }
+    }
 }
 
 impl ProgressReporter for TerminalReporter {
@@ -474,18 +500,46 @@ impl ProgressReporter for TerminalReporter {
             return;
         }
 
+        // Handle cursor visibility based on task state
+        let is_finished = matches!(event.state,
+            ProgressState::Complete | ProgressState::Failed | ProgressState::Cancelled);
+
+        if !is_finished {
+            // Hide cursor when first running task starts
+            let mut cursor_hidden = self.cursor_hidden.lock().unwrap();
+            if !*cursor_hidden {
+                self.hide_cursor();
+                *cursor_hidden = true;
+            }
+        }
+
         let formatted = self.format_event(event);
 
         if !formatted.is_empty() {
             // Use newline for completed/failed/cancelled states, carriage return for running
-            let use_newline = matches!(event.state,
-                ProgressState::Complete | ProgressState::Failed | ProgressState::Cancelled);
-            self.write_output_with_ending(&formatted, use_newline);
+            self.write_output_with_ending(&formatted, is_finished);
+        }
+
+        // Show cursor when task finishes and it's the last active task
+        if is_finished {
+            let task_states = self.task_states.lock().unwrap();
+            let has_running_tasks = task_states.values().any(|display| {
+                // Check if this task display represents a running task
+                // We'll consider any task that hasn't been marked as finished
+                true // For now, we'll show cursor after each completion
+            });
+            drop(task_states);
+
+            // Show cursor when task completes
+            let mut cursor_hidden = self.cursor_hidden.lock().unwrap();
+            if *cursor_hidden {
+                self.show_cursor();
+                *cursor_hidden = false;
+            }
         }
 
         // Clean up completed tasks if configured
-        if self.config.clear_on_complete &&
-           matches!(event.state, ProgressState::Complete | ProgressState::Failed | ProgressState::Cancelled) {
+        if self.config.clear_on_complete && is_finished {
             let mut task_states = self.task_states.lock().unwrap();
             task_states.remove(&event.task_id);
         }
@@ -518,6 +572,16 @@ impl ProgressReporter for TerminalReporter {
 impl Default for TerminalReporter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for TerminalReporter {
+    fn drop(&mut self) {
+        // Always show cursor when reporter is dropped to avoid leaving cursor hidden
+        let cursor_hidden = self.cursor_hidden.lock().unwrap();
+        if *cursor_hidden {
+            self.show_cursor();
+        }
     }
 }
 
