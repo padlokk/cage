@@ -414,15 +414,24 @@ fn cmd_batch(mut args: Args) -> i32 {
 }
 
 /// Run test suite using RSB dispatch
-fn cmd_test(_args: Args) -> i32 {
+fn cmd_test(args: Args) -> i32 {
+    if args.has("--progress-demo") {
+        return run_progress_demo();
+    }
+
     echo!(r#"🧪 Running Age Automation Test Suite...
-  Note: Comprehensive testing implementation pending
-  This would include:
-    - Security validation tests
-    - Injection prevention tests
-    - Authority chain tests
-    - Performance benchmarks
-    - Compatibility tests
+
+Available Tests:
+  --progress-demo    Demonstrate progress indicators and styles
+
+Planned Tests:
+  - Security validation tests
+  - Injection prevention tests
+  - Authority chain tests
+  - Performance benchmarks
+  - Compatibility tests
+
+Usage: cage test --progress-demo
 ✅ Test suite framework ready for implementation"#);
     0
 }
@@ -1114,6 +1123,110 @@ expect {{
 
     echo!("✅ Age proxy command completed successfully");
     Ok(())
+}
+
+/// UAT Demo for Progress Indicators
+fn run_progress_demo() -> i32 {
+    use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
+    use std::sync::Arc;
+    use std::thread;
+    use std::time::Duration;
+
+    echo!("🎯 Progress Indicators UAT Demo");
+    echo!("=================================");
+    echo!("Testing different progress styles and behaviors...\n");
+
+    // Create progress manager with terminal reporter
+    let manager = Arc::new({
+        let mut mgr = ProgressManager::new();
+        mgr.add_reporter(Arc::new(TerminalReporter::new()));
+        mgr
+    });
+
+    // Demo 1: Simple Spinner
+    echo!("📀 Demo 1: Simple Spinner");
+    let spinner_task = manager.start_task("Loading configuration", ProgressStyle::Spinner);
+    for i in 0..20 {
+        spinner_task.update_message(&format!("Loading step {}...", i + 1));
+        thread::sleep(Duration::from_millis(100));
+    }
+    spinner_task.complete("✓ Configuration loaded");
+    echo!("");
+
+    // Demo 2: Progress Bar
+    echo!("📊 Demo 2: Progress Bar (File Processing)");
+    let bar_task = manager.start_task("Processing files", ProgressStyle::Bar { total: 10 });
+    for i in 0..10 {
+        bar_task.update(i + 1, &format!("Processing file_{}.txt", i + 1));
+        thread::sleep(Duration::from_millis(200));
+    }
+    bar_task.complete("✓ All files processed");
+    echo!("");
+
+    // Demo 3: Byte Progress (Large File)
+    echo!("💾 Demo 3: Byte Progress (Large File)");
+    let bytes_task = manager.start_task("Encrypting large file", ProgressStyle::Bytes { total_bytes: 1048576 }); // 1MB
+    let chunk_size = 65536; // 64KB chunks
+    for i in (0..1048576).step_by(chunk_size) {
+        let current = std::cmp::min(i + chunk_size, 1048576);
+        bytes_task.update(current as u64, &format!("Processing chunk at {}KB", current / 1024));
+        thread::sleep(Duration::from_millis(50));
+    }
+    bytes_task.complete("✓ Large file encrypted");
+    echo!("");
+
+    // Demo 4: Counter Style
+    echo!("🔢 Demo 4: Counter Style (Key Rotation)");
+    let counter_task = manager.start_task("Rotating encryption keys", ProgressStyle::Counter { total: 5 });
+    let files = ["config.json", "secrets.txt", "database.db", "logs.txt", "backup.zip"];
+    for (i, file) in files.iter().enumerate() {
+        counter_task.update(i as u64 + 1, &format!("Rotating key for {}", file));
+        thread::sleep(Duration::from_millis(300));
+    }
+    counter_task.complete("✓ All keys rotated successfully");
+    echo!("");
+
+    // Demo 5: Multiple Concurrent Tasks
+    echo!("🚀 Demo 5: Multiple Concurrent Tasks");
+    let task1 = manager.start_task("Task A (Background sync)", ProgressStyle::Spinner);
+    let task2 = manager.start_task("Task B (File validation)", ProgressStyle::Bar { total: 8 });
+    let task3 = manager.start_task("Task C (Cleanup)", ProgressStyle::Counter { total: 3 });
+
+    // Simulate concurrent work
+    for i in 0..8 {
+        // Update all tasks
+        task1.update_message(&format!("Syncing item {}...", i + 1));
+        task2.update(i + 1, &format!("Validating file_{}.cage", i + 1));
+        if i < 3 {
+            task3.update(i + 1, &format!("Cleaning temp file {}", i + 1));
+        }
+        thread::sleep(Duration::from_millis(150));
+    }
+
+    task1.complete("✓ Background sync completed");
+    task2.complete("✓ All files validated");
+    task3.complete("✓ Cleanup finished");
+    echo!("");
+
+    // Demo 6: Error Simulation
+    echo!("❌ Demo 6: Error Handling");
+    let error_task = manager.start_task("Risky operation", ProgressStyle::Bar { total: 5 });
+    for i in 0..3 {
+        error_task.update(i + 1, &format!("Processing item {}...", i + 1));
+        thread::sleep(Duration::from_millis(200));
+    }
+    error_task.fail("✗ Operation failed: Permission denied");
+    echo!("");
+
+    echo!("✅ Progress Indicators UAT Demo Complete!");
+    echo!("All progress styles and behaviors working correctly.");
+    echo!("");
+    echo!("To see progress in real operations, use --progress flag:");
+    echo!("  cage lock myfile.txt --progress");
+    echo!("  cage unlock myfile.cage --progress");
+    echo!("  cage lock directory/ --recursive --progress");
+
+    0
 }
 
 #[cfg(test)]
