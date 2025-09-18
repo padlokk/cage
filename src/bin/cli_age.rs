@@ -23,7 +23,7 @@ fn main() {
 
     // Print banner with enhanced information
     println!("🔒 Cage - Age Encryption Automation CLI");
-    println!("🛡️  Secure Age encryption with PTY automation");
+    println!("🛡️ Secure Age encryption with PTY automation");
     println!("📦 Version: {} | Built with RSB Framework", env!("CARGO_PKG_VERSION"));
 
     if is_true("opt_verbose") {
