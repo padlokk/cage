@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::config::{AgeConfig, OutputFormat};
@@ -1166,17 +1166,50 @@ impl CrudManager {
         Ok(glob.compile_matcher())
     }
 
-    fn collect_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
-        let mut files = Vec::new();
+    /// Recursively traverse directory tree, collecting files
+    fn traverse_directory_recursive(
+        &self,
+        directory: &Path,
+        files: &mut Vec<PathBuf>,
+        visited: &mut HashSet<PathBuf>,
+        glob_matcher: &Option<GlobMatcher>,
+        encrypted_only: bool,
+    ) -> AgeResult<()> {
+        // Canonicalize to detect symlink loops
+        let canonical = directory.canonicalize().unwrap_or_else(|_| directory.to_path_buf());
 
-        // Compile glob matcher once if pattern provided
-        let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
+        // Prevent symlink loops
+        if visited.contains(&canonical) {
+            return Ok(());
+        }
+        visited.insert(canonical);
 
-        for entry in std::fs::read_dir(directory)? {
-            let entry = entry?;
+        // Read directory entries
+        let entries = match std::fs::read_dir(directory) {
+            Ok(entries) => entries,
+            Err(e) => {
+                eprintln!("⚠️  Skipping directory {}: {}", directory.display(), e);
+                return Ok(());
+            }
+        };
+
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!("⚠️  Skipping entry: {}", e);
+                    continue;
+                }
+            };
+
             let path = entry.path();
 
             if path.is_file() {
+                // Check if we only want encrypted files
+                if encrypted_only && !self.config.is_encrypted_file(&path) {
+                    continue;
+                }
+
                 // Apply glob pattern filter if specified
                 if let Some(ref matcher) = glob_matcher {
                     if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
@@ -1187,9 +1220,26 @@ impl CrudManager {
                         continue;
                     }
                 }
+
                 files.push(path);
+            } else if path.is_dir() {
+                // Recurse into subdirectory
+                self.traverse_directory_recursive(&path, files, visited, glob_matcher, encrypted_only)?;
             }
         }
+
+        Ok(())
+    }
+
+    fn collect_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
+        let mut files = Vec::new();
+        let mut visited = HashSet::new();
+
+        // Compile glob matcher once if pattern provided
+        let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
+
+        // Use recursive traversal
+        self.traverse_directory_recursive(directory, &mut files, &mut visited, &glob_matcher, false)?;
 
         Ok(files)
     }
@@ -1197,28 +1247,13 @@ impl CrudManager {
     /// Collect encrypted files matching pattern
     fn collect_encrypted_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
+        let mut visited = HashSet::new();
 
         // Compile glob matcher once if pattern provided
         let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
 
-        for entry in std::fs::read_dir(directory)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_file() && self.config.is_encrypted_file(&path) {
-                // Apply glob pattern filter if specified
-                if let Some(ref matcher) = glob_matcher {
-                    if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-                        if !matcher.is_match(filename) {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-                files.push(path);
-            }
-        }
+        // Use recursive traversal (encrypted_only = true)
+        self.traverse_directory_recursive(directory, &mut files, &mut visited, &glob_matcher, true)?;
 
         Ok(files)
     }
