@@ -1113,26 +1113,15 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
 /// Show version information with logo
 fn show_version() {
     logo();
-    println!("Copyright © 2025 Qodeninja/Oxidex");
     println!("Version: {} | License: AGPL-3.0", env!("CARGO_PKG_VERSION"));
-    println!();
-    println!("🔒 Cage - Age Encryption Automation CLI");
-    println!("🛡️ Secure Age encryption with PTY automation");
-    println!("🚀 Built with RSB Framework");
-    println!("Repository: {}", env!("CARGO_PKG_REPOSITORY"));
-    println!();
-    println!("Features:");
-    println!("  • PTY automation for Age encryption");
-    println!("  • Multi-layered in-place safety");
-    println!("  • Professional progress indicators");
-    println!("  • RSB ecosystem integration");
+    println!("Copyright © 2025 Qodeninja/Oxidex");
 }
 
 /// Show comprehensive help information
 fn show_help() {
     logo();
-    println!("Copyright © 2025 Qodeninja/Oxidex");
     println!("Version: {} | License: AGPL-3.0", env!("CARGO_PKG_VERSION"));
+    println!("Copyright © 2025 Qodeninja/Oxidex");
     println!();
     println!("🔒 Cage - Age Encryption Automation CLI");
     println!("🛡️ Secure Age encryption with PTY automation");
