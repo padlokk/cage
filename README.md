@@ -5,7 +5,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Multi-License](https://img.shields.io/badge/multi--license-model-blue.svg)](./docs/lics/LICENSE_OVERVIEW.txt)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.3.1-green.svg)](Cargo.toml)
 
 Cage provides bulletproof encryption automation tools while maintaining cryptographic security standards. Features production-grade PTY automation with comprehensive error handling and security validation.
 
@@ -22,6 +22,8 @@ Cage provides bulletproof encryption automation tools while maintaining cryptogr
 - **🏷️ Smart Extensions** - Uses `.cage` extension by default, configurable for integration
 - **🔗 Age Proxy** - Direct Age binary access with PTY automation for any Age command
 - **💡 Interactive Passphrases** - Secure terminal input with multiple input modes
+- **🛡️ In-Place Safety** - Multi-layered protection for in-place file operations with recovery mechanisms
+- **📊 Progress Indicators** - Professional progress bars, spinners, and telemetry for long operations
 - **🖥️ Cross-Platform** - Linux, macOS support with Windows compatibility planned
 
 ## 🚀 Quick Start
@@ -50,6 +52,12 @@ cage lock secret.txt mysecretpassword
 # Decrypt a file (note: cage uses .cage extension by default)
 cage unlock secret.txt.cage mysecretpassword
 
+# In-place encryption with safety checks
+cage lock secret.txt --in-place --passphrase mysecretpassword
+
+# Operations with progress indicators
+cage lock /large-directory --recursive --progress --passphrase secret
+
 # Check encryption status
 cage status /path/to/files
 
@@ -62,7 +70,7 @@ cage batch /documents --operation lock --passphrase secret
 # Built-in RSB commands
 cage help           # Show help with enhanced formatting
 cage inspect        # List all available functions
-cage demo           # Show full demonstration
+cage test --progress-demo  # Demo progress indicators
 ```
 
 ## 🔧 RSB Framework Integration
@@ -128,6 +136,110 @@ cp target/release/cage ~/.local/bin/
 sudo cp target/release/cage /usr/local/bin/
 ```
 
+## 📚 Library Usage
+
+Cage can be used as a Rust library for integrating Age encryption automation into your own applications.
+
+### Cargo.toml
+
+```toml
+[dependencies]
+cage = { path = "path/to/cage" }
+```
+
+### Basic Library Usage
+
+```rust
+use cage::cage::{
+    CrudManager, LockOptions, UnlockOptions,
+    OutputFormat, PassphraseManager, PassphraseMode
+};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize CRUD manager
+    let mut crud_manager = CrudManager::with_defaults()?;
+
+    // Create lock options
+    let options = LockOptions {
+        recursive: false,
+        pattern: None,
+        backup: false,
+        format: OutputFormat::Binary,
+        preserve_encrypted: false,
+        audit_log: None,
+    };
+
+    // Encrypt a file
+    let result = crud_manager.lock(
+        &std::path::Path::new("secret.txt"),
+        "mypassword",
+        options
+    )?;
+
+    println!("Encrypted {} files", result.processed_files.len());
+    Ok(())
+}
+```
+
+### Progress Integration
+
+```rust
+use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
+use std::sync::Arc;
+
+let manager = ProgressManager::new();
+manager.add_reporter(Arc::new(TerminalReporter::new()));
+
+let task = manager.start_task("Encrypting files", ProgressStyle::Bar { total: 10 });
+for i in 0..10 {
+    task.update(i + 1, &format!("Processing file {}", i + 1));
+    // Your encryption work here
+}
+task.complete("All files encrypted");
+```
+
+### In-Place Operations
+
+```rust
+use cage::cage::{SafetyValidator, InPlaceOperation};
+
+// Safety validation
+let safety_validator = SafetyValidator::new(false, false)?;
+safety_validator.validate_in_place_operation(&path)?;
+
+// Create in-place operation
+let mut in_place_op = InPlaceOperation::new(&path);
+
+// Execute with recovery
+in_place_op.execute(|| {
+    crud_manager.lock(&path, passphrase, options)
+})?;
+```
+
+### PTY Automation
+
+```rust
+use cage::cage::pty_wrap::PtyAgeAutomator;
+
+let automator = PtyAgeAutomator::new()?;
+let result = automator.execute_age_command(
+    &["--encrypt", "--passphrase", "input.txt"],
+    Some("mypassword"),
+    30000  // 30 second timeout
+)?;
+```
+
+### Available Modules
+
+- **`cage::cage::CrudManager`** - Core file encryption/decryption operations
+- **`cage::cage::progress`** - Progress reporting framework
+- **`cage::cage::pty_wrap`** - PTY automation for Age binary
+- **`cage::cage::SafetyValidator`** - In-place operation safety checks
+- **`cage::cage::InPlaceOperation`** - Atomic in-place file operations
+- **`cage::cage::PassphraseManager`** - Secure passphrase handling
+
+📖 **[Complete Library Documentation](docs/LIBRARY_USAGE.md)** - Comprehensive API guide with examples
+
 ## 🔧 Usage
 
 ### Command Overview
@@ -141,7 +253,7 @@ sudo cp target/release/cage /usr/local/bin/
 | `verify` | Verify file integrity | ✅ Fully Implemented |
 | `batch` | Bulk operations | ✅ Fully Implemented |
 | `proxy` | Direct Age commands with PTY | ✅ Fully Implemented |
-| `test` | Run test suite | ⚠️ In Development |
+| `test` | Run test suite & demos | ✅ Fully Implemented |
 | `demo` | Show demonstrations | ✅ Fully Implemented |
 
 ### Detailed Examples
@@ -163,6 +275,15 @@ cage lock /logs --recursive --pattern "*.log" --passphrase "strongpassword"
 
 # With backup creation
 cage lock important.txt --backup --passphrase "strongpassword"
+
+# In-place encryption (overwrites original with recovery file)
+cage lock document.pdf --in-place --passphrase "strongpassword"
+
+# In-place with danger mode (no recovery file)
+DANGER_MODE=1 cage lock document.pdf --in-place --danger-mode --passphrase "strongpassword"
+
+# Show progress for long operations
+cage lock /large-directory --recursive --progress --passphrase "strongpassword"
 ```
 
 #### File Decryption
@@ -237,8 +358,15 @@ echo "secret" | cage proxy --age-p --age-o=output.cage --stdin-passphrase input.
 #### Global Flags
 
 - `--verbose, -v` - Show detailed operation progress
+- `--progress` - Display professional progress indicators for long operations
 - `--audit-log <PATH>` - Write audit log for security compliance
 - `--format <FORMAT>` - Encryption format: `binary` (default) or `ascii`
+
+#### In-Place Operation Flags
+
+- `--in-place` - Encrypt/decrypt files in-place (overwrites original)
+- `--danger-mode` - Skip recovery file creation (requires DANGER_MODE=1 env var)
+- `--i-am-sure` - Automation override for scripted operations
 
 #### Output Formats
 
@@ -352,15 +480,25 @@ See [ROADMAP.md](ROADMAP.md) for current development priorities.
 
 ## 📚 Documentation
 
-- **[ROADMAP.md](ROADMAP.md)** - Development roadmap and feature status
-- **[Cargo.toml](Cargo.toml)** - Dependencies and project metadata
-- **Inline Documentation** - Comprehensive code documentation
+### Library & API Documentation
+- **[📖 Library Usage Guide](docs/LIBRARY_USAGE.md)** - Comprehensive Rust library documentation with examples
+- **[🏗️ ROADMAP.md](docs/procs/ROADMAP.md)** - Development roadmap and feature status
+- **[📋 TASKS.txt](docs/procs/TASKS.txt)** - Detailed task list and development plan
+
+### Feature Documentation
+- **[🛡️ Safety Design](docs/ref/SAFETY_DESIGN.md)** - In-place operation safety architecture
+- **[📊 Progress Framework](docs/features/FEATURES_PROGRESS.md)** - Progress reporting system details
+- **[⚙️ RSB Framework](docs/rsb/RSB_ARCH.md)** - RSB framework architecture and usage
 
 ### API Documentation
 
 ```bash
-# Generate and view API docs
+# Generate and view complete API docs
 cargo doc --open
+
+# Quick library examples
+cargo run --example basic_encryption
+cargo run --example progress_demo
 ```
 
 ## 🔐 Security
@@ -396,9 +534,9 @@ Please report security vulnerabilities via private channels:
 
 ## 🚧 Current Status
 
-**Version:** 0.1.0
-**Production Readiness:** 60%
-**Development Phase:** MVP (Phase 1)
+**Version:** 0.3.1
+**Production Readiness:** 85%
+**Development Phase:** Feature Complete (Phase 2)
 
 ### ✅ Implemented Features
 
@@ -412,15 +550,18 @@ Please report security vulnerabilities via private channels:
 - Security validation and audit logging
 - RSB framework integration
 - Configurable file extensions for library integration
+- **In-place operations** with multi-layered safety architecture
+- **Progress indicators** with professional terminal output
+- **Recovery mechanisms** for in-place operations
+- **Comprehensive telemetry** and progress hooks
 
 ### ⚠️ In Development
 
-- In-place file operations with recovery mechanisms
-- Progress indicators for long operations
 - Configuration file support
 - Windows compatibility
+- RageAdapter implementation
 
-See [TASKS.txt](TASKS.txt) for detailed development plan.
+See [docs/procs/TASKS.txt](docs/procs/TASKS.txt) for detailed development plan.
 
 ## 🧪 Testing
 
