@@ -16,8 +16,30 @@ use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
 // Import RSB utilities for enhanced CLI experience
 use rsb::prelude::*;
 
+/// Print the Cage logo
+fn logo() {
+    println!(r#"┌─┐┌─┐┌─┐┌─┐
+│  ├─┤│ ┬├┤
+└─┘┴ ┴└─┘└─┘"#);
+}
+
 /// Main function using RSB bootstrap
 fn main() {
+    // Check for version or help flags before RSB processing
+    let args: Vec<String> = std::env::args().collect();
+
+    // Handle --version, -v
+    if args.iter().any(|arg| arg == "--version" || arg == "-v") {
+        show_version();
+        return;
+    }
+
+    // Handle --help, -h
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        show_help();
+        return;
+    }
+
     let args = bootstrap!();
     options!(&args);
 
@@ -49,7 +71,8 @@ fn main() {
         "batch" => cmd_batch,
         "test" => cmd_test,
         "demo" => cmd_demo,
-        "proxy" => cmd_proxy
+        "proxy" => cmd_proxy,
+        "version" => cmd_version
     });
 }
 
@@ -1085,6 +1108,78 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
 
     echo!("✅ Age proxy command completed successfully");
     Ok(())
+}
+
+/// Show version information with logo
+fn show_version() {
+    logo();
+    println!("Copyright © 2025 Qodeninja/Oxidex");
+    println!("Version: {} | License: AGPL-3.0", env!("CARGO_PKG_VERSION"));
+    println!();
+    println!("🔒 Cage - Age Encryption Automation CLI");
+    println!("🛡️ Secure Age encryption with PTY automation");
+    println!("🚀 Built with RSB Framework");
+    println!("Repository: {}", env!("CARGO_PKG_REPOSITORY"));
+    println!();
+    println!("Features:");
+    println!("  • PTY automation for Age encryption");
+    println!("  • Multi-layered in-place safety");
+    println!("  • Professional progress indicators");
+    println!("  • RSB ecosystem integration");
+}
+
+/// Show comprehensive help information
+fn show_help() {
+    logo();
+    println!("Copyright © 2025 Qodeninja/Oxidex");
+    println!("Version: {} | License: AGPL-3.0", env!("CARGO_PKG_VERSION"));
+    println!();
+    println!("🔒 Cage - Age Encryption Automation CLI");
+    println!("🛡️ Secure Age encryption with PTY automation");
+    println!("🚀 Built with RSB Framework");
+    println!();
+    println!("USAGE:");
+    println!("  cage <command> [options]");
+    println!("  cage --version, -v     Show version information");
+    println!("  cage --help, -h        Show this help message");
+    println!();
+    println!("COMMANDS:");
+    println!("  lock           Encrypt files/directories");
+    println!("  unlock         Decrypt files/directories");
+    println!("  status         Check encryption status");
+    println!("  rotate         Rotate encryption keys");
+    println!("  verify         Verify file integrity");
+    println!("  batch          Bulk operations");
+    println!("  proxy          Direct Age commands with PTY");
+    println!("  test           Run test suite & demos");
+    println!("  demo           Show demonstrations");
+    println!();
+    println!("GLOBAL OPTIONS:");
+    println!("  --verbose, -v          Show detailed operation progress");
+    println!("  --progress             Display professional progress indicators");
+    println!("  --format <FORMAT>      Encryption format: binary (default) or ascii");
+    println!("  --audit-log <PATH>     Write audit log for security compliance");
+    println!();
+    println!("IN-PLACE OPERATION OPTIONS:");
+    println!("  --in-place             Encrypt/decrypt files in-place (overwrites original)");
+    println!("  --danger-mode          Skip recovery file creation (requires DANGER_MODE=1)");
+    println!("  --i-am-sure            Automation override for scripted operations");
+    println!();
+    println!("EXAMPLES:");
+    println!("  cage lock secret.txt --progress");
+    println!("  cage unlock secret.txt.cage --progress");
+    println!("  cage lock document.pdf --in-place");
+    println!("  cage status /encrypted-files --verbose");
+    println!("  cage proxy --age-p --age-a --age-o=output.age input.txt");
+    println!();
+    println!("For detailed help on a specific command, use:");
+    println!("  cage <command> --help");
+}
+
+/// Version command handler for RSB dispatch
+fn cmd_version(_args: Args) -> i32 {
+    show_version();
+    0
 }
 
 /// UAT Demo for Progress Indicators
