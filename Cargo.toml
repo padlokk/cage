@@ -1,11 +1,13 @@
 [package]
 name = "cage"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 description = "Age encryption automation CLI with PTY support"
 repository = "https://github.com/padlokk/cage"
 license = "AGPL-3.0"            
 publish = false  
+
+# does this need a lib?
 
 [[bin]]
 name = "cage"
