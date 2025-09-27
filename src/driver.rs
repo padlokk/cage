@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use std::thread;
 use std::time::Duration;
-use portable_pty::*;
+use hub::terminal_ext::portable_pty::*;
 
 fn main() {
     println!("🧪 Simple PTY + age driver test");

@@ -12,7 +12,7 @@ name = "cage"
 path = "src/bin/cli_age.rs"
 
 [dependencies]
-portable-pty = "0.9"
+# portable-pty = "0.9"  # Testing Hub terminal-ext integration
 
 # Core dependencies for Age automation
 tempfile = "3.8"
@@ -28,6 +28,6 @@ globset = "0.4"    # Glob pattern matching for file filters
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"  # TTY detection on Unix systems
 
-# RSB framework with re-exported dependencies (optional for now)
-# KEEP THIS!
-rsb = { git = "https://github.com/oodx/rsb-framework", branch = "main" }
+# RSB ecosystem dependencies
+rsb = { git = "https://github.com/oodx/rsb", branch = "main" }
+hub = { git = "https://github.com/oodx/hub.git", features = ["terminal-ext"] }

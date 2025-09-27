@@ -5,7 +5,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Multi-License](https://img.shields.io/badge/multi--license-model-blue.svg)](./docs/lics/LICENSE_OVERVIEW.txt)
-[![Version](https://img.shields.io/badge/version-0.3.1-green.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.3.2-green.svg)](Cargo.toml)
 
 Cage provides bulletproof encryption automation tools while maintaining cryptographic security standards. Features production-grade PTY automation with comprehensive error handling and security validation.
 

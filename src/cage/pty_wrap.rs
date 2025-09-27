@@ -7,7 +7,10 @@ use std::path::Path;
 use std::time::Duration;
 use std::thread;
 use std::io::{Write, Read};
-use portable_pty::*;
+// Use Hub's terminal-ext for portable-pty (RSB ecosystem approach)
+// Both import styles work per HOWTO_HUB:
+use hub::terminal_ext::portable_pty::*;  // Grouped module (preferred for clarity)
+// Alternative: use hub::portable_pty::*;  // Top-level re-export
 use tempfile::TempDir;
 use super::error::{AgeError, AgeResult};
 use super::config::OutputFormat;

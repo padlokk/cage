@@ -111,6 +111,16 @@
 
 ---
 
+## Future Infrastructure (INFRA Series)
+
+### INFRA-01: Migrate to RSB dev-pty Module [COMPLETE via Hub] ✅
+**Background**: RSB 0.6.2 includes `dev-pty` feature with `rsb::dev::pty` module, but API exports don't match `portable-pty` interface.
+**Solution**: Migrated to Hub's `terminal-ext` feature which provides `portable-pty` via RSB ecosystem.
+**Benefits**: ✅ Achieved - Reduced dependency count, better RSB ecosystem integration via Hub.
+**Status**: Completed using `hub = { git = "https://github.com/oodx/hub.git", features = ["terminal-ext"] }`.
+
+---
+
 ## Notes
 - Keep CHANGELOG entries aligned with CAGE/BUG/TEST identifiers.
 - Prioritise BUG-01..05 before starting new CAGE work; they unblock documented scenarios.
