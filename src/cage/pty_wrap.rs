@@ -479,6 +479,191 @@ impl PtyAgeAutomator {
         Ok(())
     }
 
+    /// Execute arbitrary age command with PTY automation for passphrase handling
+    pub fn execute_age_command(&self, args: &[String], passphrase: Option<&str>) -> AgeResult<String> {
+        let pty_system = native_pty_system();
+        let pty_size = PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+        let pair = pty_system.openpty(pty_size)
+            .map_err(|e| AgeError::ProcessExecutionFailed {
+                command: "create_pty".to_string(),
+                exit_code: None,
+                stderr: format!("Failed to create PTY: {}", e),
+            })?;
+
+        // Build age command with provided arguments
+        let mut cmd = CommandBuilder::new("age");
+
+        // Set working directory to match parent process
+        if let Ok(current_dir) = std::env::current_dir() {
+            cmd.cwd(current_dir);
+        }
+
+        for arg in args {
+            cmd.arg(arg);
+        }
+
+        // Spawn age in PTY
+        let child = pair.slave.spawn_command(cmd)
+            .map_err(|e| {
+                let error_msg = format!("{}", e);
+                if error_msg.contains("No viable candidates found in PATH") ||
+                   error_msg.contains("No such file or directory") ||
+                   error_msg.contains("not found") {
+                    AgeError::AgeBinaryNotFound(format!("age command not found: {}", e))
+                } else {
+                    AgeError::ProcessExecutionFailed {
+                        command: "age".to_string(),
+                        exit_code: None,
+                        stderr: format!("Failed to spawn age: {}", e),
+                    }
+                }
+            })?;
+
+        drop(pair.slave);
+
+        let mut writer = pair.master.take_writer()
+            .map_err(|e| AgeError::ProcessExecutionFailed {
+                command: "pty_writer".to_string(),
+                exit_code: None,
+                stderr: format!("Failed to get PTY writer: {}", e),
+            })?;
+
+        let mut reader = pair.master.try_clone_reader()
+            .map_err(|e| AgeError::ProcessExecutionFailed {
+                command: "pty_reader".to_string(),
+                exit_code: None,
+                stderr: format!("Failed to get PTY reader: {}", e),
+            })?;
+
+        // Handle age interaction with timeout
+        let passphrase_clone = passphrase.map(|p| p.to_string());
+        let timeout_duration = self.timeout;
+        let automation_thread = thread::spawn(move || -> AgeResult<String> {
+            let mut buffer = [0u8; 1024];
+            let mut output_buffer = String::new();
+            let mut complete_output = String::new();
+            let start_time = std::time::Instant::now();
+
+            loop {
+                // Check for timeout
+                if start_time.elapsed() > timeout_duration {
+                    return Err(AgeError::ProcessExecutionFailed {
+                        command: "pty_automation_timeout".to_string(),
+                        exit_code: None,
+                        stderr: format!("PTY automation timed out after {:?}", timeout_duration),
+                    });
+                }
+
+                match reader.read(&mut buffer) {
+                    Ok(0) => {
+                        // EOF - age finished
+                        break;
+                    }
+                    Ok(n) => {
+                        let text = String::from_utf8_lossy(&buffer[..n]);
+                        output_buffer.push_str(&text);
+                        complete_output.push_str(&text);
+
+                        // Check for passphrase prompts if passphrase provided
+                        if let Some(ref pass) = passphrase_clone {
+                            if output_buffer.contains("Enter passphrase") ||
+                               output_buffer.contains("passphrase:") {
+                                // Send passphrase
+                                writer.write_all(pass.as_bytes())
+                                    .map_err(|e| AgeError::ProcessExecutionFailed {
+                                        command: "pty_write_passphrase".to_string(),
+                                        exit_code: None,
+                                        stderr: format!("Failed to write passphrase: {}", e),
+                                    })?;
+                                writer.write_all(b"\n")
+                                    .map_err(|e| AgeError::ProcessExecutionFailed {
+                                        command: "pty_write_newline".to_string(),
+                                        exit_code: None,
+                                        stderr: format!("Failed to write newline: {}", e),
+                                    })?;
+
+                                // Clear buffer after handling prompt
+                                output_buffer.clear();
+                            }
+
+                            if output_buffer.contains("Confirm passphrase") ||
+                               output_buffer.contains("confirm:") {
+                                // Send confirmation
+                                writer.write_all(pass.as_bytes())
+                                    .map_err(|e| AgeError::ProcessExecutionFailed {
+                                        command: "pty_write_confirm".to_string(),
+                                        exit_code: None,
+                                        stderr: format!("Failed to write confirmation: {}", e),
+                                    })?;
+                                writer.write_all(b"\n")
+                                    .map_err(|e| AgeError::ProcessExecutionFailed {
+                                        command: "pty_write_confirm_newline".to_string(),
+                                        exit_code: None,
+                                        stderr: format!("Failed to write confirmation newline: {}", e),
+                                    })?;
+
+                                output_buffer.clear();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // Check if it's a "would block" error (non-fatal) or real error
+                        use std::io::ErrorKind;
+                        if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::TimedOut {
+                            // Give it a moment and continue
+                            thread::sleep(Duration::from_millis(50));
+                            continue;
+                        }
+
+                        return Err(AgeError::ProcessExecutionFailed {
+                            command: "pty_read".to_string(),
+                            exit_code: None,
+                            stderr: format!("PTY read error: {}", e),
+                        });
+                    }
+                }
+
+                // Small delay to prevent busy waiting
+                thread::sleep(Duration::from_millis(10));
+            }
+            Ok(complete_output)
+        });
+
+        // Wait for automation thread
+        let automation_result = automation_thread.join()
+            .map_err(|_| AgeError::ProcessExecutionFailed {
+                command: "automation_thread".to_string(),
+                exit_code: None,
+                stderr: "Automation thread panicked".to_string(),
+            })?;
+
+        // Wait for child process to complete
+        let mut child = child;
+        let exit_status = child.wait()
+            .map_err(|e| AgeError::ProcessExecutionFailed {
+                command: "age_wait".to_string(),
+                exit_code: None,
+                stderr: format!("Failed to wait for age process: {}", e),
+            })?;
+
+        let output = automation_result?;
+
+        if exit_status.success() {
+            Ok(output)
+        } else {
+            Err(AgeError::ProcessExecutionFailed {
+                command: format!("age {}", args.join(" ")),
+                exit_code: None, // portable_pty doesn't expose exit code directly
+                stderr: format!("Age command failed with exit status: {:?}", exit_status),
+            })
+        }
+    }
+
     /// Get available automation methods
     pub fn available_methods(&self) -> Vec<String> {
         vec!["pty".to_string()]  // Only PTY method available
