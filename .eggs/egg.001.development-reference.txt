@@ -1,0 +1,101 @@
+================================================================================
+ 🐔 CHINA'S DEVELOPMENT REFERENCE EGG #001 🥚
+================================================================================
+
+📅 Date: 2025-09-27
+🎯 Purpose: Development Context & Task Reference Compilation
+
+================================================================================
+🌟 EXECUTIVE SUMMARY
+================================================================================
+Current sprint focuses on two primary objectives:
+1. Complete META_PROCESS v2 Implementation
+2. Resolve Critical Bugs (BUG-01 through BUG-05)
+
+Total Sprint Points: 27 pts
+- META_PROCESS v2: 8 pts
+- BUG Slate: 19 pts
+
+================================================================================
+🔍 META_PROCESS v2 STATUS
+================================================================================
+Progress Breakdown:
+✅ COMPLETED:
+- Phase 1: Project Assessment & Discovery
+- Phase 2: Structure Design & Organization
+- Partial Phase 3: Core Document Creation
+
+🟡 IN PROGRESS:
+- Complete remaining Phase 3 documents
+- Phase 4: Agent Analysis Consolidation
+- Phase 5: Automation & Validation
+- Phase 6: Testing & Refinement
+
+================================================================================
+🐞 BUG SLATE PRIORITY (Post META_PROCESS)
+================================================================================
+Critical Bugs (Blocking Production, In Order):
+
+1. BUG-01: Preserve Original Extensions [3 pts]
+   📍 Location: `src/cage/lifecycle/crud_manager.rs:857-907`
+   🎯 Goal: Fix filename handling during lock/unlock
+
+2. BUG-02: Recursive Operations [5 pts]
+   📍 Location: Traversal functions in `crud_manager.rs`
+   🎯 Goal: Implement proper recursive directory traversal
+
+3. BUG-03: Pattern Filtering [3 pts]
+   📍 Location: Traversal helpers
+   🎯 Goal: Replace substring matching with glob support
+
+4. BUG-04: Unlock Options [3 pts]
+   📍 Location: `unlock_single_file`
+   🎯 Goal: Implement proper handling of unlock options
+
+5. BUG-05: Proxy Command Rewrite [5 pts]
+   📍 Location: `src/bin/cli_age.rs`
+   🎯 Goal: Cross-platform PTY proxy implementation
+
+================================================================================
+📚 REQUIRED READING LIST
+================================================================================
+BEFORE Starting Development:
+1. /docs/procs/TASKS.txt (Full task details)
+2. /docs/procs/SPRINT.txt (Sprint context)
+3. /docs/procs/CONTINUE.md (Latest session status)
+4. /docs/tech/CAGE_PTY_FIX.md (PTY migration details)
+5. /docs/ref/RSB_LESSONS.md (Framework patterns)
+
+CODE LOCATIONS TO REVIEW:
+- `src/cage/lifecycle/crud_manager.rs`
+- `src/bin/cli_age.rs`
+- `src/cage/in_place.rs`
+- `src/cage/config.rs`
+
+================================================================================
+🚧 RECOMMENDED WORKFLOW
+================================================================================
+1. Complete META_PROCESS v2
+2. Address BUG-01 through BUG-05
+3. Run comprehensive tests
+4. Update documentation
+5. Prepare for release
+
+================================================================================
+🔬 TECHNICAL CONTEXT
+================================================================================
+- Language: Rust
+- Framework: RSB (Rebel String-Biased)
+- Current Version: 0.3.1
+- Test Command: `cargo test --all`
+- Smoke Test: `./bin/test.sh run smoke`
+
+================================================================================
+🐔 CHICKEN DISCLAIMER
+================================================================================
+This egg represents a snapshot of the current development state. Always verify
+with the most recent documentation and consult with team members for the latest
+updates. My summaries are based on available documentation and may not capture
+100% of nuanced context.
+
+Cluck cluck! 🐔

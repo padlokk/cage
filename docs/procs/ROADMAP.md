@@ -1,8 +1,8 @@
 # Cage Development Roadmap
 
-**Last Updated:** 2025-09-13
-**Current Status:** 60% Production Ready
-**Version:** 0.1.0
+**Last Updated:** 2025-09-27
+**Current Status:** META_PROCESS v2 rollout + P0 bug slate
+**Version:** 0.3.1
 
 ## Project Overview
 

@@ -1,8 +1,8 @@
-# Cage Sprint: META_PROCESS v2 Implementation + P1 Phase
+# Cage Sprint: META_PROCESS v2 Implementation + BUG Slate
 
 **Sprint Duration**: Current (started 2025-09-27)
-**Sprint Goal**: Complete META_PROCESS v2 rollout, then resume P1 bug fixes
-**Total Story Points**: META_PROCESS (est. 8 pts) + P1 (32 pts) = 40 pts
+**Sprint Goal**: Finish META_PROCESS v2 rollout, then clear BUG-01…BUG-05
+**Total Story Points**: META_PROCESS (est. 8 pts) + BUG slate (19 pts) = 27 pts
 
 ================================================================================
 ## ACTIVE SPRINT TASKS
@@ -26,7 +26,7 @@ Status: IN PROGRESS
   - [x] PROCESS.txt
   - [x] QUICK_REF.txt
   - [x] CONTINUE.md
-  - [ ] SPRINT.txt (this file - being created)
+  - [ ] SPRINT.txt (this file – final review pending)
   - [ ] DONE.txt
 
 - [ ] Phase 4: Agent Analysis Consolidation (1 pt)
@@ -48,83 +48,53 @@ Status: IN PROGRESS
 - [ ] Merge admin/meta-process to main (0.5 pts)
 
 ================================================================================
-## QUEUED P1 TASKS (Resume after META_PROCESS complete)
+## NEXT WORK AFTER META_PROCESS
 ================================================================================
 
-### Critical Bugs (Blocking Production)
+### BUG Slate (Blocking Production)
 
-**BUG-01: Preserve Original Extensions** [3 pts]
-- Location: src/cage/lifecycle/crud_manager.rs:857-907
-- Issue: lock_single_file rewrites to <stem>.cage breaking documented flow
-- Priority: HIGH - Breaks user-facing behavior
+- **BUG-01: Preserve Original Extensions** (3 pts)
+  - Path: `src/cage/lifecycle/crud_manager.rs`
+  - Goal: Append `.cage` without stripping original suffix; adjust unlock to reverse safely.
 
-**BUG-02: Recursive Operations Ignore Subdirectories** [5 pts]
-- Location: collect_files_with_pattern functions
-- Issue: read_dir is non-recursive, skips nested trees
-- Priority: HIGH - Advertised feature doesn't work
+- **BUG-02: Recursive Operations Ignore Subdirectories** (5 pts)
+  - Path: traversal helpers in `crud_manager.rs`
+  - Goal: Implement shared recursive traversal for lock/unlock/status/verify.
 
-**BUG-03: Pattern Filters Treat Globs as Literal Substrings** [3 pts]
-- Location: Same traversal helpers
-- Issue: CLI advertises glob usage but never matches
-- Priority: HIGH - Security automation scripts can miss targets
+- **BUG-03: Pattern Filters Treat Globs as Literal Substrings** (3 pts)
+  - Path: same traversal helpers
+  - Goal: Replace substring matcher with glob support (e.g. `globset`).
 
-**BUG-04: Unlock Options Ignored** [3 pts]
-- Location: unlock_single_file function
-- Issue: _options unused, encrypted artifacts always preserved
-- Priority: MEDIUM - UX surprise but not breaking
+- **BUG-04: Unlock Options Ignored** (3 pts)
+  - Path: `unlock_single_file`
+  - Goal: Honour `preserve_encrypted` and `selective` options; update reporting accordingly.
 
-**BUG-05: Proxy Command Still Uses Expect Script** [5 pts]
-- Location: execute_proxy_command in cli_age.rs
-- Issue: Contradicts PTY migration, Unix-only
-- Priority: MEDIUM - Cross-platform concern
+- **BUG-05: Proxy Command Still Uses Expect Script** (5 pts)
+  - Path: `src/bin/cli_age.rs` (proxy handler)
+  - Goal: Reuse PTY automator; remove `expect`; keep behaviour cross-platform friendly.
 
-### Feature Work (Already Complete from P0)
-
-**CAGE-01: Key Rotation** [8 pts] - ✅ COMPLETE
-**CAGE-02: File Verification** [5 pts] - ✅ COMPLETE
-**CAGE-03: Backup/Recovery** [5 pts] - ✅ COMPLETE
-
-### Test Improvements
-
-**TEST-01: Align CLI Suites with Current Binary** [3 pts]
-- Location: tests/cli/*.sh
-- Issue: Scripts call deprecated binaries
-- Priority: MEDIUM - Integration tests not running
-
-**TEST-02: Regression Coverage for BUG-01..04** [3 pts]
-- Priority: HIGH - Lock in fixes once completed
-
-**TEST-03: Proxy PTY Integration Tests** [2 pts]
-- Priority: LOW - After BUG-05 resolved
-
-================================================================================
-## SPRINT BACKLOG (Not in current sprint)
-================================================================================
-
-### P1 Remaining Tasks
-- CAGE-04: In-place operation safety [5 pts]
-- CAGE-05: Progress & telemetry [3 pts]
-- CAGE-06: Configuration file support [5 pts]
-- CAGE-07: RageAdapter implementation [8 pts]
-- TASK-010: RSB CLI migration [8 pts]
+### Follow-up Work
+- **TEST-01**: Align CLI suites with current binary (3 pts).
+- **TEST-02**: Regression coverage for BUG-01..04 (3 pts).
+- Resume CAGE-04+ feature work once bug slate and tests are complete.
 
 ================================================================================
 ## SPRINT NOTES
 ================================================================================
 
 **Key Decisions**:
-- Prioritize META_PROCESS v2 completion for better workflow foundation
-- BUG-01 through BUG-05 take priority after META_PROCESS
-- Consider TASK-010 (RSB migration) before remaining P1 work
+- Complete META_PROCESS v2 before touching feature work.
+- BUG-01 through BUG-05 are highest priority production fixes once process work is done.
+- Queue TEST-01/TEST-02 immediately after the bug slate.
 
 **Blockers**:
-- None currently
+- None currently.
 
 **Team Velocity**:
-- Solo development with AI agent support
-- Estimated 10-15 story points per week
+- Solo development with agent assistance.
+- Estimated 10–15 story points per week.
 
 ================================================================================
 
 Last Updated: 2025-09-27
-Next Review: After META_PROCESS v2 complete
+Next Review: After META_PROCESS v2 completion
