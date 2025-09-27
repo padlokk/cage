@@ -463,7 +463,7 @@ mod tests {
 
         multi.complete("All steps completed");
 
-        assert_eq!(multi.main_task().state(), super::core::ProgressState::Complete);
+        assert_eq!(multi.main_task().state(), crate::cage::progress::ProgressState::Complete);
     }
 
     #[test]

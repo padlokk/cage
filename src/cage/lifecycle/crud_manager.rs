@@ -854,7 +854,11 @@ impl CrudManager {
 
     /// Lock a single file
     fn lock_single_file(&self, file: &Path, passphrase: &str, options: &LockOptions, result: &mut OperationResult) -> AgeResult<()> {
-        let output_path = file.with_extension(&self.config.encrypted_file_extension);
+        let output_path = {
+            let mut path = file.as_os_str().to_os_string();
+            path.push(self.config.extension_with_dot());
+            PathBuf::from(path)
+        };
 
         let mut backup_info: Option<BackupInfo> = None;
 
@@ -932,8 +936,26 @@ impl CrudManager {
 
     /// Unlock a single file
     fn unlock_single_file(&self, file: &Path, passphrase: &str, _options: &UnlockOptions, result: &mut OperationResult) -> AgeResult<()> {
-        // Determine output path by removing .age extension
-        let output_path = file.with_extension("");
+        // Determine output path by stripping only the configured extension suffix
+        let output_path = {
+            let file_name = file.file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| AgeError::InvalidOperation {
+                    operation: "unlock".to_string(),
+                    reason: format!("Invalid filename: {}", file.display()),
+                })?;
+
+            let suffix = self.config.extension_with_dot();
+            if !file_name.ends_with(&suffix) {
+                return Err(AgeError::InvalidOperation {
+                    operation: "unlock".to_string(),
+                    reason: format!("File does not have {} extension: {}", suffix, file.display()),
+                });
+            }
+
+            let output_name = &file_name[..file_name.len() - suffix.len()];
+            file.with_file_name(output_name)
+        };
 
         match self.adapter.decrypt(file, &output_path, passphrase) {
             Ok(_) => {

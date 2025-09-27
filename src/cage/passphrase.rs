@@ -262,16 +262,16 @@ mod tests {
 
     #[test]
     fn test_insecure_usage_detection() {
-        let args1 = vec!["cage".to_string(), "lock", "--passphrase", "secret123"];
-        let detected = PassphraseManager::detect_insecure_usage(&args1.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        let args1 = vec!["cage".to_string(), "lock".to_string(), "--passphrase".to_string(), "secret123".to_string()];
+        let detected = PassphraseManager::detect_insecure_usage(&args1);
         assert_eq!(detected, Some("secret123".to_string()));
 
-        let args2 = vec!["cage".to_string(), "lock", "--passphrase=mysecret"];
-        let detected = PassphraseManager::detect_insecure_usage(&args2.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        let args2 = vec!["cage".to_string(), "lock".to_string(), "--passphrase=mysecret".to_string()];
+        let detected = PassphraseManager::detect_insecure_usage(&args2);
         assert_eq!(detected, Some("mysecret".to_string()));
 
-        let args3 = vec!["cage".to_string(), "lock", "file.txt"];
-        let detected = PassphraseManager::detect_insecure_usage(&args3.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        let args3 = vec!["cage".to_string(), "lock".to_string(), "file.txt".to_string()];
+        let detected = PassphraseManager::detect_insecure_usage(&args3);
         assert_eq!(detected, None);
     }
 
