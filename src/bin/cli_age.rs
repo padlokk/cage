@@ -76,7 +76,7 @@ fn cmd_install(_args: Args) -> i32 {
 }
 
 /// Lock (encrypt) files using RSB dispatch
-fn cmd_lock(mut args: Args) -> i32 {
+fn cmd_lock(args: Args) -> i32 {
     let paths_str = args.get_or(1, "");
     let paths: Vec<PathBuf> = if paths_str.is_empty() {
         // Get remaining arguments as paths
@@ -96,7 +96,7 @@ fn cmd_lock(mut args: Args) -> i32 {
     if let Some(_insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
         stderr!("⚠️  WARNING: Passphrase detected on command line!");
         stderr!("   This is insecure and visible in process list.");
-        if !args.has("--i-am-sure") {
+        if !is_true("opt_i_am_sure") {
             stderr!("   Use interactive prompt instead, or add --i-am-sure to override");
             return 1;
         }
@@ -104,7 +104,7 @@ fn cmd_lock(mut args: Args) -> i32 {
 
     // Get passphrase securely
     let passphrase_manager = PassphraseManager::new();
-    let passphrase = if args.has("--stdin-passphrase") {
+    let passphrase = if is_true("opt_stdin_passphrase") {
         match passphrase_manager.get_passphrase_with_mode("Enter passphrase", false, PassphraseMode::Stdin) {
             Ok(pass) => pass,
             Err(e) => {
@@ -128,16 +128,17 @@ fn cmd_lock(mut args: Args) -> i32 {
         }
     };
 
-    let recursive = args.has("--recursive");
-    let pattern = args.has_val("--pattern");
-    let backup = args.has("--backup");
+    let recursive = is_true("opt_recursive");
+    let pattern = get_var("opt_pattern");
+    let pattern = if pattern.is_empty() { None } else { Some(pattern) };
+    let backup = is_true("opt_backup");
     let verbose = is_true("opt_verbose");
-    let show_progress = args.has("--progress");
+    let show_progress = is_true("opt_progress");
 
     // In-place operation flags
-    let in_place = args.has("--in-place");
-    let danger_mode = args.has("--danger-mode");
-    let i_am_sure = args.has("--i-am-sure");
+    let in_place = is_true("opt_in_place");
+    let danger_mode = is_true("opt_danger_mode");
+    let i_am_sure = is_true("opt_i_am_sure");
 
     let format = match get_var("opt_format").as_str() {
         "ascii" => OutputFormat::AsciiArmor,
@@ -178,7 +179,7 @@ fn cmd_lock(mut args: Args) -> i32 {
 }
 
 /// Unlock (decrypt) files using RSB dispatch
-fn cmd_unlock(mut args: Args) -> i32 {
+fn cmd_unlock(args: Args) -> i32 {
     let paths_str = args.get_or(1, "");
     let paths: Vec<PathBuf> = if paths_str.is_empty() {
         args.remaining().iter().map(PathBuf::from).collect()
@@ -194,7 +195,7 @@ fn cmd_unlock(mut args: Args) -> i32 {
 
     // Get passphrase securely (same pattern as lock)
     let passphrase_manager = PassphraseManager::new();
-    let passphrase = if args.has("--stdin-passphrase") {
+    let passphrase = if is_true("opt_stdin_passphrase") {
         match passphrase_manager.get_passphrase_with_mode("Enter passphrase", false, PassphraseMode::Stdin) {
             Ok(pass) => pass,
             Err(e) => {
@@ -215,11 +216,12 @@ fn cmd_unlock(mut args: Args) -> i32 {
         }
     };
 
-    let selective = args.has("--selective");
-    let pattern = args.has_val("--pattern");
-    let preserve = args.has("--preserve");
+    let selective = is_true("opt_selective");
+    let pattern = get_var("opt_pattern");
+    let pattern = if pattern.is_empty() { None } else { Some(pattern) };
+    let preserve = is_true("opt_preserve");
     let verbose = is_true("opt_verbose");
-    let show_progress = args.has("--progress");
+    let show_progress = is_true("opt_progress");
 
     let audit_log = if !get_var("opt_audit_log").is_empty() {
         Some(PathBuf::from(get_var("opt_audit_log")))
@@ -259,7 +261,7 @@ fn cmd_status(args: Args) -> i32 {
 }
 
 /// Rotate encryption keys using RSB dispatch
-fn cmd_rotate(mut args: Args) -> i32 {
+fn cmd_rotate(args: Args) -> i32 {
     let repository = PathBuf::from(args.get_or(1, ""));
     if repository.as_os_str().is_empty() {
         stderr!("❌ Repository path required for rotation");
@@ -269,52 +271,58 @@ fn cmd_rotate(mut args: Args) -> i32 {
 
     // Get old passphrase securely
     let passphrase_manager = PassphraseManager::new();
-    let old_passphrase = if let Some(pass) = args.has_val("--old-passphrase") {
-        // Command line provided (warn but allow)
-        stderr!("⚠️  Warning: Old passphrase on command line is insecure");
-        pass
-    } else if args.has("--stdin-passphrase") {
-        match passphrase_manager.get_passphrase_with_mode("Enter old passphrase", false, PassphraseMode::Stdin) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to read old passphrase from stdin: {}", e);
-                return 1;
+    let old_passphrase = {
+        let old_pass_var = get_var("opt_old_passphrase");
+        if !old_pass_var.is_empty() {
+            // Command line provided (warn but allow)
+            stderr!("⚠️  Warning: Old passphrase on command line is insecure");
+            old_pass_var
+        } else if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode("Enter old passphrase", false, PassphraseMode::Stdin) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read old passphrase from stdin: {}", e);
+                    return 1;
+                }
             }
-        }
-    } else {
-        match passphrase_manager.get_passphrase("Enter current passphrase", false) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to get old passphrase: {}", e);
-                return 1;
+        } else {
+            match passphrase_manager.get_passphrase("Enter current passphrase", false) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get old passphrase: {}", e);
+                    return 1;
+                }
             }
         }
     };
 
     // Get new passphrase securely with confirmation
-    let new_passphrase = if let Some(pass) = args.has_val("--new-passphrase") {
-        // Command line provided (warn but allow)
-        stderr!("⚠️  Warning: New passphrase on command line is insecure");
-        pass
-    } else if args.has("--stdin-passphrase") {
-        match passphrase_manager.get_passphrase_with_mode("Enter new passphrase", false, PassphraseMode::Stdin) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to read new passphrase from stdin: {}", e);
-                return 1;
+    let new_passphrase = {
+        let new_pass_var = get_var("opt_new_passphrase");
+        if !new_pass_var.is_empty() {
+            // Command line provided (warn but allow)
+            stderr!("⚠️  Warning: New passphrase on command line is insecure");
+            new_pass_var
+        } else if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode("Enter new passphrase", false, PassphraseMode::Stdin) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read new passphrase from stdin: {}", e);
+                    return 1;
+                }
             }
-        }
-    } else {
-        match passphrase_manager.get_passphrase("Enter new passphrase", true) {  // confirm=true for new passphrase
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to get new passphrase: {}", e);
-                return 1;
+        } else {
+            match passphrase_manager.get_passphrase("Enter new passphrase", true) {  // confirm=true for new passphrase
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get new passphrase: {}", e);
+                    return 1;
+                }
             }
         }
     };
 
-    let backup = args.has("--backup");
+    let backup = is_true("opt_backup");
     let verbose = is_true("opt_verbose");
 
     match execute_rotate_operation(&repository, &old_passphrase, &new_passphrase, backup, verbose) {
@@ -352,7 +360,7 @@ fn cmd_verify(args: Args) -> i32 {
 }
 
 /// Batch process files using RSB dispatch
-fn cmd_batch(mut args: Args) -> i32 {
+fn cmd_batch(args: Args) -> i32 {
     let directory = PathBuf::from(args.get_or(1, ""));
     if directory.as_os_str().is_empty() {
         stderr!("❌ Directory required for batch operation");
@@ -360,8 +368,9 @@ fn cmd_batch(mut args: Args) -> i32 {
         return 1;
     }
 
-    let operation = args.has_val("--operation").unwrap_or_default();
-    let pattern = args.has_val("--pattern");
+    let operation = get_var("opt_operation");
+    let pattern = get_var("opt_pattern");
+    let pattern = if pattern.is_empty() { None } else { Some(pattern) };
 
     if operation.is_empty() {
         stderr!("❌ Operation type required");
@@ -371,30 +380,33 @@ fn cmd_batch(mut args: Args) -> i32 {
 
     // Get passphrase securely for batch operations
     let passphrase_manager = PassphraseManager::new();
-    let passphrase = if let Some(pass) = args.has_val("--passphrase") {
-        // Command line provided (warn but allow with confirmation)
-        stderr!("⚠️  Warning: Batch passphrase on command line is insecure");
-        stderr!("   This will be applied to multiple files!");
-        if !args.has("--i-am-sure") {
-            stderr!("   Add --i-am-sure to confirm or use interactive prompt");
-            return 1;
-        }
-        pass
-    } else if args.has("--stdin-passphrase") {
-        match passphrase_manager.get_passphrase_with_mode("Enter passphrase for batch operation", false, PassphraseMode::Stdin) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to read passphrase from stdin: {}", e);
+    let passphrase = {
+        let pass_var = get_var("opt_passphrase");
+        if !pass_var.is_empty() {
+            // Command line provided (warn but allow with confirmation)
+            stderr!("⚠️  Warning: Batch passphrase on command line is insecure");
+            stderr!("   This will be applied to multiple files!");
+            if !is_true("opt_i_am_sure") {
+                stderr!("   Add --i-am-sure to confirm or use interactive prompt");
                 return 1;
             }
-        }
-    } else {
-        echo!("⚠️  Batch operation will apply to multiple files in {}", directory.display());
-        match passphrase_manager.get_passphrase(&format!("Enter passphrase for batch {}", operation), false) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to get passphrase: {}", e);
-                return 1;
+            pass_var
+        } else if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode("Enter passphrase for batch operation", false, PassphraseMode::Stdin) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                    return 1;
+                }
+            }
+        } else {
+            echo!("⚠️  Batch operation will apply to multiple files in {}", directory.display());
+            match passphrase_manager.get_passphrase(&format!("Enter passphrase for batch {}", operation), false) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get passphrase: {}", e);
+                    return 1;
+                }
             }
         }
     };
@@ -414,8 +426,8 @@ fn cmd_batch(mut args: Args) -> i32 {
 }
 
 /// Run test suite using RSB dispatch
-fn cmd_test(args: Args) -> i32 {
-    if args.has("--progress-demo") {
+fn cmd_test(_args: Args) -> i32 {
+    if is_true("opt_progress_demo") {
         return run_progress_demo();
     }
 
@@ -1041,7 +1053,7 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
 
         // Create passphrase manager and get passphrase from user
         let passphrase_manager = PassphraseManager::new();
-        let passphrase = if args.has("--stdin-passphrase") {
+        let passphrase = if is_true("opt_stdin_passphrase") {
             passphrase_manager.get_passphrase_with_mode(
                 "Enter passphrase for Age operation",
                 false,
