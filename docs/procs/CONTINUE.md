@@ -1,28 +1,37 @@
 # Continue Log – Bug Slate Progress
 
-## HANDOFF-2025-09-27-1000
+## HANDOFF-2025-09-27-1030
 
-### Session Duration: ~30 minutes
+### Session Duration: ~90 minutes
 ### Branch: main
 ### Phase: Critical Bug Fixes (BUG-01 through BUG-05)
 
 ### Completed:
-- ✅ BUG-01: Preserve Original Extensions [3 pts] - CODE COMPLETE (Awaiting UAT)
+- ✅ BUG-01: Preserve Original Extensions [3 pts] - COMPLETE
   - Fixed lock_single_file to append .cage extension instead of replacing
   - Fixed unlock_single_file to strip only .cage suffix, preserving original extensions
-  - Verified: report.pdf → report.pdf.cage → report.pdf (round-trip successful)
-  - Fixed pre-existing compilation errors in passphrase.rs and progress/manager.rs
-  - China review completed (see .eggs/egg.002.bug01-extension-fix.txt)
+  - Resolved UAT issues: failure tracking, UTF-8 handling with clear messages
+  - UAT Report: .analysis/uat_bug01_extension_fix.md
+  - Commits: 8bdec70, c02bba3
+
+- ✅ BUG-03: Glob Pattern Support [3 pts] - COMPLETE
+  - Added globset = "0.4" dependency
+  - Created create_glob_matcher() helper
+  - Replaced substring contains() with proper glob matching
+  - Supports *.ext, prefix*, ???? patterns
+  - Works for both lock and unlock operations
+  - UAT Report: .analysis/uat_bug03_glob_patterns.md
+  - Commit: 54828f4
 
 ### In Progress:
-- 🔄 Awaiting UAT verification for BUG-01 before marking complete
-- Ready to proceed with BUG-03 (glob patterns) next
+- 🔄 Ready to proceed with BUG-02 (recursive traversal, 5 pts)
 
 ### Next Agent MUST:
-1. Conduct UAT verification for BUG-01 extension preservation
-2. Once verified, commit BUG-01 changes
-3. Proceed with BUG-03: Pattern Filtering (glob support)
-4. Continue with BUG-02, BUG-04, BUG-05 in priority order
+1. Implement BUG-02: Recursive directory traversal (5 pts)
+2. Implement BUG-04: Honor unlock options (3 pts)
+3. Implement BUG-05: Proxy PTY rewrite (5 pts)
+
+### Progress: 6/19 story points complete (32%)
 
 ---
 
