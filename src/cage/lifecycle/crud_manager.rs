@@ -936,7 +936,7 @@ impl CrudManager {
     }
 
     /// Unlock a single file
-    fn unlock_single_file(&self, file: &Path, passphrase: &str, _options: &UnlockOptions, result: &mut OperationResult) -> AgeResult<()> {
+    fn unlock_single_file(&self, file: &Path, passphrase: &str, options: &UnlockOptions, result: &mut OperationResult) -> AgeResult<()> {
         // Determine output path by stripping only the configured extension suffix
         let output_path = {
             let file_name_os = file.file_name()
@@ -975,9 +975,42 @@ impl CrudManager {
             file.with_file_name(output_name)
         };
 
+        // Honor verify_before_unlock option
+        if options.verify_before_unlock {
+            if let Err(e) = self.verify_file_integrity(file) {
+                result.add_failure(file.display().to_string());
+                eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);
+                return Err(AgeError::InvalidOperation {
+                    operation: "unlock".to_string(),
+                    reason: format!("File failed verification: {}", e),
+                });
+            }
+        }
+
+        // Honor selective option - skip if selective mode and conditions not met
+        if options.selective {
+            // For selective mode, we could add additional criteria here
+            // For now, selective mode will process all files that pass pattern filter
+            // This allows for future extension of selective criteria
+        }
+
         match self.adapter.decrypt(file, &output_path, passphrase) {
             Ok(_) => {
                 result.add_success(file.display().to_string());
+
+                // Honor preserve_encrypted option
+                if !options.preserve_encrypted {
+                    // Delete the encrypted file after successful unlock
+                    if let Err(e) = std::fs::remove_file(file) {
+                        eprintln!("⚠️  Warning: Failed to delete encrypted file {}: {}", file.display(), e);
+                        // Don't fail the operation if we can't delete the encrypted file
+                    } else {
+                        eprintln!("🗑️  Deleted encrypted file: {}", file.display());
+                    }
+                } else {
+                    eprintln!("📂 Preserved encrypted file: {}", file.display());
+                }
+
                 Ok(())
             }
             Err(e) => {
