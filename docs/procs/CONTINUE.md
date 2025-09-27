@@ -39,7 +39,22 @@
 1. Implement BUG-04: Honor unlock options (3 pts)
 2. Implement BUG-05: Proxy PTY rewrite (5 pts)
 
-### Progress: 11/19 story points complete (58%)
+- ✅ BUG-04: Honor Unlock Options [3 pts] - COMPLETE
+  - Fixed unlock_single_file to honor all UnlockOptions
+  - Added verify_before_unlock integrity checking
+  - Added preserve_encrypted option (delete vs keep encrypted files)
+  - Added selective unlock framework (extensible)
+  - Clear CLI feedback: 🗑️ deleted vs 📂 preserved messages
+  - UAT Report: .analysis/uat_bug04_unlock_options.md
+  - Commit: [pending]
+
+### In Progress:
+- 🔄 Ready to proceed with BUG-05 (proxy PTY rewrite, 5 pts)
+
+### Next Agent MUST:
+1. Implement BUG-05: Proxy PTY rewrite (5 pts) - Final bug
+
+### Progress: 14/19 story points complete (74%)
 
 ---
 
