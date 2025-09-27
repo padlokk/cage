@@ -1,0 +1,256 @@
+================================================================================
+ 📋 CAGE DEVELOPMENT PROCESS v2
+================================================================================
+
+Last Updated: 2025-09-27
+Project: Cage - Age Encryption Automation CLI
+Version: 0.3.1
+Status: P0 Complete (21/21 pts), P1 Phase (32 pts)
+
+================================================================================
+ 🏗️ PROJECT STRUCTURE & KEY DOCUMENTS
+================================================================================
+
+ROOT DIRECTORY:
+/home/xnull/repos/code/rust/prods/padlokk/cage/
+
+PROCESS DOCUMENTS (docs/procs/):
+- PROCESS.txt ← You are here (master workflow)
+- CONTINUE.md ← Session status & handoffs (UPDATE EVERY SESSION!)
+- TASKS.txt ← Detailed task breakdown with story points
+- QUICK_REF.txt ← 30-second context for urgent starts
+- SPRINT.txt ← Current iteration/sprint tasks (TO BE CREATED)
+- DONE.txt ← Completed work archive (TO BE CREATED)
+
+REFERENCE DOCUMENTS (docs/ref/):
+- ROADMAP.md ← Strategic overview & 3-phase plan
+- RSB_LESSONS.md ← RSB framework integration lessons
+- SAFETY_DESIGN.md ← Security & safety architecture
+
+ANALYSIS & INSIGHTS (.analysis/):
+- egg.1.rsb-cli-analysis.txt ← RSB CLI migration strategy
+- egg.1.rsb-xdg-analysis.txt ← XDG compliance analysis
+- egg.001.meta-process-v2-analysis.txt ← META_PROCESS implementation
+- SESSION_01_p0_complete_rsb_ready.md ← P0 completion session
+- SESSION_02_progress_framework_complete.md ← Framework progress
+
+TECHNICAL DOCUMENTATION (docs/misc/):
+- CAGE_PTY_FIX.md ← PTY automation fix details
+- PADLOCK_INTEGRATION.md ← Historical padlock integration
+- SECRETS_FOR_RSB.md ← RSB secrets management
+- SESSION.md ← Session management notes
+
+================================================================================
+ 🔄 SELF-HYDRATING WORKFLOW PROCESS
+================================================================================
+
+STEP 1: CONTEXT HYDRATION CHECKLIST
+────────────────────────────────────
+When starting ANY session (new agent or continuation):
+
+1. READ START.txt (30 seconds)
+2. READ this file - PROCESS.txt (3 minutes)
+3. READ docs/procs/CONTINUE.md (1 minute)
+4. READ docs/procs/TASKS.txt (1 minute)
+5. CHECK .analysis/ for recent insights (optional, 2 minutes)
+
+TOTAL TIME: 5 minutes to full productive context
+
+STEP 2: PHASE DETECTION
+────────────────────────
+Identify current project phase from CONTINUE.md and TASKS.txt:
+
+- PLANNING: Designing features, reviewing architecture
+- DEVELOPMENT: Active coding on BUG/CAGE/TEST tasks
+- TESTING: Running test suites, fixing test failures
+- REFACTORING: RSB migration, code cleanup
+- DOCUMENTATION: Updating docs, creating guides
+
+STEP 3: WORK EXECUTION PATTERNS
+────────────────────────────────
+
+FOR BUG FIXES (BUG-01 through BUG-05):
+1. Read bug description in docs/procs/TASKS.txt
+2. Locate affected code (paths provided in task)
+3. Fix issue following checklist items
+4. Run `cargo test --all` to verify
+5. Run `./bin/test.sh run smoke` for integration tests
+6. Update docs/procs/CONTINUE.md with progress
+
+FOR FEATURE WORK (CAGE-01 through CAGE-07):
+1. Review feature spec in docs/procs/TASKS.txt
+2. Check docs/ref/ for related architecture decisions
+3. Implement following RSB patterns (see .analysis/egg.1.rsb-cli-analysis.txt)
+4. Add comprehensive tests (unit + integration)
+5. Update README.md if user-facing
+6. Update docs/procs/CONTINUE.md with completion
+
+FOR TEST IMPROVEMENTS (TEST-01 through TEST-03):
+1. Review test requirements in docs/procs/TASKS.txt
+2. Update test scripts in bin/ or tests/
+3. Run full test suite to verify
+4. Document test coverage improvements
+5. Update docs/procs/CONTINUE.md
+
+STEP 4: SESSION CLOSURE & HANDOFF REQUIREMENTS
+──────────────────────────────────────────────
+MANDATORY at end of EVERY session:
+
+1. Update docs/procs/CONTINUE.md using standardized format:
+   - Session duration
+   - Branch name
+   - Completed items
+   - Blocked items
+   - Next agent MUST do
+   - Context hash (git commit SHA)
+   - Files modified count
+
+2. Commit all changes to git:
+   git add .
+   git commit -m "Descriptive message"
+
+3. Update docs/procs/TASKS.txt if tasks completed or priorities changed
+
+4. Run `./bin/validate-docs.sh` if it exists
+
+================================================================================
+ 📊 PROJECT STATUS QUICK REFERENCE
+================================================================================
+
+CURRENT VERSION: 0.3.1
+CURRENT BRANCH: admin/meta-process (for META_PROCESS v2 rollout)
+MAIN BRANCH: main
+
+PHASE STATUS:
+- ✅ P0 "Blocking Production" (21/21 pts) - COMPLETE
+- 🔴 P1 "High Priority" (32 pts) - IN PROGRESS
+- ⬆️ P2 "Enhancement" - Future
+
+P1 PRIORITIES (see TASKS.txt for details):
+1. BUG-01: Preserve extensions (3 pts)
+2. BUG-02: Recursive operations (5 pts)
+3. BUG-03: Pattern filters/globs (3 pts)
+4. BUG-04: Unlock options (3 pts)
+5. BUG-05: Proxy command PTY (5 pts)
+6. CAGE-01: Key rotation (8 pts) - ALREADY COMPLETE
+7. CAGE-02: File verification (5 pts) - ALREADY COMPLETE
+8. CAGE-03: Backup/recovery (5 pts) - ALREADY COMPLETE
+
+KEY DECISIONS:
+- Using RSB framework for enhanced CLI and XDG support
+- PTY automation with portable-pty (proven working)
+- Local file focus (working directory operations)
+- XDG compliance for system-level config
+
+BLOCKERS:
+- None currently
+
+CRITICAL CONTEXT:
+- P0 phase completed previous session (SESSION_01)
+- RSB CLI migration identified as optimization (TASK-010, 8 pts)
+- All core operations working (lock, unlock, status, verify)
+- 52 tests passing (38 unit + 2 CLI + 4 PTY + 7 integration + 1 doc)
+
+================================================================================
+ 🔧 COMMON WORKFLOWS
+================================================================================
+
+BUILD & TEST:
+────────────
+cargo build                    # Build debug
+cargo build --release          # Build release
+cargo test --all               # Run all tests
+./bin/test.sh run smoke        # Quick smoke test
+./bin/test.sh run all          # Full integration suite
+
+RUN CAGE:
+────────
+cargo run --bin cage -- --help           # Show help
+cargo run --bin cage -- lock file.txt    # Lock file
+cargo run --bin cage -- unlock file.txt.cage  # Unlock file
+cargo run --bin cage -- status .         # Check status
+cargo run --bin cage -- verify file.txt.cage   # Verify integrity
+
+DEVELOPMENT:
+────────────
+git checkout -b feature/task-name        # New feature branch
+# ... make changes ...
+cargo test --all                         # Verify tests pass
+git add .
+git commit -m "feat: description"
+git checkout main
+git merge feature/task-name
+
+RSB FRAMEWORK:
+─────────────
+# RSB is located at: /home/xnull/repos/code/rust/oodx/rsb/
+# Already imported in Cage via Cargo.toml
+# See .analysis/egg.1.rsb-cli-analysis.txt for migration patterns
+
+================================================================================
+ 🎯 AGENT QUICK START GUIDE
+================================================================================
+
+PROJECT BACKGROUND:
+Cage is an Age encryption automation CLI tool that eliminates manual TTY
+interaction while maintaining cryptographic security. Built with Rust using
+the RSB (Rebel String-Biased) framework for enhanced CLI and utilities.
+
+KEY ARCHITECTURE:
+- Core Library: src/cage/ - Main encryption/decryption logic
+- CLI Binary: src/bin/cli_age.rs - Command-line interface
+- PTY Automation: src/driver.rs - Portable PTY for Age interaction
+- Lifecycle Management: src/cage/lifecycle/ - CRUD operations
+- Adapters: src/cage/adapter.rs - Age binary & rage crate backends
+
+WORKFLOW RULES:
+1. ALWAYS update docs/procs/CONTINUE.md at session end
+2. ALWAYS run tests before committing (cargo test --all)
+3. FOLLOW RSB patterns for new code (see RSB_LESSONS.md)
+4. COMMIT frequently with descriptive messages
+5. CHECK TASKS.txt for current priorities
+
+TESTING REQUIREMENTS:
+- Unit tests for all new functions
+- Integration tests for CLI commands
+- PTY tests for automation features
+- Regression tests for bug fixes
+
+================================================================================
+ 📚 REFERENCE LINKS
+================================================================================
+
+BY PRIORITY:
+1. docs/procs/CONTINUE.md - Current session status
+2. docs/procs/TASKS.txt - Active task breakdown
+3. docs/ref/ROADMAP.md - Strategic plan
+4. .analysis/egg.1.rsb-cli-analysis.txt - RSB migration strategy
+5. docs/ref/SAFETY_DESIGN.md - Security architecture
+6. README.md - Project overview & usage
+
+TOPIC-SPECIFIC:
+- RSB Integration: docs/ref/RSB_LESSONS.md
+- PTY Automation: docs/misc/CAGE_PTY_FIX.md
+- Security: docs/ref/SAFETY_DESIGN.md
+- Padlock History: docs/misc/PADLOCK_INTEGRATION.md
+
+TESTING & VALIDATION:
+- Test Runner: bin/test.sh
+- Test Directory: tests/
+- Documentation Validator: bin/validate-docs.sh (TO BE CREATED)
+
+================================================================================
+ 🚨 CRITICAL REMINDERS
+================================================================================
+
+1. **SESSION HANDOFF**: Update CONTINUE.md EVERY session (MANDATORY!)
+2. **TEST BEFORE COMMIT**: Run `cargo test --all` always
+3. **RSB PATTERNS**: Follow RSB framework conventions
+4. **NO BROKEN BUILDS**: Never commit failing code
+5. **DOCUMENT AS YOU GO**: Keep TASKS.txt current
+
+================================================================================
+
+For META_PROCESS v2 details, see: META_PROCESS.txt in project root
+
+NEED HELP? Read START.txt for quick navigation guide

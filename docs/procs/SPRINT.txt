@@ -1,0 +1,130 @@
+# Cage Sprint: META_PROCESS v2 Implementation + P1 Phase
+
+**Sprint Duration**: Current (started 2025-09-27)
+**Sprint Goal**: Complete META_PROCESS v2 rollout, then resume P1 bug fixes
+**Total Story Points**: META_PROCESS (est. 8 pts) + P1 (32 pts) = 40 pts
+
+================================================================================
+## ACTIVE SPRINT TASKS
+================================================================================
+
+### META_PROCESS v2 Implementation (8 pts estimated)
+Status: IN PROGRESS
+
+- [x] Phase 1: Project Assessment & Discovery (2 pts)
+  - [x] Document inventory with China
+  - [x] Agent analysis inventory
+  - [x] Current state analysis
+
+- [x] Phase 2: Structure Design & Organization (2 pts)
+  - [x] Create directory structure
+  - [x] Migrate documents
+  - [x] Consolidate analysis files
+
+- [~] Phase 3: Core Document Creation (2 pts)
+  - [x] START.txt
+  - [x] PROCESS.txt
+  - [x] QUICK_REF.txt
+  - [x] CONTINUE.md
+  - [ ] SPRINT.txt (this file - being created)
+  - [ ] DONE.txt
+
+- [ ] Phase 4: Agent Analysis Consolidation (1 pt)
+  - [ ] Deploy China for wisdom consolidation
+  - [ ] Deploy Tina for quality analysis
+  - [ ] Extract technical debt
+  - [ ] Integrate MVP triage
+
+- [ ] Phase 5: Automation & Validation (1 pt)
+  - [ ] Create bin/validate-docs.sh
+  - [ ] Define session handoff requirements
+  - [ ] Implement multi-speed onboarding
+
+- [ ] Phase 6: Testing & Refinement (0.5 pts)
+  - [ ] Test with fresh agent
+  - [ ] Validate all workflow paths
+  - [ ] Refine documentation
+
+- [ ] Merge admin/meta-process to main (0.5 pts)
+
+================================================================================
+## QUEUED P1 TASKS (Resume after META_PROCESS complete)
+================================================================================
+
+### Critical Bugs (Blocking Production)
+
+**BUG-01: Preserve Original Extensions** [3 pts]
+- Location: src/cage/lifecycle/crud_manager.rs:857-907
+- Issue: lock_single_file rewrites to <stem>.cage breaking documented flow
+- Priority: HIGH - Breaks user-facing behavior
+
+**BUG-02: Recursive Operations Ignore Subdirectories** [5 pts]
+- Location: collect_files_with_pattern functions
+- Issue: read_dir is non-recursive, skips nested trees
+- Priority: HIGH - Advertised feature doesn't work
+
+**BUG-03: Pattern Filters Treat Globs as Literal Substrings** [3 pts]
+- Location: Same traversal helpers
+- Issue: CLI advertises glob usage but never matches
+- Priority: HIGH - Security automation scripts can miss targets
+
+**BUG-04: Unlock Options Ignored** [3 pts]
+- Location: unlock_single_file function
+- Issue: _options unused, encrypted artifacts always preserved
+- Priority: MEDIUM - UX surprise but not breaking
+
+**BUG-05: Proxy Command Still Uses Expect Script** [5 pts]
+- Location: execute_proxy_command in cli_age.rs
+- Issue: Contradicts PTY migration, Unix-only
+- Priority: MEDIUM - Cross-platform concern
+
+### Feature Work (Already Complete from P0)
+
+**CAGE-01: Key Rotation** [8 pts] - ✅ COMPLETE
+**CAGE-02: File Verification** [5 pts] - ✅ COMPLETE
+**CAGE-03: Backup/Recovery** [5 pts] - ✅ COMPLETE
+
+### Test Improvements
+
+**TEST-01: Align CLI Suites with Current Binary** [3 pts]
+- Location: tests/cli/*.sh
+- Issue: Scripts call deprecated binaries
+- Priority: MEDIUM - Integration tests not running
+
+**TEST-02: Regression Coverage for BUG-01..04** [3 pts]
+- Priority: HIGH - Lock in fixes once completed
+
+**TEST-03: Proxy PTY Integration Tests** [2 pts]
+- Priority: LOW - After BUG-05 resolved
+
+================================================================================
+## SPRINT BACKLOG (Not in current sprint)
+================================================================================
+
+### P1 Remaining Tasks
+- CAGE-04: In-place operation safety [5 pts]
+- CAGE-05: Progress & telemetry [3 pts]
+- CAGE-06: Configuration file support [5 pts]
+- CAGE-07: RageAdapter implementation [8 pts]
+- TASK-010: RSB CLI migration [8 pts]
+
+================================================================================
+## SPRINT NOTES
+================================================================================
+
+**Key Decisions**:
+- Prioritize META_PROCESS v2 completion for better workflow foundation
+- BUG-01 through BUG-05 take priority after META_PROCESS
+- Consider TASK-010 (RSB migration) before remaining P1 work
+
+**Blockers**:
+- None currently
+
+**Team Velocity**:
+- Solo development with AI agent support
+- Estimated 10-15 story points per week
+
+================================================================================
+
+Last Updated: 2025-09-27
+Next Review: After META_PROCESS v2 complete

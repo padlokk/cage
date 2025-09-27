@@ -1,0 +1,43 @@
+🎯 CAGE QUICK REFERENCE (30-Second Context)
+================================================================================
+
+**Current Focus**: P1 Phase - Critical Bug Fixes + Feature Completion
+
+📊 **Project Status**:
+- ✅ P0 "Blocking Production" (21/21 pts) - COMPLETE
+- 🔴 P1 "High Priority" (32 pts) - IN PROGRESS
+- ⬆️ P2 "Enhancement" - Future
+
+🚨 **Critical Context**:
+- **Current Branch**: admin/meta-process (META_PROCESS v2 rollout)
+- **Version**: 0.3.1
+- **MVP**: P1 bugs blocking documented scenarios - fix first!
+- **Tests**: 52 passing (38 unit + 2 CLI + 4 PTY + 7 int + 1 doc)
+
+📋 **P1 Priority Tasks** (see docs/procs/TASKS.txt):
+1. BUG-01: Preserve extensions during lock/unlock (3 pts)
+2. BUG-02: Recursive operations ignore subdirs (5 pts)
+3. BUG-03: Pattern filters treat globs as literals (3 pts)
+4. BUG-04: Unlock options ignored (3 pts)
+5. BUG-05: Proxy command uses expect script (5 pts)
+
+🏗️ **Architecture**:
+- **Language**: Rust
+- **Framework**: RSB (Rebel String-Biased)
+- **PTY**: portable-pty (proven working)
+- **Test Command**: `cargo test --all`
+- **Smoke Test**: `./bin/test.sh run smoke`
+
+⚡ **Immediate Next Steps**:
+1. Read docs/procs/CONTINUE.md for latest session status
+2. Check docs/procs/TASKS.txt for detailed task breakdown
+3. Review .analysis/egg.1.rsb-cli-analysis.txt for RSB patterns
+
+🚨 **Critical Rules**:
+- UPDATE docs/procs/CONTINUE.md at end of EVERY session
+- RUN `cargo test --all` before every commit
+- FOLLOW RSB patterns (see docs/ref/RSB_LESSONS.md)
+- NO broken builds in commits
+
+================================================================================
+Last Updated: 2025-09-27
