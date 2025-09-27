@@ -20,6 +20,7 @@ use crate::cage::security::AuditLogger;
 use crate::cage::operations::{
     RepositoryStatus, OperationResult
 };
+use globset::{Glob, GlobMatcher};
 
 /// Options for lock operations
 #[derive(Debug, Clone)]
@@ -1155,20 +1156,35 @@ impl CrudManager {
     }
 
     /// Collect files matching pattern
+    /// Create a glob matcher from pattern string
+    fn create_glob_matcher(&self, pattern: &str) -> AgeResult<GlobMatcher> {
+        let glob = Glob::new(pattern)
+            .map_err(|e| AgeError::InvalidOperation {
+                operation: "pattern_matching".to_string(),
+                reason: format!("Invalid glob pattern '{}': {}", pattern, e),
+            })?;
+        Ok(glob.compile_matcher())
+    }
+
     fn collect_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
+
+        // Compile glob matcher once if pattern provided
+        let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
 
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() {
-                // Apply pattern filter if specified
-                if let Some(pattern) = pattern {
+                // Apply glob pattern filter if specified
+                if let Some(ref matcher) = glob_matcher {
                     if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-                        if !filename.contains(pattern) {
+                        if !matcher.is_match(filename) {
                             continue;
                         }
+                    } else {
+                        continue;
                     }
                 }
                 files.push(path);
@@ -1182,17 +1198,22 @@ impl CrudManager {
     fn collect_encrypted_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
 
+        // Compile glob matcher once if pattern provided
+        let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
+
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let path = entry.path();
 
             if path.is_file() && self.config.is_encrypted_file(&path) {
-                // Apply pattern filter if specified
-                if let Some(pattern) = pattern {
+                // Apply glob pattern filter if specified
+                if let Some(ref matcher) = glob_matcher {
                     if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-                        if !filename.contains(pattern) {
+                        if !matcher.is_match(filename) {
                             continue;
                         }
+                    } else {
+                        continue;
                     }
                 }
                 files.push(path);
