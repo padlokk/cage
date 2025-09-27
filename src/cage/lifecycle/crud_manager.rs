@@ -938,15 +938,32 @@ impl CrudManager {
     fn unlock_single_file(&self, file: &Path, passphrase: &str, _options: &UnlockOptions, result: &mut OperationResult) -> AgeResult<()> {
         // Determine output path by stripping only the configured extension suffix
         let output_path = {
-            let file_name = file.file_name()
-                .and_then(|n| n.to_str())
-                .ok_or_else(|| AgeError::InvalidOperation {
-                    operation: "unlock".to_string(),
-                    reason: format!("Invalid filename: {}", file.display()),
+            let file_name_os = file.file_name()
+                .ok_or_else(|| {
+                    result.add_failure(file.display().to_string());
+                    AgeError::InvalidOperation {
+                        operation: "unlock".to_string(),
+                        reason: format!("Cannot extract filename from path: {}", file.display()),
+                    }
                 })?;
+
+            // Try UTF-8 conversion for standard filename handling
+            let file_name = match file_name_os.to_str() {
+                Some(name) => name,
+                None => {
+                    result.add_failure(file.display().to_string());
+                    eprintln!("⚠️  Skipping file with non-UTF8 filename: {}", file.display());
+                    return Err(AgeError::InvalidOperation {
+                        operation: "unlock".to_string(),
+                        reason: format!("Non-UTF8 filename not supported: {}", file.display()),
+                    });
+                }
+            };
 
             let suffix = self.config.extension_with_dot();
             if !file_name.ends_with(&suffix) {
+                result.add_failure(file.display().to_string());
+                eprintln!("⚠️  Skipping file without {} extension: {}", suffix, file.display());
                 return Err(AgeError::InvalidOperation {
                     operation: "unlock".to_string(),
                     reason: format!("File does not have {} extension: {}", suffix, file.display()),
