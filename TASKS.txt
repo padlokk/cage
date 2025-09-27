@@ -1,8 +1,8 @@
 # Cage Development Tasks
 
-**Created:** 2025-09-13
-**Current Version:** 0.1.0
-**Status:** Ready for P0 Implementation
+**Updated:** 2025-09-14
+**Current Version:** 0.3.1
+**Status:** Planning Refresh (CAGE/BUG/TEST series)
 
 ## Story Point Scale
 - 1 pt = 1-2 hours (simple fix/addition)
@@ -12,282 +12,106 @@
 
 ---
 
-## P0 - BLOCKING PRODUCTION (Must Complete First)
+## Critical Bugs (Blocking Production)
 
-### TASK-001: Implement Key Rotation Logic [8 pts]
-**Location:** `src/cage/lifecycle/crud_manager.rs:196-224`
-**Current Status:** Stub implementation only
-**Requirements:**
-- [ ] Complete re-encryption with new passphrase
-- [ ] Validation of old passphrase before rotation
-- [ ] Atomic operation with rollback capability
-- [ ] Handle file permission preservation
-- [ ] Add comprehensive error handling
-- [ ] Unit tests for rotation logic
-- [ ] Integration test with actual files
-**Definition of Done:** Key rotation works end-to-end with rollback on failure
+### BUG-01: Preserve Original Extensions During Lock/Unlock [3 pts]
+**Location:** `src/cage/lifecycle/crud_manager.rs:857-907`
+**Issue:** `lock_single_file` rewrites filenames to `<stem>.cage`, breaking documented `file.ext.cage` flow and round-trip unlock.
+**Fix Checklist:**
+- [ ] Append configured extension to the full name (e.g. `report.pdf.cage`).
+- [ ] Update unlock logic to strip only the configured suffix.
+- [ ] Adjust CLI examples/tests after the change.
+- [ ] Add regression tests covering nested extensions.
 
-### TASK-002: Implement File Verification System [5 pts]
-**Location:** `src/cage/lifecycle/crud_manager.rs:577-581`
-**Current Status:** Placeholder method only
-**Requirements:**
-- [ ] Verify encrypted files can be decrypted with correct passphrase
-- [ ] Check file integrity after encryption/decryption
-- [ ] Validate Age headers and format correctness
-- [ ] Performance optimization for large files
-- [ ] Add verification result reporting
-- [ ] Unit tests for verification logic
-- [ ] Error handling for corrupted files
-**Definition of Done:** Verification detects corruption and validates integrity
+### BUG-02: Recursive Operations Ignore Subdirectories [5 pts]
+**Location:** `collect_files_with_pattern` & friends (`src/cage/lifecycle/crud_manager.rs:921-960, 1120-1160`)
+**Issue:** `read_dir` is non-recursive, so `--recursive`, `status`, and `verify` skip nested trees.
+**Fix Checklist:**
+- [ ] Implement depth-first traversal with symlink guards.
+- [ ] Respect pattern filters across depth.
+- [ ] Share traversal between lock/unlock/status/verify.
+- [ ] Add integration coverage for nested directories.
 
-### TASK-003: Implement Backup System Logic [5 pts]
-**Location:** Throughout codebase (`--backup` flag exists but no implementation)
-**Current Status:** CLI flag exists, no backend logic
-**Requirements:**
-- [ ] Create backup files before operations (.bak extension)
-- [ ] Configurable backup location and naming
-- [ ] Backup cleanup on successful operations
-- [ ] Restore capability on operation failure
-- [ ] Handle backup conflicts (existing .bak files)
-- [ ] Add backup size estimation
-- [ ] Unit tests for backup operations
-**Definition of Done:** --backup flag creates/manages backups safely
+### BUG-03: Pattern Filters Treat Globs as Literal Substrings [3 pts]
+**Location:** Same traversal helpers (`contains(pattern)` logic).
+**Issue:** CLI advertises glob usage (`--pattern "*.log"`), but current logic never matches such inputs.
+**Fix Checklist:**
+- [ ] Replace substring check with glob matcher (e.g. `globset`).
+- [ ] Support negation/advanced patterns if feasible.
+- [ ] Document accepted syntax and update help output.
+- [ ] Add unit tests for positive/negative cases.
 
-### TASK-004: Fix Integration Tests [3 pts]
-**Location:** `tests/` directory
-**Current Status:** References wrong project (padlock)
-**Requirements:**
-- [ ] Update test imports to use cage modules
-- [ ] Remove padlock-specific test cases
-- [ ] Add cage-specific integration scenarios
-- [ ] Update test runner configuration
-- [ ] Verify all tests pass with current codebase
-**Definition of Done:** All integration tests pass and test cage functionality
+### BUG-04: Unlock Options Ignored [3 pts]
+**Location:** `unlock_single_file` (`src/cage/lifecycle/crud_manager.rs:933-947`).
+**Issue:** `_options` is unused; encrypted artifacts are always preserved and selective unlock is impossible.
+**Fix Checklist:**
+- [ ] Honour `preserve_encrypted` by optionally deleting ciphertext.
+- [ ] Honour `selective` / pattern-driven unlock.
+- [ ] Extend CLI feedback for skipped/deleted files.
+- [ ] Add tests validating option behaviour.
+
+### BUG-05: Proxy Command Still Uses Expect Script [5 pts]
+**Location:** `execute_proxy_command` (`src/bin/cli_age.rs:959-1119`).
+**Issue:** Hand-written `expect` script contradicts PTY migration (`docs/tech/CAGE_PTY_FIX.md`) and is Unix-only.
+**Fix Checklist:**
+- [ ] Reuse `PtyAgeAutomator` for proxy mode.
+- [ ] Provide stdin/interactive passphrase handling without external tools.
+- [ ] Gate Unix-specific code; offer meaningful error or alternative on Windows.
+- [ ] Add proxy-specific integration tests.
 
 ---
 
-## P1 - HIGH PRIORITY (After P0 Complete)
+## Core Feature Work (CAGE Series)
 
-### TASK-005: Interactive Passphrase Prompting [3 pts]
-**Location:** `src/bin/cli_age.rs` and command handlers
-**Current Status:** Requires passphrase as CLI argument (security risk)
-**Requirements:**
-- [ ] Add secure terminal passphrase input (rpassword crate)
-- [ ] Remove passphrase from command line arguments
-- [ ] Add passphrase confirmation for critical operations
-- [ ] Handle TTY detection for automated scenarios
-- [ ] Add --stdin-passphrase option for scripts
-**Definition of Done:** No passphrases visible in process list or history
+### CAGE-01: Implement Key Rotation Lifecycle [8 pts]
+**Source:** Former TASK-001 (`src/cage/lifecycle/crud_manager.rs:196-400`).
+**Deliverables:** Atomic old→new passphrase rotation with backup/rollback, permission preservation, and coverage.
 
-### TASK-006: In-place File Operations [5 pts]
-**Location:** File operation handlers throughout codebase
-**Current Status:** Requires separate input/output files
-**Requirements:**
-- [ ] Detect when input == output path
-- [ ] Use temporary files for atomic in-place operations
-- [ ] Preserve original file metadata and permissions
-- [ ] Handle edge cases (readonly files, symlinks)
-- [ ] Add --in-place flag for explicit control
-- [ ] Rollback on failure to preserve original
-**Definition of Done:** `cage lock file.txt` encrypts file.txt directly and safely
+### CAGE-02: File Integrity Verification System [5 pts]
+**Source:** Former TASK-002 (`src/cage/lifecycle/crud_manager.rs:1000-1106`).
+**Deliverables:** Header/format validation, optional decrypt probe, structured reporting, and corruption handling.
 
-### TASK-007: Progress Indicators for Long Operations [3 pts]
-**Location:** Operation execution loops
-**Current Status:** No user feedback during operations
-**Requirements:**
-- [ ] Add progress bars for file operations (indicatif crate)
-- [ ] Show current file being processed
-- [ ] Display time estimates and speed
-- [ ] Handle progress for batch operations
-- [ ] Respect --quiet flag to suppress progress
-**Definition of Done:** Users see progress for operations >2 seconds
+### CAGE-03: Backup & Recovery Pipeline [5 pts]
+**Source:** Former TASK-003.
+**Deliverables:** Functional `--backup` flag, configurable retention, conflict handling, and restore hooks.
 
-### TASK-008: Configuration File Support [5 pts]
-**Location:** `src/cage/config.rs`
-**Current Status:** Only command-line configuration
-**Requirements:**
-- [ ] Support ~/.cagerc configuration file
-- [ ] TOML format with sensible defaults
-- [ ] Environment variable override support
-- [ ] Per-project configuration (.cage.toml)
-- [ ] Configuration validation and error reporting
-- [ ] Add config subcommands (show, edit, validate)
-**Definition of Done:** Config file works with priority: CLI > project > user > defaults
+### CAGE-04: In-Place Operation Safety Layers [5 pts]
+**Location:** `src/bin/cli_age.rs:569-760`, `src/cage/in_place.rs`.
+**Scope:** Finish SafetyValidator/RecoveryManager wiring, ensure metadata preservation, document danger mode, and test rollback.
 
-### TASK-009: Complete RageAdapter Implementation [8 pts]
-**Location:** `src/cage/adapter.rs:117-157`
-**Current Status:** Stub returning not-implemented errors
-**Requirements:**
-- [ ] Add rage crate dependency
-- [ ] Implement encrypt/decrypt using rage library
-- [ ] Add rage-specific configuration options
-- [ ] Performance comparison with shell adapter
-- [ ] Error mapping from rage to AgeError types
-- [ ] Feature parity with ShellAdapter
-- [ ] Adapter selection logic and auto-detection
-**Definition of Done:** RageAdapter works as drop-in replacement for ShellAdapter
+### CAGE-05: Progress & Telemetry Surface [3 pts]
+**Location:** Progress manager utilities.
+**Scope:** Integrate spinner/bar styles with CRUD operations, respect verbosity flags, and expose hooks for long jobs.
+
+### CAGE-06: Configuration File Support [5 pts]
+**Location:** `src/cage/config.rs`.
+**Scope:** Layered `~/.cagerc` / project config loading, validation, overrides, and CLI subcommands.
+
+### CAGE-07: RageAdapter Implementation [8 pts]
+**Location:** `src/cage/adapter.rs:117-157`.
+**Scope:** Integrate `rage` crate, match shell adapter parity, add selection heuristics, and document usage.
 
 ---
 
-## IMPLEMENTATION NOTES
+## Test & Tooling Improvements (TEST Series)
 
-**Testing Strategy:**
-- Unit tests for each task component
-- Integration tests with real files
-- UAT tests for user scenarios
-- Performance benchmarks for critical paths
+### TEST-01: Align CLI Suites with Current Binary [3 pts]
+**Location:** `tests/cli/*.sh`.
+**Issue:** Scripts call `./target/debug/cli_age` / `cli_auth` which no longer exist; suites never exercise `cage` binary.
+**Tasks:**
+- [ ] Update invocations to the `cage` executable (and drop defunct `cli_auth`).
+- [ ] Refresh scenarios to cover recursion/pattern cases once fixed.
+- [ ] Add CI guard to ensure scripts run under `cargo test` or dedicated harness.
 
-**Commit Strategy:**
-- One commit per completed task
-- Include tests in the same commit
-- Use conventional commit format
-- Add CHANGELOG.md entries for user-facing changes
+### TEST-02: Regression Coverage for BUG-01..04 [3 pts]
+**Scope:** Add targeted unit/integration tests to lock in newly fixed behaviours (extensions, recursion, globbing, unlock options).
 
-**Dependencies to Add:**
-- `rpassword` for secure input (TASK-005)
-- `indicatif` for progress bars (TASK-007)
-- `toml` for config files (TASK-008)
-- `rage` for RageAdapter (TASK-009)
-
-## P2 - RSB FRAMEWORK INTEGRATION (Major Architecture Migration)
-
-### TASK-010: Bootstrap and Global Context Migration [5 pts]
-**Location:** `src/bin/cli_age.rs:451-487` (main function)
-**Current Status:** Using clap::Parser::parse() with manual setup
-**Requirements:**
-- [ ] Replace `Cli::parse()` with RSB `bootstrap!()` macro
-- [ ] Remove clap::Parser derive from Cli struct
-- [ ] Implement `options!(&args)` for automatic flag processing
-- [ ] Migrate CLI struct fields to global context variables (opt_verbose, opt_audit_log, opt_format)
-- [ ] Add XDG path initialization via RSB setup_xdg_paths()
-- [ ] Update main banner to show RSB framework integration
-**Definition of Done:** CLI launches with RSB bootstrap and global context populated
-
-### TASK-011: Command Dispatch System Migration [5 pts]
-**Location:** `src/bin/cli_age.rs:183-217` (execute_command method)
-**Current Status:** Using clap::Subcommand enum with match statement
-**Requirements:**
-- [ ] Remove clap::Subcommand derive from Commands enum
-- [ ] Replace enum match with RSB `dispatch!()` macro
-- [ ] Add `pre_dispatch!()` for setup commands (init, install)
-- [ ] Convert Commands enum variants to string-based routing
-- [ ] Implement dispatch table for lock, unlock, status, rotate, verify, batch
-- [ ] Add built-in RSB commands (help, inspect, stack)
-**Definition of Done:** All commands route through RSB dispatch system
-
-### TASK-012: Command Handler Function Migration [8 pts]
-**Location:** `src/bin/cli_age.rs:219-448` (all execute_* methods)
-**Current Status:** Methods on LifecycleDispatcher struct taking parsed arguments
-**Requirements:**
-- [ ] Convert execute_lock to standalone fn cmd_lock(args: Args) -> i32
-- [ ] Convert execute_unlock to standalone fn cmd_unlock(args: Args) -> i32
-- [ ] Convert execute_status to standalone fn cmd_status(args: Args) -> i32
-- [ ] Convert execute_rotate to standalone fn cmd_rotate(args: Args) -> i32
-- [ ] Convert execute_verify to standalone fn cmd_verify(args: Args) -> i32
-- [ ] Convert execute_batch to standalone fn cmd_batch(args: Args) -> i32
-- [ ] Replace clap argument access with Args wrapper methods
-- [ ] Use global context for verbose mode and configuration
-**Definition of Done:** All commands work as standalone functions with Args -> i32 signature
-
-### TASK-013: Argument Processing Migration [3 pts]
-**Location:** `src/bin/cli_age.rs` (all command argument handling)
-**Current Status:** Using clap-parsed struct fields directly
-**Requirements:**
-- [ ] Replace direct field access with args.get(), args.get_or(), args.has() patterns
-- [ ] Implement positional argument parsing (args.get(1), args.get(2))
-- [ ] Convert flag detection to args.has("--flag") patterns
-- [ ] Add args.has_val("--key") for options with values
-- [ ] Use args.remaining() for multiple path arguments
-- [ ] Implement bash-like variable expansion with args.expand()
-**Definition of Done:** No direct clap struct field access, all via Args wrapper
-
-### TASK-014: RSB Sanity Test Suite [3 pts]
-**Location:** New file `tests/rsb_integration.rs`
-**Current Status:** No RSB-specific testing
-**Requirements:**
-- [ ] Create RSB framework integration tests
-- [ ] Test bootstrap!() macro initialization
-- [ ] Test global context variable storage and retrieval
-- [ ] Test dispatch!() routing for all commands
-- [ ] Test Args wrapper argument parsing patterns
-- [ ] Test XDG path setup and configuration
-- [ ] Test built-in RSB commands (help, inspect, stack)
-**Definition of Done:** Comprehensive RSB integration test coverage
-
-### TASK-015: Remove Clap Dependencies [2 pts]
-**Location:** `Cargo.toml` and imports throughout codebase
-**Current Status:** Clap dependency and imports present
-**Requirements:**
-- [ ] Remove clap dependency from Cargo.toml
-- [ ] Remove all `use clap::*` imports
-- [ ] Remove clap derive macros (Parser, Subcommand, ValueEnum)
-- [ ] Update Cargo.lock
-- [ ] Verify no clap-related compilation errors
-**Definition of Done:** Project compiles without clap dependency
-
-### TASK-016: Enhanced RSB Features Integration [3 pts]
-**Location:** Throughout CLI implementation
-**Current Status:** Basic RSB usage only
-**Requirements:**
-- [ ] Implement RSB echo!() and stderr!() macros for output
-- [ ] Add RSB mkdir_p() for directory creation operations
-- [ ] Use RSB expand_vars() for configuration template expansion
-- [ ] Implement function registration for introspection
-- [ ] Add call stack tracking for debugging
-- [ ] Integrate RSB logging utilities
-**Definition of Done:** CLI leverages full RSB utility suite
+### TEST-03: Proxy PTY Integration Tests [2 pts]
+**Scope:** Once BUG-05 is addressed, add cross-platform proxy tests (skipping gracefully where PTY unavailable).
 
 ---
 
-## REDUNDANT UTILITIES ANALYSIS
-
-### Clap Dependencies to Remove:
-- `clap::Parser` → RSB `bootstrap!()` macro
-- `clap::Subcommand` → RSB `dispatch!()` patterns
-- Manual argument parsing → RSB `Args` wrapper
-- Custom help generation → Built-in RSB help command
-- Manual environment setup → Automatic XDG and global context
-
-### Expected Code Reduction:
-- Current CLI: ~500 lines of clap boilerplate
-- RSB CLI: ~50 lines with macro-driven architecture
-- **Reduction: 90% code reduction for CLI infrastructure**
-
----
-
-## IMPLEMENTATION NOTES
-
-**RSB Migration Strategy:**
-- Phase 1: Bootstrap and global context (TASK-010)
-- Phase 2: Dispatch system migration (TASK-011)
-- Phase 3: Handler function conversion (TASK-012)
-- Phase 4: Argument processing cleanup (TASK-013)
-- Phase 5: Testing and validation (TASK-014)
-- Phase 6: Dependency cleanup (TASK-015)
-- Phase 7: Enhanced features (TASK-016)
-
-**Testing Strategy:**
-- RSB integration tests before migration
-- Continuous testing during each phase
-- Regression tests for all existing functionality
-- Performance comparison (before/after RSB)
-
-**Commit Strategy:**
-- One commit per RSB task
-- Maintain functionality during migration
-- Document breaking changes clearly
-- Include migration guide in CHANGELOG.md
-
-**Dependencies to Remove:**
-- `clap` (replaced by RSB framework)
-- Manual argument validation (RSB Args handles this)
-
-**Dependencies Already Available:**
-- `rsb` framework (already in Cargo.toml)
-- RSB prelude already imported
-
-**Total Effort Estimate:**
-- P0 Tasks: 21 story points (~2-3 weeks) ✅ **COMPLETE**
-- P1 Tasks: 24 story points (~3-4 weeks)
-- P2 RSB Tasks: 29 story points (~4-5 weeks)
-- **Total: 74 story points (~9-12 weeks)**
+## Notes
+- Keep CHANGELOG entries aligned with CAGE/BUG/TEST identifiers.
+- Prioritise BUG-01..05 before starting new CAGE work; they unblock documented scenarios.
+- Coordinate config and backup changes with documentation updates in README and `docs/tech/*`.

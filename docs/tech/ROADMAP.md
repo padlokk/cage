@@ -42,30 +42,28 @@ Cage is an Age encryption automation CLI with PTY support that eliminates manual
 
 ### ❌ P0 - Blocking Production (Must Fix)
 
-| Feature | Status | Location | Impact |
-|---------|--------|----------|---------|
-| **Key Rotation** | Stub Implementation | `src/cage/lifecycle/crud_manager.rs:196-224` | Core functionality missing |
-| **File Verification** | Placeholder | `src/cage/lifecycle/crud_manager.rs:577-581` | Integrity checking absent |
-| **Backup System** | Flag exists, no logic | Throughout codebase | Data safety risk |
-| **Integration Tests** | Reference wrong project | `tests/` directory | No validation |
-| **RageAdapter** | Not implemented | `src/cage/adapter.rs:117-157` | Alternative backend missing |
+| Task | Summary | Impact |
+|------|---------|--------|
+| **BUG-01** | Preserve original extensions during lock/unlock so round-trips follow documented `file.ext.cage` pattern. | Current behaviour breaks advertised UX and makes decrypt CLI examples unusable. |
+| **BUG-02** | Rework traversal to honour `--recursive`, status, and verify across nested trees. | Directories are reported as processed but child files remain untouched. |
+| **BUG-03** | Replace substring pattern filters with glob support (`*.log`, `**/*secret*`). | Flagged feature silently fails; security automation scripts can miss targets. |
+| **BUG-04** | Wire unlock options to deletion & selective flows. | `--preserve`/`--selective` are ignored, causing data-retention surprises. |
+| **BUG-05** | Remove `expect` dependency from proxy and reuse PTY stack with cross-platform guards. | Proxy command fails on systems without `expect` and contradicts PTY migration. |
+| **CAGE-01** | Finish key rotation lifecycle (atomic, rollback, permission retention). | Rotation command remains a stub; compliance stories blocked. |
+| **CAGE-02** | Deliver file integrity verification pipeline with actionable reporting. | No integrity signal; tampering/corruption undetectable. |
+| **CAGE-03** | Implement backup/recovery system backing `--backup`. | Flag is cosmetic; there is no safety net for destructive ops. |
+| **TEST-01** | Align CLI test suites with the `cage` binary and modern scenarios. | Current “integration tests” never run, masking regressions. |
 
 ### ❌ P1 - High Priority (Critical for Usability)
 
-**Core Functionality Gaps:**
-- In-place encryption/decryption operations
-- Large file streaming with progress indicators
-- Parallel batch processing optimization
-- File permission preservation during operations
-- Symlink and special file handling
-- Atomic operations with rollback capability
-
-**User Experience Issues:**
-- No interactive passphrase prompting (security risk)
-- Missing progress feedback for long operations
-- No configuration file support (`~/.cagerc`)
-- Lack of dry-run mode for testing operations
-- Limited error recovery guidance
+| Task | Summary |
+|------|---------|
+| **CAGE-04** | Complete in-place operation safety layers (RecoveryManager, danger mode prompts). |
+| **CAGE-05** | Standardise progress/telemetry so long operations emit feedback. |
+| **CAGE-06** | Add layered configuration file support (`~/.cagerc`, project overrides). |
+| **CAGE-07** | Implement RageAdapter for alternative backend support. |
+| **TEST-02** | Add regression coverage for BUG-01..BUG-04 scenarios. |
+| **TEST-03** | Add proxy PTY integration coverage (skip gracefully when unsupported). |
 
 ---
 
@@ -74,35 +72,15 @@ Cage is an Age encryption automation CLI with PTY support that eliminates manual
 ### Phase 1: MVP (4-6 weeks) - Target: 85% Production Ready
 
 **Critical Completions:**
-- [ ] **Implement Key Rotation Logic**
-  - Complete re-encryption with new passphrase
-  - Validation of old passphrase before rotation
-  - Atomic operation with rollback capability
-  - Backup creation during rotation process
+- [ ] **BUG-01 → BUG-05**: Ship the blocking fixes for extension handling, recursion, glob patterns, unlock options, and proxy PTY support.
+- [ ] **CAGE-01**: Key rotation lifecycle with rollback and permission preservation.
+- [ ] **CAGE-02**: File integrity verification with actionable reporting.
+- [ ] **CAGE-03**: Backup & recovery pipeline powering `--backup` and rotation safeguards.
+- [ ] **TEST-01**: Restore end-to-end CLI coverage against the `cage` binary.
 
-- [ ] **File Integrity Verification System**
-  - Checksum validation of encrypted files
-  - Detection of corruption or tampering
-  - Verification without full decryption
-  - Comprehensive integrity reporting
-
-- [ ] **Backup and Recovery System**
-  - Automatic backup creation before operations
-  - Backup verification and restore capabilities
-  - Recovery from partial operation failures
-  - Configurable backup retention policies
-
-- [ ] **Fix Integration Test Suite**
-  - Replace placeholder padlock references
-  - Create working end-to-end tests
-  - Add real Age binary integration testing
-  - Performance and load testing infrastructure
-
-- [ ] **Progress Indicators**
-  - Real-time progress bars for long operations
-  - Operation status reporting and feedback
-  - Cancellation support (Ctrl+C handling)
-  - Performance metrics display
+**Progress Enablement:**
+- [ ] **CAGE-05** groundwork for long-running job feedback once core bugs are fixed.
+- [ ] **TEST-02** regression coverage to lock the fixes in place.
 
 **Success Criteria:**
 - All CLI commands fully functional (no stubs)
@@ -113,35 +91,12 @@ Cage is an Age encryption automation CLI with PTY support that eliminates manual
 ### Phase 2: Production Ready (8-10 weeks) - Target: 95% Production Ready
 
 **User Experience Enhancements:**
-- [ ] **Interactive Mode Implementation**
-  - Secure passphrase prompting via TTY
-  - Confirmation prompts for destructive operations
-  - Better error recovery suggestions
-  - User-friendly operation workflows
-
-- [ ] **Configuration File Support**
-  - `~/.cagerc` configuration file parsing
-  - Profile management (multiple configurations)
-  - Environment variable support
-  - Configuration validation and templates
-
-- [ ] **Cross-Platform Compatibility**
-  - Windows TTY automation methods
-  - Platform-specific binary detection
-  - Cross-platform path handling improvements
-  - Platform-specific security features
-
-- [ ] **Advanced Operations**
-  - Dry-run mode (`--dry-run` flag)
-  - Shell completion scripts (bash/zsh/fish)
-  - Operation history browsing
-  - Memory usage optimization
-
-- [ ] **Documentation and Security**
-  - Comprehensive user manual
-  - Security audit and penetration testing
-  - Best practices guide
-  - Troubleshooting documentation
+- [ ] **CAGE-04**: Harden in-place workflows with multi-layer safety prompts and recovery artefacts.
+- [ ] **CAGE-05**: Expand progress/telemetry once core bug fixes land (spinner, bar, byte styles).
+- [ ] **CAGE-06**: Deliver layered configuration support (`~/.cagerc`, project overrides, env merging).
+- [ ] **CAGE-07**: Ship RageAdapter as a first-class backend option.
+- [ ] **TEST-03**: Establish proxy/PTy regression coverage (skip gracefully on unsupported platforms).
+- [ ] Documentation refresh accompanying each shipped task (README + `docs/tech/*`).
 
 **Success Criteria:**
 - Production-grade error handling and recovery
