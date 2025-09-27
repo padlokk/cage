@@ -977,22 +977,32 @@ impl CrudManager {
 
         // Honor verify_before_unlock option
         if options.verify_before_unlock {
-            if let Err(e) = self.verify_file_integrity(file) {
-                result.add_failure(file.display().to_string());
-                eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);
-                return Err(AgeError::InvalidOperation {
-                    operation: "unlock".to_string(),
-                    reason: format!("File failed verification: {}", e),
-                });
+            match self.verify_file_integrity(file) {
+                Ok(status) => {
+                    if !status.is_valid() {
+                        result.add_failure(file.display().to_string());
+                        let error_msg = status.error_message.unwrap_or_else(||
+                            "File failed integrity verification".to_string());
+                        eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), error_msg);
+                        return Err(AgeError::InvalidOperation {
+                            operation: "unlock".to_string(),
+                            reason: format!("File failed verification: {}", error_msg),
+                        });
+                    }
+                }
+                Err(e) => {
+                    result.add_failure(file.display().to_string());
+                    eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);
+                    return Err(AgeError::InvalidOperation {
+                        operation: "unlock".to_string(),
+                        reason: format!("File failed verification: {}", e),
+                    });
+                }
             }
         }
 
-        // Honor selective option - skip if selective mode and conditions not met
-        if options.selective {
-            // For selective mode, we could add additional criteria here
-            // For now, selective mode will process all files that pass pattern filter
-            // This allows for future extension of selective criteria
-        }
+        // Note: selective option temporarily removed until proper implementation
+        // TODO: Implement selective unlock with specific criteria
 
         match self.adapter.decrypt(file, &output_path, passphrase) {
             Ok(_) => {

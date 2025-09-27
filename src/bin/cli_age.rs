@@ -1041,7 +1041,7 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
 
         // Create passphrase manager and get passphrase from user
         let passphrase_manager = PassphraseManager::new();
-        let passphrase = if is_true("opt_stdin_passphrase") {
+        let passphrase = if args.has("--stdin-passphrase") {
             passphrase_manager.get_passphrase_with_mode(
                 "Enter passphrase for Age operation",
                 false,
