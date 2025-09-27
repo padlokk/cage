@@ -162,16 +162,32 @@ let output = pty_automator.execute_age_command(&age_args, Some(&passphrase))?;
 
 ---
 
-## ✅ UAT Sign-Off
+## 🔧 Regression Fixes Applied
+
+**Date**: 2025-09-27 (Post-implementation review)
+
+### Critical Issue Fixed:
+1. **Stdin Passphrase Flag**: Fixed proxy command stdin passphrase detection
+   - **Issue**: Used `is_true("opt_stdin_passphrase")` but CLI flag is `--stdin-passphrase`
+   - **Fix**: Restored `args.has("--stdin-passphrase")` to match other commands
+   - **Impact**: `cage proxy --stdin-passphrase` now works correctly again
+
+### Verification:
+- Regression tests confirm proxy command accepts `--stdin-passphrase` flag
+- Code analysis confirms consistent flag handling across all commands
+- All existing proxy functionality preserved
+
+## ✅ UAT Sign-Off (Updated)
 
 **Expect Script Removal**: ✅ Verified (no expect references found)
 **PTY Automation**: ✅ Verified (PtyAgeAutomator integrated)
 **Code Compilation**: ✅ Verified (clean build)
-**Functionality Preservation**: ✅ Verified (all features maintained)
+**Functionality Preservation**: ✅ Verified (all features maintained) - **FIXED**
 **Cross-Platform Support**: ✅ Verified (portable_pty used)
 **Error Handling**: ✅ Verified (proper exception management)
+**Stdin Passphrase**: ✅ Verified (flag detection corrected) - **FIXED**
 
-**Final Recommendation**: **APPROVE FOR MERGE**
+**Final Recommendation**: **APPROVE FOR MERGE** (with regression fixes)
 
 ---
 
