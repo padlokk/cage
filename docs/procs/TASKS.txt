@@ -91,6 +91,23 @@
 **Location:** `src/cage/adapter.rs:117-157`.
 **Scope:** Integrate `rage` crate, match shell adapter parity, add selection heuristics, and document usage.
 
+[5] CAGE-08: Multi-Recipient Encryption Support [Backlog]
+**Location:** Adapter + CRUD pipeline + CLI
+**Scope:** Allow callers (e.g., Ignite) to supply multiple `age` recipients so parents retain access to child-encrypted artifacts.
+**Tasks:**
+- [ ] Extend `AgeAdapter` / `CrudManager` to accept `Vec<Recipient>` and invoke `age` in public-key mode.
+- [ ] Update proxy command to forward recipient sets rather than single passphrase.
+- [ ] Extend CLI/config to accept recipient lists.
+- [ ] Add tests ensuring each recipient can decrypt (parent + child scenario).
+
+[4] CAGE-09: SSH Recipient Integration [Backlog]
+**Location:** Adapter + CLI
+**Scope:** Support SSH-derived age recipients alongside native `.age` keys so Ignite and future clients can mix credential types.
+**Tasks:**
+- [ ] Provide conversion from SSH public keys to age recipients.
+- [ ] Document CLI usage / config knobs.
+- [ ] Tests covering encrypt/decrypt with SSH recipients.
+
 ---
 
 ## Test & Tooling Improvements (TEST Series)
@@ -118,6 +135,16 @@
 **Solution**: Migrated to Hub's `terminal-ext` feature which provides `portable-pty` via RSB ecosystem.
 **Benefits**: ✅ Achieved - Reduced dependency count, better RSB ecosystem integration via Hub.
 **Status**: Completed using `hub = { git = "https://github.com/oodx/hub.git", features = ["terminal-ext"] }`.
+
+### INFRA-02: Migrate to RSB Progress Module [3 pts]
+**Location**: `src/cage/progress/*` → `rsb::progress`
+**Issue**: Cage maintains local copy of progress module (`cage::cage::progress`) that duplicates RSB's version.
+**Tasks**:
+- [ ] Replace `use cage::cage::progress` with `use rsb::progress` throughout codebase
+- [ ] Remove `src/cage/progress/` directory (5 files: core, manager, mod, styles, terminal)
+- [ ] Verify CAGE-05 progress integration still functions correctly
+- [ ] Update documentation references from `cage::progress` to `rsb::progress`
+**Benefits**: Reduced code duplication, leverage RSB ecosystem updates, cleaner dependency graph.
 
 ---
 
