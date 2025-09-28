@@ -1,0 +1,12 @@
+Stakeholder expectations:
+
+1. cage can be used both as a cli and a library
+2. cage properly exposes an ergonomic API interface for library usage of all features (parity between CLI and API)
+2a. suggest using a CageConfig component to capture all properties and values to be sent to age wrapper
+3. cage supports streaming encryption (via age)
+4. cage supports SSH keys for decrypt/encrypt (via age)
+5. cage supports asii armor requests (via age)
+6. cage supports derived-detemrinistic keys (via age) 
+7. first-class mutli recipient support and lifecycling (structs/enums etc) (via) age
+
+This defines the required MVP for actual downstream usage.

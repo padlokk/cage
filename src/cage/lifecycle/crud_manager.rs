@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::collections::{HashMap, HashSet};
 
+use rsb::visual::glyphs::glyph_enable;
 use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::strings::{fmt_warning, fmt_deleted, fmt_preserved};
 use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::adapter::AgeAdapter;
 #[allow(unused_imports)]
@@ -369,6 +371,9 @@ impl CrudManager {
         adapter: Box<dyn AgeAdapter>,
         config: AgeConfig,
     ) -> AgeResult<Self> {
+        // Enable RSB glyphs for visual output
+        glyph_enable();
+
         let audit_logger = AuditLogger::new(config.audit_log_path.clone().map(PathBuf::from))?;
 
         Ok(Self {
@@ -1104,13 +1109,13 @@ impl CrudManager {
                 if !options.preserve_encrypted {
                     // Delete the encrypted file after successful unlock
                     if let Err(e) = std::fs::remove_file(file) {
-                        eprintln!("⚠️  Warning: Failed to delete encrypted file {}: {}", file.display(), e);
+                        eprintln!("{}", fmt_warning(&format!("Failed to delete encrypted file {}: {}", file.display(), e)));
                         // Don't fail the operation if we can't delete the encrypted file
                     } else {
-                        eprintln!("🗑️  Deleted encrypted file: {}", file.display());
+                        eprintln!("{}", fmt_deleted(&file.display().to_string()));
                     }
                 } else {
-                    eprintln!("📂 Preserved encrypted file: {}", file.display());
+                    eprintln!("{}", fmt_preserved(&file.display().to_string()));
                 }
 
                 Ok(())

@@ -1,0 +1,71 @@
+================================================================================
+ 🎯 CODEX UAT QUICK-START
+================================================================================
+
+Role: Primary UAT/verification agent for Cage.
+
+Use this file to rehydrate context quickly. For live status, always consult:
+- `docs/procs/PROCESS.txt`
+- `docs/procs/CONTINUE.md`
+- `docs/procs/TASKS.txt`
+
+Those documents track current workstreams, handoffs, and priorities.
+
+--------------------------------------------------------------------------------
+ Project Snapshot
+--------------------------------------------------------------------------------
+- **Product**: Cage – Age encryption automation tool (Rust)
+- **Surfaces**: CLI binary (`cage`) + library API (`cage::cage::*`)
+- **Frameworks**: RSB for CLI orchestrations; PTY automation via `hub::portable_pty`
+- **Testing**: `cargo test --all` + targeted integration/UAT suites
+
+--------------------------------------------------------------------------------
+ Stakeholder Expectations (MVP)
+--------------------------------------------------------------------------------
+1. **Dual Usage**: Cage must be fully usable both as a CLI and as a library. The
+   library API needs ergonomic parity with CLI capabilities.
+2. **Configuration Model**: Introduce a comprehensive configuration component
+   (e.g. `CageConfig`) to manage passphrases, recipients, identities, streaming
+   options, and other knobs centrally.
+3. **Streaming Support**: Provide streaming encrypt/decrypt (Readers/Writers)
+   for large-file workflows, avoiding temporary files.
+4. **SSH Key Support**: Accept SSH identities for encrypt/decrypt operations.
+5. **ASCII Armor**: Continue supporting ASCII-armor output (already present).
+6. **Deterministic/Derived Keys**: Allow derived key workflows (`age --derive`).
+7. **Multi-Recipient Lifecycle**: First-class handling of recipient sets,
+   including lifecycle management and audit metadata.
+
+--------------------------------------------------------------------------------
+ Security & Quality Concerns
+--------------------------------------------------------------------------------
+- **Binary Snooping**: Centralize user-facing strings and sensitive literals to
+  minimize exposure in compiled binaries (dedicated `strings` module or similar).
+- **Test Gating**: Age-dependent tests (e.g. selective unlock suite) must skip
+  gracefully when the `age` binary is unavailable to keep CI green.
+- **Audit & Telemetry**: Enhanced logging without leaking secrets; structured
+  events for downstream systems.
+- **Parity Validation**: UAT should verify both CLI and library code paths for
+  every major feature.
+
+--------------------------------------------------------------------------------
+ UAT Agent Checklist
+--------------------------------------------------------------------------------
+1. Hydrate process docs (PROCESS / CONTINUE / TASKS) for current status.
+2. Review `docs/ref/ROADMAP.md` for strategic milestones.
+3. Confirm any new deliverable against stakeholder expectations above.
+4. Validate security constraints (string centralization, no secret leakage in
+   logs/tests).
+5. Run or request appropriate test suites; ensure age availability assumptions
+   are documented.
+6. Record findings in UAT reports or handoffs as required.
+
+--------------------------------------------------------------------------------
+ Useful References
+--------------------------------------------------------------------------------
+- `docs/LIBRARY_USAGE.md` – Library integration examples.
+- `docs/procs/PROCESS.txt` – Workflow rules & priority context.
+- `docs/ref/ROADMAP.md` – Long-term roadmap & milestones.
+- `src/cage/` – Core library modules (adapter, lifecycle, config, etc.).
+- `tests/` – Unit, integration, PTY, and regression suites.
+
+================================================================================

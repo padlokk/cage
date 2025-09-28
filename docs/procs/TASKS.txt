@@ -87,6 +87,60 @@
 - [ ] Surface CLI flags and config for identity management.
 - [ ] Add regression tests covering identity-driven unlock.
 
+### CAGE-11: CageConfig & Operation Request API [5 pts]
+**Location:** `src/cage/config.rs`, `src/cage/lifecycle/`
+**Scope:** Introduce `CageConfig` and typed request structs (LockRequest, UnlockRequest, RotateRequest) to unify CLI and library entry points.
+**Tasks:**
+- [ ] Design request structs covering existing CLI flags.
+- [ ] Refactor `CrudManager` methods to accept request structs.
+- [ ] Provide builder/compatibility helpers for CLI usage.
+- [ ] Update docs/examples in `docs/LIBRARY_USAGE.md`.
+
+### CAGE-12: Adapter Interface Refresh [5 pts]
+**Location:** `src/cage/adapter.rs`, `src/cage/age_engine.rs`
+**Scope:** Extend `AgeAdapter` to support file + streaming operations with a unified trait.
+**Tasks:**
+- [ ] Add stream-based methods (Reader/Writer) to the trait.
+- [ ] Update `ShellAdapter` implementation using age binary via stdin/stdout.
+- [ ] Ensure health checks cover new paths.
+- [ ] Provide scaffolding for future native implementations.
+
+### CAGE-13: Streaming Encryption & Decryption [8 pts]
+**Location:** Adapter + CRUD pipeline + CLI
+**Scope:** Deliver streaming support end-to-end, including request options and regression tests.
+**Tasks:**
+- [ ] Add streaming options to request structs and CLI flags.
+- [ ] Implement streaming encrypt/decrypt flows with age binary pipes.
+- [ ] Create regression tests using in-memory buffers and large-file fixtures.
+- [ ] Document usage patterns and performance guidance.
+
+### CAGE-14: SSH Identity Support [5 pts]
+**Location:** Adapter + config + CLI
+**Scope:** Accept SSH identities for encrypt/decrypt across API and CLI.
+**Tasks:**
+- [ ] Implement identity parsing/validation (CLI + config).
+- [ ] Wire identities through adapter and request structs.
+- [ ] Add regression tests with sample SSH keys.
+- [ ] Update documentation and warnings around key management.
+
+### CAGE-15: Deterministic Key Derivation [5 pts]
+**Location:** Adapter + config + CLI
+**Scope:** Support age derived keys (`--derive`) through configuration and runtime flows.
+**Tasks:**
+- [ ] Extend config/request structs with derivation parameters (salt, context).
+- [ ] Invoke age binary with derive options and handle output.
+- [ ] Add tests verifying deterministic outputs and error cases.
+- [ ] Document security considerations and defaults.
+
+### CAGE-16: Multi-Recipient Lifecycle [8 pts]
+**Location:** Adapter + CRUD pipeline + CLI
+**Scope:** Implement lifecycle management for recipient groups, including inspection and rotation helpers.
+**Tasks:**
+- [ ] Model recipients and groups (structs/enums) for lock/unlock flows.
+- [ ] Update adapters to accept recipient lists for encryption.
+- [ ] Provide audit/reporting hooks for recipient metadata.
+- [ ] Add tests ensuring each recipient can decrypt and lifecycle operations succeed.
+
 ---
 
 ## Test & Tooling Improvements (TEST Series)
@@ -126,6 +180,24 @@
 - [ ] Verify CAGE-05 progress integration still functions correctly
 - [ ] Update documentation references from `cage::progress` to `rsb::progress`
 **Benefits**: Reduced code duplication, leverage RSB ecosystem updates, cleaner dependency graph.
+
+### SEC-01: Centralized String Management [5 pts]
+**Location:** `src/cage/strings.rs` (new) + audit across modules
+**Issue:** Sensitive/user-facing literals scattered across the codebase increase binary snooping risk.
+**Tasks:**
+- [ ] Create dedicated string constants module with clear naming.
+- [ ] Migrate existing inline strings (CLI messages, errors, prompts) to the module.
+- [ ] Add lint/check script to detect new inline strings in critical paths.
+- [ ] Document guidelines in CONTRIBUTING/PROCESS.
+
+### OBS-01: Structured Audit & Telemetry [3 pts]
+**Location:** `src/cage/security.rs`, logging pathways
+**Issue:** New features (streaming, identities, recipients) require expanded auditing without leaking secrets.
+**Tasks:**
+- [ ] Extend audit logger to capture new events with structured metadata.
+- [ ] Ensure sensitive fields are scrubbed/redacted.
+- [ ] Offer optional JSON logging for downstream ingestion.
+- [ ] Update docs with observability configuration.
 
 ---
 

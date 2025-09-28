@@ -25,6 +25,7 @@ pub mod config;
 pub mod passphrase;
 pub mod in_place;
 pub mod progress;
+pub mod strings;  // Centralized string constants (SEC-01)
 
 // Re-export core types for convenience
 pub use adapter::{AgeAdapter, AdapterFactory};

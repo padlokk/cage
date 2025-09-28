@@ -19,8 +19,9 @@
 1. BUG-04 follow-up: swap selective-mode logs to ASCII & make tests age-aware.
 2. CAGE-03 follow-up: retention/conflict strategy for backups.
 3. CAGE-06: Implement config file discovery/loading.
-4. CAGE-08/09/10: Design recipient + identity plumbing (post-BUG-04).
-5. TEST-01/03: Refresh CLI & proxy test suites once behaviour stabilises.
+4. CAGE-11/12 groundwork for CageConfig + adapter refresh.
+5. CAGE-13/14/15/16: Streaming, SSH, derived keys, recipients planning.
+6. SEC-01: Start string constants inventory.
 
 🏗️ **Architecture**:
 - **Language**: Rust
