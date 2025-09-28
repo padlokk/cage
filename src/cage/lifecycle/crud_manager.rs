@@ -16,6 +16,7 @@ use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::strings::{fmt_warning, fmt_deleted, fmt_preserved};
 use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::adapter::AgeAdapter;
+use crate::cage::requests::{LockRequest, UnlockRequest, VerifyRequest, Identity};
 #[allow(unused_imports)]
 use crate::cage::tty_automation::TtyAutomator;
 use crate::cage::security::AuditLogger;
@@ -392,7 +393,81 @@ impl CrudManager {
     }
 
     // ========================================================================================
-    // CORE CRUD OPERATIONS - Primary lifecycle management
+    // UNIFIED REQUEST API (CAGE-11) - New interface using request structs
+    // ========================================================================================
+
+    /// Lock operation using request struct (CAGE-11)
+    pub fn lock_with_request(&mut self, request: &LockRequest) -> AgeResult<OperationResult> {
+        // Extract passphrase from identity
+        let passphrase = match &request.identity {
+            Identity::Passphrase(p) => p.clone(),
+            Identity::PromptPassphrase => {
+                // TODO: Implement interactive prompt
+                return Err(AgeError::PassphraseError {
+                    message: "Interactive prompt not yet implemented".to_string(),
+                });
+            }
+            _ => {
+                return Err(AgeError::PassphraseError {
+                    message: "Identity files not yet supported".to_string(),
+                });
+            }
+        };
+
+        // Convert to legacy options
+        let options = LockOptions {
+            format: request.format,
+            recursive: request.recursive,
+            pattern_filter: request.pattern.clone(),
+            backup_before_lock: request.backup,
+        };
+
+        self.lock(&request.target, &passphrase, options)
+    }
+
+    /// Unlock operation using request struct (CAGE-11)
+    pub fn unlock_with_request(&mut self, request: &UnlockRequest) -> AgeResult<OperationResult> {
+        // Extract passphrase from identity
+        let passphrase = match &request.identity {
+            Identity::Passphrase(p) => p.clone(),
+            Identity::PromptPassphrase => {
+                // TODO: Implement interactive prompt
+                return Err(AgeError::PassphraseError {
+                    message: "Interactive prompt not yet implemented".to_string(),
+                });
+            }
+            _ => {
+                return Err(AgeError::PassphraseError {
+                    message: "Identity files not yet supported".to_string(),
+                });
+            }
+        };
+
+        // Convert to legacy options
+        let options = UnlockOptions {
+            selective: request.selective,
+            verify_before_unlock: request.verify_first,
+            pattern_filter: request.pattern.clone(),
+            preserve_encrypted: request.preserve_encrypted,
+        };
+
+        self.unlock(&request.target, &passphrase, options)
+    }
+
+    /// Verify operation using request struct (CAGE-11)
+    pub fn verify_with_request(&mut self, request: &VerifyRequest) -> AgeResult<VerificationResult> {
+        // Current verify method doesn't support passphrase parameter
+        // TODO: Extend verify to support deep verification with passphrase
+        if request.deep_verify && request.identity.is_some() {
+            // For now, just warn that deep verify is not yet implemented
+            eprintln!("{}", fmt_warning("Deep verification with passphrase not yet implemented"));
+        }
+
+        self.verify(&request.target)
+    }
+
+    // ========================================================================================
+    // CORE CRUD OPERATIONS - Legacy interface (maintained for backward compatibility)
     // ========================================================================================
 
     /// CREATE: Lock (encrypt) files or repositories
@@ -1039,7 +1114,7 @@ impl CrudManager {
                 Some(name) => name,
                 None => {
                     result.add_failure(file.display().to_string());
-                    eprintln!("⚠️  Skipping file with non-UTF8 filename: {}", file.display());
+                    eprintln!("{}", fmt_warning(&format!("Skipping file with non-UTF8 filename: {}", file.display())));
                     return Err(AgeError::InvalidOperation {
                         operation: "unlock".to_string(),
                         reason: format!("Non-UTF8 filename not supported: {}", file.display()),
@@ -1050,7 +1125,7 @@ impl CrudManager {
             let suffix = self.config.extension_with_dot();
             if !file_name.ends_with(&suffix) {
                 result.add_failure(file.display().to_string());
-                eprintln!("⚠️  Skipping file without {} extension: {}", suffix, file.display());
+                eprintln!("{}", fmt_warning(&format!("Skipping file without {} extension: {}", suffix, file.display())));
                 return Err(AgeError::InvalidOperation {
                     operation: "unlock".to_string(),
                     reason: format!("File does not have {} extension: {}", suffix, file.display()),
@@ -1075,7 +1150,7 @@ impl CrudManager {
                             eprintln!("[SKIP] {} (selective mode): {}", file.display(), error_msg);
                             return Ok(());
                         } else {
-                            eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), error_msg);
+                            eprintln!("{}", fmt_warning(&format!("Skipping file that failed verification: {}: {}", file.display(), error_msg)));
                             return Err(AgeError::InvalidOperation {
                                 operation: "unlock".to_string(),
                                 reason: format!("File failed verification: {}", error_msg),
@@ -1091,7 +1166,7 @@ impl CrudManager {
                         eprintln!("[SKIP] {} (selective mode): verification failed: {}", file.display(), e);
                         return Ok(());
                     } else {
-                        eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);
+                        eprintln!("{}", fmt_warning(&format!("Skipping file that failed verification: {}: {}", file.display(), e)));
                         return Err(AgeError::InvalidOperation {
                             operation: "unlock".to_string(),
                             reason: format!("File failed verification: {}", e),
@@ -1328,7 +1403,7 @@ impl CrudManager {
         let entries = match std::fs::read_dir(directory) {
             Ok(entries) => entries,
             Err(e) => {
-                eprintln!("⚠️  Skipping directory {}: {}", directory.display(), e);
+                eprintln!("{}", fmt_warning(&format!("Skipping directory {}: {}", directory.display(), e)));
                 return Ok(());
             }
         };
@@ -1337,7 +1412,7 @@ impl CrudManager {
             let entry = match entry {
                 Ok(e) => e,
                 Err(e) => {
-                    eprintln!("⚠️  Skipping entry: {}", e);
+                    eprintln!("{}", fmt_warning(&format!("Skipping entry: {}", e)));
                     continue;
                 }
             };

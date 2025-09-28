@@ -8,7 +8,9 @@
 
 use std::io::{self, Write};
 use rpassword::read_password;
+use rsb::visual::glyphs::glyph;
 use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::strings::{fmt_warning, fmt_info};
 
 /// Passphrase input modes for different scenarios
 #[derive(Debug, Clone, PartialEq)]
@@ -125,7 +127,7 @@ impl PassphraseManager {
         }
 
         // Print prompt to stderr to avoid interfering with stdout
-        eprint!("🔐 {}: ", prompt);
+        eprint!("{} {}: ", glyph("lock"), prompt);
         io::stderr().flush().map_err(|e| AgeError::PassphraseError {
             message: format!("Failed to flush stderr: {}", e),
         })?;
@@ -142,7 +144,7 @@ impl PassphraseManager {
 
         // Confirmation for critical operations
         if confirm {
-            eprint!("🔐 Confirm {}: ", prompt);
+            eprint!("{} Confirm {}: ", glyph("lock"), prompt);
             io::stderr().flush().map_err(|e| AgeError::PassphraseError {
                 message: format!("Failed to flush stderr: {}", e),
             })?;
@@ -190,7 +192,7 @@ impl PassphraseManager {
 
     /// Warn about insecure command line usage
     fn warn_insecure_usage(&self) {
-        eprintln!("⚠️  WARNING: Passphrase provided on command line!");
+        eprintln!("{}", fmt_warning("WARNING: Passphrase provided on command line!"));
         eprintln!("   This is insecure and visible in process list and shell history.");
         eprintln!("   Use interactive prompt or CAGE_PASSPHRASE environment variable instead.");
         eprintln!("   For automation, use --stdin-passphrase flag.");
@@ -199,16 +201,16 @@ impl PassphraseManager {
     /// Validate passphrase strength and provide recommendations
     fn validate_passphrase_strength(&self, passphrase: &str) -> AgeResult<()> {
         if passphrase.len() < 8 {
-            eprintln!("⚠️  Warning: Passphrase is less than 8 characters.");
+            eprintln!("{}", fmt_warning("Passphrase is less than 8 characters."));
             eprintln!("   Consider using a longer passphrase for better security.");
         }
 
         if passphrase.len() < 12 && !passphrase.chars().any(|c| c.is_ascii_punctuation()) {
-            eprintln!("💡 Tip: Consider adding special characters for stronger security.");
+            eprintln!("{}", fmt_info("Tip: Consider adding special characters for stronger security."));
         }
 
         if passphrase.to_lowercase() == passphrase {
-            eprintln!("💡 Tip: Mix of uppercase and lowercase letters improves security.");
+            eprintln!("{}", fmt_info("Tip: Mix of uppercase and lowercase letters improves security."));
         }
 
         // Don't fail on weak passwords, just warn

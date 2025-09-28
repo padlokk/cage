@@ -13,6 +13,8 @@
 use std::path::{Path, PathBuf};
 use std::io::{self, Write};
 use chrono::Utc;
+use rsb::visual::glyphs::glyph;
+use crate::cage::strings::fmt_warning;
 use crate::cage::error::{AgeError, AgeResult};
 
 /// Recovery file manager for creating and managing .tmp.recover files
@@ -116,7 +118,7 @@ impl SafetyValidator {
 
             if !self.i_am_sure {
                 // Prompt for confirmation
-                eprintln!("⚠️  DANGER MODE: This action is UNRECOVERABLE!");
+                eprintln!("{}", fmt_warning("DANGER MODE: This action is UNRECOVERABLE!"));
                 eprintln!("   File: {}", file.display());
                 eprintln!("   No recovery file will be created.");
                 eprintln!("   If encryption fails or you forget the passphrase, your file is LOST FOREVER.");
