@@ -130,7 +130,7 @@ P1 PRIORITIES (see TASKS.txt for details):
 1. BUG-04 🟡 – Polish selective unlock (ASCII logs + skip tests when `age` missing)
 2. CAGE-03 🟡 – Finish backup retention & conflict strategy
 3. CAGE-06 🟠 – Build config file loader + CLI wiring
-4. CAGE-11/12 🟠 – CageConfig + adapter refresh groundwork
+4. CAGE-11/12 🟠 – Finalize request docs + streaming adapter work
 5. CAGE-13/14/15/16 ⬆️ – Streaming, SSH identities, derived keys, multi-recipient lifecycle
 6. SEC-01 🟠 – Centralize strings to mitigate binary snooping
 

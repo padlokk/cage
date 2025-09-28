@@ -1,8 +1,8 @@
 # 📚 Cage Library Documentation
 
-**Version**: 0.3.1
-**Updated**: 2025-09-27
-**API Stability**: Production Ready
+**Version**: 0.5.0
+**Updated**: 2025-09-28
+**API Stability**: Production Ready (request API preferred)
 
 Cage provides a comprehensive Rust library for Age encryption automation with advanced features including in-place operations, progress tracking, and PTY automation.
 
@@ -19,87 +19,83 @@ cage = { path = "path/to/cage" }
 # cage = "0.3.1"
 ```
 
-### Basic Encryption Example
+### Basic Encryption Example (Request API)
 
 ```rust
-use cage::cage::{CrudManager, LockOptions, OutputFormat};
+use cage::cage::{CrudManager, OutputFormat};
+use cage::cage::requests::{LockRequest, Identity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut crud_manager = CrudManager::with_defaults()?;
 
-    let options = LockOptions {
-        recursive: false,
-        pattern: None,
-        backup: false,
-        format: OutputFormat::Binary,
-        preserve_encrypted: false,
-        audit_log: None,
-    };
+    let request = LockRequest::new(
+        std::path::PathBuf::from("secret.txt"),
+        Identity::Passphrase("mypassword".to_string())
+    )
+    .with_format(OutputFormat::Binary)
+    .backup(true);
 
-    let result = crud_manager.lock(
-        &std::path::Path::new("secret.txt"),
-        "mypassword",
-        options
-    )?;
-
+    let result = crud_manager.lock_with_request(&request)?;
     println!("Encrypted {} files", result.processed_files.len());
     Ok(())
 }
 ```
 
+> Legacy code that calls `lock(&path, passphrase, LockOptions)` still works, but new
+> development should prefer the typed request API for parity with the CLI.
+
 ---
 
 ## 🏗️ Core Modules
 
-### 1. CrudManager - Core Operations
+### 1. CrudManager + Request API
 
-The primary interface for all file encryption/decryption operations.
+The primary interface now accepts typed request structs that mirror CLI features.
 
 ```rust
-use cage::cage::{CrudManager, LockOptions, UnlockOptions};
+use cage::cage::{CrudManager, OutputFormat};
+use cage::cage::requests::{LockRequest, UnlockRequest, Identity};
 
-// Initialize with defaults
 let mut crud_manager = CrudManager::with_defaults()?;
 
-// Or with custom configuration
-let crud_manager = CrudManager::new(
-    some_custom_config,
-    custom_passphrase_manager,
-    custom_security_validator
-)?;
+let lock_request = LockRequest::new(
+    std::path::PathBuf::from("docs/"),
+    Identity::Passphrase("secret123".to_string())
+)
+.recursive(true)
+.with_format(OutputFormat::AsciiArmor)
+.backup(true);
+
+let lock_result = crud_manager.lock_with_request(&lock_request)?;
+
+let unlock_request = UnlockRequest::new(
+    std::path::PathBuf::from("docs/"),
+    Identity::Passphrase("secret123".to_string())
+)
+.selective(true)
+.preserve_encrypted(true);
+
+let unlock_result = crud_manager.unlock_with_request(&unlock_request)?;
 ```
 
-#### Lock Operations
+#### Legacy API (Still Available)
+
+For existing integrations you can continue using `lock(&path, passphrase, LockOptions)` and
+`unlock(&path, passphrase, UnlockOptions)`. Those internally delegate to the same logic used by request structs.
 
 ```rust
-use cage::cage::{LockOptions, OutputFormat};
+use cage::cage::{CrudManager, LockOptions, OutputFormat};
 
-let options = LockOptions {
-    recursive: true,          // Process directories recursively
-    pattern: Some("*.txt".to_string()), // Glob pattern filter
-    backup: true,             // Create backup before encryption
-    format: OutputFormat::Ascii, // ASCII armor format
-    preserve_encrypted: false, // Delete original after encryption
-    audit_log: Some(PathBuf::from("/var/log/cage.log")),
+let mut crud_manager = CrudManager::with_defaults()?;
+
+let legacy_options = LockOptions {
+    recursive: false,
+    pattern_filter: None,
+    backup_before_lock: true,
+    format: OutputFormat::Binary,
 };
 
-let result = crud_manager.lock(&path, "passphrase", options)?;
-println!("Processed files: {:#?}", result.processed_files);
-```
-
-#### Unlock Operations
-
-```rust
-use cage::cage::UnlockOptions;
-
-let options = UnlockOptions {
-    selective: false,         // Process all files vs selective
-    pattern: Some("*.cage".to_string()), // Pattern for selective unlock
-    preserve_encrypted: true, // Keep encrypted files after decryption
-    audit_log: Some(PathBuf::from("/var/log/cage.log")),
-};
-
-let result = crud_manager.unlock(&path, "passphrase", options)?;
+let result = crud_manager.lock(&std::path::Path::new("legacy.txt"), "pass", legacy_options)?;
 ```
 
 ### 2. Progress Framework

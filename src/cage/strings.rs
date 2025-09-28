@@ -160,12 +160,9 @@ pub const VAL_FILE_ALREADY_ENCRYPTED: &str = "File is already encrypted";
 pub const VAL_INVALID_PATTERN: &str = "Invalid pattern filter";
 
 // ============================================================================
-// TEST-ONLY MESSAGES (conditionally compiled)
+// TEST SUPPORT MESSAGES
 // ============================================================================
 
-#[cfg(test)]
-pub mod test_messages {
-    pub const TEST_SKIP_NO_AGE: &str = "SKIPPED: Age binary not found in PATH";
-    pub const TEST_PASS: &str = "[PASS]";
-    pub const TEST_FAIL: &str = "[FAIL]";
-}
+pub const TEST_SKIP_NO_AGE: &str = "SKIPPED: Age binary not found in PATH";
+pub const TEST_PASS: &str = "[PASS]";
+pub const TEST_FAIL: &str = "[FAIL]";

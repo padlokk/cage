@@ -26,6 +26,32 @@
 
 ---
 
+## HANDOFF-2025-09-28-? (UAT/dev sync)
+
+### Session Duration: ~1 hour
+### Branch: main
+### Phase: Request/API integration & adapter groundwork
+
+### Completed:
+- ✅ BUG-04 follow-up finalized: selective unlock logging now routed through glyph helpers (`fmt_warning` etc.).
+- ✅ CAGE-11 wiring: CLI uses `lock_with_request` / `unlock_with_request`; tests confirm request builders.
+- ✅ TEST-04 gating: selective-unlock tests skip gracefully when `age` binary missing.
+- ✅ AdapterFactory now returns `AdapterV1Compat<ShellAdapterV2>` to expose the new trait surface.
+
+### Partial:
+- 🟡 CAGE-11 doc update still pending (`docs/LIBRARY_USAGE.md`).
+- 🟡 CAGE-12 streaming methods still return `AdapterNotImplemented`; needs follow-through.
+
+### Next Agent MUST:
+1. Update docs/LIBRARY_USAGE.md with request API usage (CAGE-11).
+2. Implement real streaming flows in `ShellAdapterV2` (CAGE-12/CAGE-13).
+3. Continue SEC-01 string migration in CLI + docs as modules are touched.
+
+### Context Hash: (pending commit)
+### Files Modified: CODEX_START.txt, docs/procs/{TASKS,PROCESS,QUICK_REF}.txt, src/bin/cli_age.rs, src/cage/{adapter.rs,adapter_v2.rs,in_place.rs,mod.rs,progress/{core.rs,mod.rs},requests.rs,strings.rs}, tests/test_selective_unlock.rs
+
+---
+
 ## HANDOFF-2025-09-27-1130
 
 ### Session Duration: ~2 hours

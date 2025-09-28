@@ -82,9 +82,11 @@ mod tests {
         assert_eq!(manager.active_tasks().len(), 2);
 
         task1.complete("Task 1 done");
+        manager.cleanup_finished();
         assert_eq!(manager.active_tasks().len(), 1);
 
         task2.complete("Task 2 done");
+        manager.cleanup_finished();
         assert_eq!(manager.active_tasks().len(), 0);
     }
 }

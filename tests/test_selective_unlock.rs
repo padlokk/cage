@@ -15,6 +15,10 @@ fn age_available() -> bool {
 }
 
 fn setup_test_manager(temp_dir: &TempDir) -> CrudManager {
+    if which::which("age").is_err() {
+        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
+        panic!("skip");
+    }
     let adapter = Box::new(ShellAdapter::new().expect("Failed to create adapter"));
     let mut config = AgeConfig::default();
     config.audit_log_path = Some(temp_dir.path().join("audit.log").display().to_string());
@@ -25,7 +29,7 @@ fn setup_test_manager(temp_dir: &TempDir) -> CrudManager {
 #[test]
 fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("SKIPPED: Age binary not found in PATH");
+        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
@@ -83,7 +87,7 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
 #[test]
 fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("SKIPPED: Age binary not found in PATH");
+        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
@@ -126,7 +130,7 @@ fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::err
 #[test]
 fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("SKIPPED: Age binary not found in PATH");
+        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
@@ -174,7 +178,7 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
 #[test]
 fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("SKIPPED: Age binary not found in PATH");
+        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 

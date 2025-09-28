@@ -212,6 +212,12 @@ impl UnlockRequest {
         self.preserve_encrypted = enabled;
         self
     }
+
+    /// Builder method to set pattern filter
+    pub fn with_pattern(mut self, pattern: String) -> Self {
+        self.pattern = Some(pattern);
+        self
+    }
 }
 
 // ============================================================================

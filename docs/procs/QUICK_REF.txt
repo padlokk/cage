@@ -19,7 +19,7 @@
 1. BUG-04 follow-up: swap selective-mode logs to ASCII & make tests age-aware.
 2. CAGE-03 follow-up: retention/conflict strategy for backups.
 3. CAGE-06: Implement config file discovery/loading.
-4. CAGE-11/12 groundwork for CageConfig + adapter refresh.
+4. CAGE-11/12: Finish docs + implement streaming adapter behaviour.
 5. CAGE-13/14/15/16: Streaming, SSH, derived keys, recipients planning.
 6. SEC-01: Start string constants inventory.
 

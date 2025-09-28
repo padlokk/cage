@@ -5,9 +5,13 @@
 
 use std::path::Path;
 use std::io::{Read, Write};
+use std::fs::File;
+use std::sync::Arc;
 use super::error::{AgeError, AgeResult};
 use super::config::OutputFormat;
 use super::requests::{Identity, Recipient};
+use super::pty_wrap::PtyAgeAutomator;
+use tempfile::tempdir;
 
 // ============================================================================
 // CORE ADAPTER TRAITS
@@ -46,7 +50,7 @@ pub trait AgeAdapterV2: Send + Sync {
         &self,
         input: &mut dyn Read,
         output: &mut dyn Write,
-        identity: &Identity,
+        _identity: &Identity,
         recipients: Option<&[Recipient]>,
         format: OutputFormat,
     ) -> AgeResult<u64>; // Returns bytes processed
@@ -56,7 +60,7 @@ pub trait AgeAdapterV2: Send + Sync {
         &self,
         input: &mut dyn Read,
         output: &mut dyn Write,
-        identity: &Identity,
+        _identity: &Identity,
     ) -> AgeResult<u64>; // Returns bytes processed
 
     // ========================================================================
@@ -219,18 +223,18 @@ pub struct AdapterCapabilities {
 // ============================================================================
 
 /// Wrapper to adapt V2 interface to original AgeAdapter trait
-pub struct AdapterV1Compat<T: AgeAdapterV2 + Clone> {
-    inner: T,
+pub struct AdapterV1Compat {
+    inner: Arc<dyn AgeAdapterV2>,
 }
 
-impl<T: AgeAdapterV2 + Clone> AdapterV1Compat<T> {
+impl AdapterV1Compat {
     /// Create a new compatibility wrapper
-    pub fn new(adapter: T) -> Self {
-        Self { inner: adapter }
+    pub fn new(adapter: impl AgeAdapterV2 + 'static) -> Self {
+        Self { inner: Arc::new(adapter) }
     }
 }
 
-impl<T: AgeAdapterV2 + Clone + 'static> super::adapter::AgeAdapter for AdapterV1Compat<T> {
+impl super::adapter::AgeAdapter for AdapterV1Compat {
     fn encrypt(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
         let identity = Identity::Passphrase(passphrase.to_string());
         self.inner.encrypt_file(input, output, &identity, None, format)
@@ -261,8 +265,241 @@ impl<T: AgeAdapterV2 + Clone + 'static> super::adapter::AgeAdapter for AdapterV1
     }
 
     fn clone_box(&self) -> Box<dyn super::adapter::AgeAdapter> {
-        // For now, return a placeholder error
-        unimplemented!("Clone not implemented for AdapterV1Compat")
+        Box::new(AdapterV1Compat { inner: Arc::clone(&self.inner) })
+    }
+}
+
+// ============================================================================
+// SHELL ADAPTER V2 IMPLEMENTATION
+// ============================================================================
+
+#[derive(Clone, Default)]
+pub struct ShellAdapterV2;
+
+impl ShellAdapterV2 {
+    pub fn new() -> AgeResult<Self> {
+        // Validate age binary availability early
+        let automator = PtyAgeAutomator::new()?;
+        automator.check_age_binary()?;
+        Ok(Self)
+    }
+}
+
+impl AgeAdapterV2 for ShellAdapterV2 {
+    fn encrypt_file(
+        &self,
+        input: &Path,
+        output: &Path,
+        identity: &Identity,
+        _recipients: Option<&[Recipient]>,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
+        let pass = match identity {
+            Identity::Passphrase(p) => p.clone(),
+            Identity::PromptPassphrase => {
+                return Err(AgeError::AdapterNotImplemented("PromptPassphrase not supported in ShellAdapterV2".into()));
+            }
+            Identity::IdentityFile(_) | Identity::SshKey(_) => {
+                return Err(AgeError::AdapterNotImplemented("Identity-based encryption not yet implemented".into()));
+            }
+        };
+
+        let automator = PtyAgeAutomator::new()?;
+        automator.encrypt(input, output, &pass, format)
+    }
+
+    fn decrypt_file(
+        &self,
+        input: &Path,
+        output: &Path,
+        identity: &Identity,
+    ) -> AgeResult<()> {
+        let pass = match identity {
+            Identity::Passphrase(p) => p.clone(),
+            Identity::PromptPassphrase => {
+                return Err(AgeError::AdapterNotImplemented("PromptPassphrase not supported in ShellAdapterV2".into()));
+            }
+            Identity::IdentityFile(_) | Identity::SshKey(_) => {
+                return Err(AgeError::AdapterNotImplemented("Identity-based decryption not yet implemented".into()));
+            }
+        };
+
+        let automator = PtyAgeAutomator::new()?;
+        automator.decrypt(input, output, &pass)
+    }
+
+    fn encrypt_stream(
+        &self,
+        input: &mut dyn Read,
+        output: &mut dyn Write,
+        identity: &Identity,
+        recipients: Option<&[Recipient]>,
+        format: OutputFormat,
+    ) -> AgeResult<u64> {
+        if let Some(recips) = recipients {
+            if !recips.is_empty() {
+                return Err(AgeError::AdapterNotImplemented("Public-key streaming not yet implemented".into()));
+            }
+        }
+
+        let pass = match identity {
+            Identity::Passphrase(p) => p.clone(),
+            _ => return Err(AgeError::AdapterNotImplemented("Streaming requires passphrase identity".into())),
+        };
+
+        let temp_dir = tempdir().map_err(|e| AgeError::TemporaryResourceError {
+            resource_type: "dir".into(),
+            operation: "create".into(),
+            reason: e.to_string(),
+        })?;
+
+        let input_path = temp_dir.path().join("stream_input");
+        let mut temp_in = File::create(&input_path).map_err(|e| AgeError::file_error("create", input_path.clone(), e))?;
+        let bytes_copied = std::io::copy(input, &mut temp_in).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "encrypt_stream".into(),
+            source: e,
+        })?;
+        temp_in.flush().map_err(|e| AgeError::IoError {
+            operation: "flush".into(),
+            context: "encrypt_stream".into(),
+            source: e,
+        })?;
+
+        let output_path = temp_dir.path().join("stream_output");
+
+        let automator = PtyAgeAutomator::new()?;
+        automator.encrypt(&input_path, &output_path, &pass, format)?;
+
+        let mut encrypted = File::open(&output_path).map_err(|e| AgeError::file_error("open", output_path.clone(), e))?;
+        std::io::copy(&mut encrypted, output).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "encrypt_stream".into(),
+            source: e,
+        })?;
+
+        Ok(bytes_copied)
+    }
+
+    fn decrypt_stream(
+        &self,
+        input: &mut dyn Read,
+        output: &mut dyn Write,
+        identity: &Identity,
+    ) -> AgeResult<u64> {
+        let pass = match identity {
+            Identity::Passphrase(p) => p.clone(),
+            _ => return Err(AgeError::AdapterNotImplemented("Streaming requires passphrase identity".into())),
+        };
+
+        let temp_dir = tempdir().map_err(|e| AgeError::TemporaryResourceError {
+            resource_type: "dir".into(),
+            operation: "create".into(),
+            reason: e.to_string(),
+        })?;
+
+        let input_path = temp_dir.path().join("stream_input.cage");
+        let mut temp_in = File::create(&input_path).map_err(|e| AgeError::file_error("create", input_path.clone(), e))?;
+        let bytes_copied = std::io::copy(input, &mut temp_in).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "decrypt_stream".into(),
+            source: e,
+        })?;
+        temp_in.flush().map_err(|e| AgeError::IoError {
+            operation: "flush".into(),
+            context: "decrypt_stream".into(),
+            source: e,
+        })?;
+
+        let output_path = temp_dir.path().join("stream_output");
+
+        let automator = PtyAgeAutomator::new()?;
+        automator.decrypt(&input_path, &output_path, &pass)?;
+
+        let mut decrypted = File::open(&output_path).map_err(|e| AgeError::file_error("open", output_path.clone(), e))?;
+        std::io::copy(&mut decrypted, output).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "decrypt_stream".into(),
+            source: e,
+        })?;
+
+        Ok(bytes_copied)
+    }
+
+    fn validate_identity(&self, identity: &Identity) -> AgeResult<()> {
+        match identity {
+            Identity::Passphrase(pass) => {
+                if pass.is_empty() {
+                    Err(AgeError::InvalidOperation { operation: "validate_identity".into(), reason: "Empty passphrase".into() })
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Err(AgeError::AdapterNotImplemented("Identity validation not implemented".into())),
+        }
+    }
+
+    fn validate_recipients(&self, _recipients: &[Recipient]) -> AgeResult<()> {
+        Err(AgeError::AdapterNotImplemented("Recipient validation not implemented".into()))
+    }
+
+    fn generate_identity(&self) -> AgeResult<(String, String)> {
+        Err(AgeError::AdapterNotImplemented("Identity generation not implemented".into()))
+    }
+
+    fn ssh_to_recipient(&self, _ssh_pubkey: &str) -> AgeResult<String> {
+        Err(AgeError::AdapterNotImplemented("SSH recipient conversion not implemented".into()))
+    }
+
+    fn verify_file(&self, _file: &Path, _identity: Option<&Identity>) -> AgeResult<VerificationResult> {
+        Err(AgeError::AdapterNotImplemented("verify_file not implemented".into()))
+    }
+
+    fn inspect_file(&self, _file: &Path) -> AgeResult<FileMetadata> {
+        Err(AgeError::AdapterNotImplemented("inspect_file not implemented".into()))
+    }
+
+    fn is_encrypted(&self, file: &Path) -> bool {
+        file.extension().map_or(false, |e| e == "cage")
+    }
+
+    fn health_check(&self) -> AgeResult<HealthStatus> {
+        let age_available = PtyAgeAutomator::new()?.check_age_binary().is_ok();
+        Ok(HealthStatus {
+            healthy: age_available,
+            age_binary: age_available,
+            age_version: None,
+            can_encrypt: age_available,
+            can_decrypt: age_available,
+            streaming_available: age_available,
+            errors: if age_available { vec![] } else { vec!["Age binary not available".into()] },
+        })
+    }
+
+    fn capabilities(&self) -> AdapterCapabilities {
+        AdapterCapabilities {
+            passphrase: true,
+            public_key: false,
+            identity_files: false,
+            ssh_recipients: false,
+            streaming: true,
+            ascii_armor: true,
+            hardware_keys: false,
+            key_derivation: false,
+            max_file_size: None,
+        }
+    }
+
+    fn adapter_name(&self) -> &'static str {
+        "ShellAdapterV2"
+    }
+
+    fn adapter_version(&self) -> String {
+        format!("shell-v2-{}", super::VERSION)
+    }
+
+    fn clone_box(&self) -> Box<dyn AgeAdapterV2> {
+        Box::new(Self)
     }
 }
 
@@ -350,5 +587,41 @@ mod tests {
         assert!(caps.passphrase);
         assert!(caps.streaming);
         assert_eq!(caps.max_file_size, Some(1_073_741_824));
+    }
+
+    #[test]
+    fn test_shell_adapter_v2_stream_round_trip() {
+        if which::which("age").is_err() {
+            println!("Streaming test skipped: age binary not available");
+            return;
+        }
+
+        let adapter = ShellAdapterV2::new().expect("Failed to create ShellAdapterV2");
+
+        let mut plaintext = std::io::Cursor::new(b"streaming round trip".to_vec());
+        let mut encrypted = Vec::new();
+
+        adapter
+            .encrypt_stream(
+                &mut plaintext,
+                &mut encrypted,
+                &Identity::Passphrase("passphrase123".to_string()),
+                None,
+                OutputFormat::Binary,
+            )
+            .expect("Streaming encrypt failed");
+
+        let mut encrypted_cursor = std::io::Cursor::new(encrypted);
+        let mut decrypted = Vec::new();
+
+        adapter
+            .decrypt_stream(
+                &mut encrypted_cursor,
+                &mut decrypted,
+                &Identity::Passphrase("passphrase123".to_string()),
+            )
+            .expect("Streaming decrypt failed");
+
+        assert_eq!(decrypted, b"streaming round trip");
     }
 }

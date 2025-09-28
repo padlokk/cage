@@ -578,10 +578,9 @@ fn execute_lock_operation(
         .with_format(options.format)
         .recursive(options.recursive);
 
-        let lock_request = if let Some(ref pattern) = options.pattern_filter {
-            lock_request.with_pattern(pattern.clone())
-        } else {
-            lock_request
+        let lock_request = match options.pattern_filter.clone() {
+            Some(pattern_val) => lock_request.with_pattern(pattern_val),
+            None => lock_request,
         };
 
         let result = match crud_manager.lock_with_request(&lock_request) {
@@ -697,10 +696,9 @@ fn execute_in_place_lock_operation(
             .with_format(options.format)
             .recursive(options.recursive);
 
-            let lock_request = if let Some(ref pattern) = options.pattern_filter {
-                lock_request.with_pattern(pattern.clone())
-            } else {
-                lock_request
+            let lock_request = match options.pattern_filter.clone() {
+                Some(pattern_val) => lock_request.with_pattern(pattern_val),
+                None => lock_request,
             };
 
             let result = match crud_manager.lock_with_request(&lock_request) {
@@ -865,12 +863,9 @@ fn execute_unlock_operation(
         .selective(options.selective)
         .preserve_encrypted(options.preserve_encrypted);
 
-        let unlock_request = if let Some(ref pattern) = options.pattern_filter {
-            // Pattern filter is supported but not exposed in builder yet
-            // For now, we'll just use the basic request
-            unlock_request
-        } else {
-            unlock_request
+        let unlock_request = match options.pattern_filter.clone() {
+            Some(pattern_val) => unlock_request.with_pattern(pattern_val),
+            None => unlock_request,
         };
 
         let result = match crud_manager.unlock_with_request(&unlock_request) {

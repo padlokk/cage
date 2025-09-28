@@ -9,6 +9,7 @@
 use std::path::Path;
 use super::error::{AgeError, AgeResult};
 use super::config::OutputFormat;
+use super::adapter_v2::{ShellAdapterV2, AdapterV1Compat};
 
 /// Core Age operations interface that all adapters must implement
 pub trait AgeAdapter {
@@ -162,13 +163,17 @@ pub struct AdapterFactory;
 impl AdapterFactory {
     /// Create the default adapter (currently ShellAdapter)
     pub fn create_default() -> AgeResult<Box<dyn AgeAdapter>> {
-        Ok(Box::new(ShellAdapter::new()?))
+        let v2 = ShellAdapterV2::new()?;
+        Ok(Box::new(AdapterV1Compat::new(v2)))
     }
     
     /// Create specific adapter by name
     pub fn create_adapter(adapter_type: &str) -> AgeResult<Box<dyn AgeAdapter>> {
         match adapter_type {
-            "shell" => Ok(Box::new(ShellAdapter::new()?)),
+            "shell" => {
+                let v2 = ShellAdapterV2::new()?;
+                Ok(Box::new(AdapterV1Compat::new(v2)))
+            },
             "rage" => Ok(Box::new(RageAdapter::new()?)),
             _ => Err(AgeError::InvalidAdapter(format!("Unknown adapter type: {}", adapter_type))),
         }

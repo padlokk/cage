@@ -13,7 +13,6 @@
 use std::path::{Path, PathBuf};
 use std::io::{self, Write};
 use chrono::Utc;
-use rsb::visual::glyphs::glyph;
 use crate::cage::strings::fmt_warning;
 use crate::cage::error::{AgeError, AgeResult};
 

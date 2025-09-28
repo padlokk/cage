@@ -345,11 +345,7 @@ pub mod utils {
         }
 
         let rate = items as f64 / duration.as_secs_f64();
-        if rate >= 1.0 {
-            format!("{:.1} items/s", rate)
-        } else {
-            format!("{:.2} items/s", rate)
-        }
+        format!("{:.1} items/s", rate)
     }
 }
 
