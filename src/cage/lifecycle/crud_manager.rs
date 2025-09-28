@@ -80,12 +80,85 @@ pub struct VerificationResult {
     pub overall_status: String,
 }
 
+/// Retention policy for backup lifecycle management
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetentionPolicy {
+    /// Keep all backups indefinitely (manual cleanup only)
+    KeepAll,
+    /// Keep backups for N days, then auto-delete
+    KeepDays(u32),
+    /// Keep only the last N backups per file
+    KeepLast(usize),
+    /// Combined: keep last N backups AND those within M days
+    KeepLastAndDays { last: usize, days: u32 },
+}
+
+impl Default for RetentionPolicy {
+    fn default() -> Self {
+        RetentionPolicy::KeepLast(3)
+    }
+}
+
+impl RetentionPolicy {
+    /// Determine which backups should be deleted based on this policy
+    /// Returns indices of backups to delete (sorted by age, oldest first)
+    pub fn apply(&self, backups: &[BackupInfo]) -> Vec<usize> {
+        if backups.is_empty() {
+            return Vec::new();
+        }
+
+        match self {
+            RetentionPolicy::KeepAll => Vec::new(),
+
+            RetentionPolicy::KeepDays(days) => {
+                let cutoff_secs = *days as u64 * 86400;
+                backups
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, backup)| {
+                        if backup.age_seconds() > cutoff_secs {
+                            Some(idx)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            }
+
+            RetentionPolicy::KeepLast(keep_count) => {
+                if backups.len() <= *keep_count {
+                    Vec::new()
+                } else {
+                    (*keep_count..backups.len()).collect()
+                }
+            }
+
+            RetentionPolicy::KeepLastAndDays { last, days } => {
+                let cutoff_secs = *days as u64 * 86400;
+                backups
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, backup)| {
+                        // Keep if within last N OR within time window
+                        if idx < *last || backup.age_seconds() <= cutoff_secs {
+                            None
+                        } else {
+                            Some(idx)
+                        }
+                    })
+                    .collect()
+            }
+        }
+    }
+}
+
 /// Backup management for safe file operations
 #[derive(Debug, Clone)]
 pub struct BackupManager {
     backup_dir: Option<PathBuf>,
     backup_extension: String,
     cleanup_on_success: bool,
+    retention_policy: RetentionPolicy,
 }
 
 impl BackupManager {
@@ -95,6 +168,7 @@ impl BackupManager {
             backup_dir: None, // Use same directory as original file
             backup_extension: ".bak".to_string(),
             cleanup_on_success: true,
+            retention_policy: RetentionPolicy::default(),
         }
     }
 
@@ -104,6 +178,7 @@ impl BackupManager {
             backup_dir: Some(backup_dir),
             backup_extension: ".bak".to_string(),
             cleanup_on_success: true,
+            retention_policy: RetentionPolicy::default(),
         }
     }
 
@@ -120,6 +195,12 @@ impl BackupManager {
     /// Set cleanup behavior
     pub fn with_cleanup(mut self, cleanup: bool) -> Self {
         self.cleanup_on_success = cleanup;
+        self
+    }
+
+    /// Set retention policy
+    pub fn with_retention(mut self, policy: RetentionPolicy) -> Self {
+        self.retention_policy = policy;
         self
     }
 
@@ -1538,5 +1619,112 @@ mod tests {
         // Both backups should exist in some form
         let backup_content = std::fs::read(&backup_info2.backup_path).unwrap();
         assert_eq!(backup_content, b"modified");
+    }
+
+    #[test]
+    fn test_retention_policy_keep_all() {
+        let policy = RetentionPolicy::KeepAll;
+        let backups = create_test_backups(5);
+        let to_delete = policy.apply(&backups);
+        assert_eq!(to_delete.len(), 0, "KeepAll should not delete any backups");
+    }
+
+    #[test]
+    fn test_retention_policy_keep_last() {
+        let policy = RetentionPolicy::KeepLast(3);
+        let backups = create_test_backups(5);
+        let to_delete = policy.apply(&backups);
+        assert_eq!(to_delete, vec![3, 4], "Should delete backups beyond index 2");
+
+        let policy_more = RetentionPolicy::KeepLast(10);
+        let to_delete_more = policy_more.apply(&backups);
+        assert_eq!(to_delete_more.len(), 0, "Should keep all when count >= total");
+    }
+
+    #[test]
+    fn test_retention_policy_keep_days() {
+        let now = std::time::SystemTime::now();
+        let mut backups = Vec::new();
+
+        // Create backups at different ages
+        backups.push(BackupInfo {
+            original_path: PathBuf::from("/test/file1.txt"),
+            backup_path: PathBuf::from("/test/file1.txt.bak"),
+            created_at: now - std::time::Duration::from_secs(86400 * 2), // 2 days
+            size_bytes: 100,
+        });
+        backups.push(BackupInfo {
+            original_path: PathBuf::from("/test/file2.txt"),
+            backup_path: PathBuf::from("/test/file2.txt.bak"),
+            created_at: now - std::time::Duration::from_secs(86400 * 5), // 5 days
+            size_bytes: 100,
+        });
+        backups.push(BackupInfo {
+            original_path: PathBuf::from("/test/file3.txt"),
+            backup_path: PathBuf::from("/test/file3.txt.bak"),
+            created_at: now - std::time::Duration::from_secs(86400 * 10), // 10 days
+            size_bytes: 100,
+        });
+
+        let policy = RetentionPolicy::KeepDays(7);
+        let to_delete = policy.apply(&backups);
+        assert_eq!(to_delete, vec![2], "Should delete backups older than 7 days");
+    }
+
+    #[test]
+    fn test_retention_policy_keep_last_and_days() {
+        let now = std::time::SystemTime::now();
+        let mut backups = Vec::new();
+
+        // Create 5 backups with varying ages
+        for i in 0..5 {
+            backups.push(BackupInfo {
+                original_path: PathBuf::from(format!("/test/file{}.txt", i)),
+                backup_path: PathBuf::from(format!("/test/file{}.txt.bak", i)),
+                created_at: now - std::time::Duration::from_secs(86400 * (i + 1) as u64),
+                size_bytes: 100,
+            });
+        }
+
+        // Policy: keep last 2 AND those within 3 days
+        let policy = RetentionPolicy::KeepLastAndDays { last: 2, days: 3 };
+        let to_delete = policy.apply(&backups);
+
+        // Should keep:
+        // - Index 0, 1 (last 2)
+        // - Index 2 (within 3 days = 3 * 86400)
+        // Should delete: Index 3, 4 (beyond last 2 AND older than 3 days)
+        assert_eq!(to_delete, vec![3, 4]);
+    }
+
+    #[test]
+    fn test_retention_policy_empty_backups() {
+        let policies = vec![
+            RetentionPolicy::KeepAll,
+            RetentionPolicy::KeepDays(7),
+            RetentionPolicy::KeepLast(3),
+            RetentionPolicy::KeepLastAndDays { last: 2, days: 7 },
+        ];
+
+        for policy in policies {
+            let to_delete = policy.apply(&[]);
+            assert_eq!(to_delete.len(), 0, "Empty backup list should return empty delete list");
+        }
+    }
+
+    fn create_test_backups(count: usize) -> Vec<BackupInfo> {
+        let mut backups = Vec::new();
+        let now = std::time::SystemTime::now();
+
+        for i in 0..count {
+            backups.push(BackupInfo {
+                original_path: PathBuf::from(format!("/test/file{}.txt", i)),
+                backup_path: PathBuf::from(format!("/test/file{}.txt.bak", i)),
+                created_at: now - std::time::Duration::from_secs(i as u64 * 60),
+                size_bytes: 100,
+            });
+        }
+
+        backups
     }
 }
