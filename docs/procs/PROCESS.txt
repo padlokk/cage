@@ -127,14 +127,12 @@ PHASE STATUS:
 - ⬆️ P2 "Enhancement" - Future
 
 P1 PRIORITIES (see TASKS.txt for details):
-1. BUG-01: Preserve extensions (3 pts)
-2. BUG-02: Recursive operations (5 pts)
-3. BUG-03: Pattern filters/globs (3 pts)
-4. BUG-04: Unlock options (3 pts)
-5. BUG-05: Proxy command PTY (5 pts)
-6. CAGE-01: Key rotation (8 pts) - ALREADY COMPLETE
-7. CAGE-02: File verification (5 pts) - ALREADY COMPLETE
-8. CAGE-03: Backup/recovery (5 pts) - ALREADY COMPLETE
+1. BUG-04 🟡 – Implement selective unlock + tests (preserve_encrypted live)
+2. CAGE-03 🟡 – Finish backup retention & conflict strategy
+3. CAGE-06 🟠 – Build config file loader + CLI wiring
+4. TEST-01 🟠 – Refresh CLI suites for `cage` binary
+5. TEST-03 🟠 – Add proxy PTY regression coverage
+6. CAGE-08/09/10 ⬆️ – Recipient & identity support after unlock/config polish
 
 KEY DECISIONS:
 - Using RSB framework for enhanced CLI and XDG support

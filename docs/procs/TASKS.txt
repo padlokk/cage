@@ -14,50 +14,24 @@
 
 ## Critical Bugs (Blocking Production)
 
-### BUG-01: Preserve Original Extensions During Lock/Unlock [3 pts]
-**Location:** `src/cage/lifecycle/crud_manager.rs:857-907`
-**Issue:** `lock_single_file` rewrites filenames to `<stem>.cage`, breaking documented `file.ext.cage` flow and round-trip unlock.
-**Fix Checklist:**
-- [ ] Append configured extension to the full name (e.g. `report.pdf.cage`).
-- [ ] Update unlock logic to strip only the configured suffix.
-- [ ] Adjust CLI examples/tests after the change.
-- [ ] Add regression tests covering nested extensions.
+### BUG-01: Preserve Original Extensions During Lock/Unlock [3 pts] ✅
+**Status:** Complete – `lock_single_file` now appends the configured suffix and `unlock_single_file` only strips that suffix (`src/cage/lifecycle/crud_manager.rs:856`, `src/cage/lifecycle/crud_manager.rs:939`). Regression coverage still recommended.
 
-### BUG-02: Recursive Operations Ignore Subdirectories [5 pts]
-**Location:** `collect_files_with_pattern` & friends (`src/cage/lifecycle/crud_manager.rs:921-960, 1120-1160`)
-**Issue:** `read_dir` is non-recursive, so `--recursive`, `status`, and `verify` skip nested trees.
-**Fix Checklist:**
-- [ ] Implement depth-first traversal with symlink guards.
-- [ ] Respect pattern filters across depth.
-- [ ] Share traversal between lock/unlock/status/verify.
-- [ ] Add integration coverage for nested directories.
+### BUG-02: Recursive Operations Ignore Subdirectories [5 pts] ✅
+**Status:** Complete – Depth-first traversal with glob support is live (`src/cage/lifecycle/crud_manager.rs:1212`).
 
-### BUG-03: Pattern Filters Treat Globs as Literal Substrings [3 pts]
-**Location:** Same traversal helpers (`contains(pattern)` logic).
-**Issue:** CLI advertises glob usage (`--pattern "*.log"`), but current logic never matches such inputs.
-**Fix Checklist:**
-- [ ] Replace substring check with glob matcher (e.g. `globset`).
-- [ ] Support negation/advanced patterns if feasible.
-- [ ] Document accepted syntax and update help output.
-- [ ] Add unit tests for positive/negative cases.
+### BUG-03: Pattern Filters Treat Globs as Literal Substrings [3 pts] ✅
+**Status:** Complete – `globset` matcher is used for lock/unlock/status/verify (`src/cage/lifecycle/crud_manager.rs:1203`).
 
-### BUG-04: Unlock Options Ignored [3 pts]
+### BUG-04: Unlock Options Ignored [3 pts] 🟡
 **Location:** `unlock_single_file` (`src/cage/lifecycle/crud_manager.rs:933-947`).
-**Issue:** `_options` is unused; encrypted artifacts are always preserved and selective unlock is impossible.
-**Fix Checklist:**
-- [ ] Honour `preserve_encrypted` by optionally deleting ciphertext.
-- [ ] Honour `selective` / pattern-driven unlock.
-- [ ] Extend CLI feedback for skipped/deleted files.
-- [ ] Add tests validating option behaviour.
+**Status:** Partially complete – `preserve_encrypted` and `verify_before_unlock` ship (`src/cage/lifecycle/crud_manager.rs:1007`), but selective unlock remains TODO and lacks coverage.
+**Next Actions:**
+- Implement selective unlock handling across repository traversal.
+- Add regression tests for both delete/preserve paths and selective filters.
 
-### BUG-05: Proxy Command Still Uses Expect Script [5 pts]
-**Location:** `execute_proxy_command` (`src/bin/cli_age.rs:959-1119`).
-**Issue:** Hand-written `expect` script contradicts PTY migration (`docs/tech/CAGE_PTY_FIX.md`) and is Unix-only.
-**Fix Checklist:**
-- [ ] Reuse `PtyAgeAutomator` for proxy mode.
-- [ ] Provide stdin/interactive passphrase handling without external tools.
-- [ ] Gate Unix-specific code; offer meaningful error or alternative on Windows.
-- [ ] Add proxy-specific integration tests.
+### BUG-05: Proxy Command Still Uses Expect Script [5 pts] ✅
+**Status:** Complete – Proxy command now routes through `PtyAgeAutomator` (`src/bin/cli_age.rs:993`). Follow-up tests still pending (see TEST-03).
 
 ---
 
@@ -71,9 +45,8 @@
 **Source:** Former TASK-002 (`src/cage/lifecycle/crud_manager.rs:1000-1106`).
 **Deliverables:** Header/format validation, optional decrypt probe, structured reporting, and corruption handling.
 
-### CAGE-03: Backup & Recovery Pipeline [5 pts]
-**Source:** Former TASK-003.
-**Deliverables:** Functional `--backup` flag, configurable retention, conflict handling, and restore hooks.
+### CAGE-03: Backup & Recovery Pipeline [5 pts] 🟡
+**Status:** Partial – `backup_before_lock` covers single-file backups with restore-on-failure (`src/cage/lifecycle/crud_manager.rs:864`), but retention policies, user-configurable dirs, and multi-run conflict handling remain.
 
 ### CAGE-04: In-Place Operation Safety Layers [5 pts]
 **Location:** `src/bin/cli_age.rs:569-760`, `src/cage/in_place.rs`.
@@ -84,12 +57,10 @@
 **Scope:** Integrate spinner/bar styles with CRUD operations, respect verbosity flags, and expose hooks for long jobs.
 
 ### CAGE-06: Configuration File Support [5 pts]
-**Location:** `src/cage/config.rs`.
-**Scope:** Layered `~/.cagerc` / project config loading, validation, overrides, and CLI subcommands.
+**Status:** Pending – `AgeConfig` only offers programmatic defaults; no on-disk config loader or CLI wiring exists.
 
 ### CAGE-07: RageAdapter Implementation [8 pts]
-**Location:** `src/cage/adapter.rs:117-157`.
-**Scope:** Integrate `rage` crate, match shell adapter parity, add selection heuristics, and document usage.
+**Status:** Deferred backlog – Rage adapter remains a stub returning `AdapterNotImplemented` (`src/cage/adapter.rs:128`).
 
 [5] CAGE-08: Multi-Recipient Encryption Support [Backlog]
 **Location:** Adapter + CRUD pipeline + CLI
@@ -108,23 +79,27 @@
 - [ ] Document CLI usage / config knobs.
 - [ ] Tests covering encrypt/decrypt with SSH recipients.
 
+[4] CAGE-10: Identity Key Support (Backlog)
+**Location:** Adapter + CRUD pipeline + CLI
+**Scope:** Provide first-class identity/key-file flows (Age `--identity`) so unlock/no-passphrase operations work without proxy handoffs.
+**Tasks:**
+- [ ] Extend CRUD interfaces to accept identity files for decrypt/verify.
+- [ ] Update `PtyAgeAutomator` to invoke `age -d -i` when identities supplied.
+- [ ] Surface CLI flags and config for identity management.
+- [ ] Add regression tests covering identity-driven unlock.
+
 ---
 
 ## Test & Tooling Improvements (TEST Series)
 
 ### TEST-01: Align CLI Suites with Current Binary [3 pts]
-**Location:** `tests/cli/*.sh`.
-**Issue:** Scripts call `./target/debug/cli_age` / `cli_auth` which no longer exist; suites never exercise `cage` binary.
-**Tasks:**
-- [ ] Update invocations to the `cage` executable (and drop defunct `cli_auth`).
-- [ ] Refresh scenarios to cover recursion/pattern cases once fixed.
-- [ ] Add CI guard to ensure scripts run under `cargo test` or dedicated harness.
+**Status:** Pending – scripts still invoke removed binaries.
 
 ### TEST-02: Regression Coverage for BUG-01..04 [3 pts]
 **Scope:** Add targeted unit/integration tests to lock in newly fixed behaviours (extensions, recursion, globbing, unlock options).
 
 ### TEST-03: Proxy PTY Integration Tests [2 pts]
-**Scope:** Once BUG-05 is addressed, add cross-platform proxy tests (skipping gracefully where PTY unavailable).
+**Status:** Pending – implement after stabilising proxy command.
 
 ---
 
@@ -152,3 +127,12 @@
 - Keep CHANGELOG entries aligned with CAGE/BUG/TEST identifiers.
 - Prioritise BUG-01..05 before starting new CAGE work; they unblock documented scenarios.
 - Coordinate config and backup changes with documentation updates in README and `docs/tech/*`.
+
+[4] CAGE-10: Identity Key Support (Backlog)
+**Location:** Adapter + CRUD pipeline + CLI
+**Scope:** Provide first-class identity/key-file flows (Age `--identity`) so unlock/no-passphrase operations work without proxy handoffs.
+**Tasks:**
+- [ ] Extend CRUD interfaces to accept identity files for decrypt/verify.
+- [ ] Update `PtyAgeAutomator` to invoke `age -d -i` when identities supplied.
+- [ ] Surface CLI flags and config for identity management.
+- [ ] Add regression tests covering identity-driven unlock.

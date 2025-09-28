@@ -1,12 +1,13 @@
 🎯 CAGE QUICK REFERENCE (30-Second Context)
 ================================================================================
 
-**Current Focus**: Finish META_PROCESS rollout → BUG-01…BUG-05
+**Current Focus**: Finish selective unlock & backup polish → prep recipient/identity features
 
 📊 **Project Status**:
-- 🔧 META_PROCESS v2 (in progress)
-- 🔴 P0 bug slate (BUG-01…BUG-05) queued immediately after
-- ⬆️ P1 feature/test work resumes once bugs cleared
+- 🔧 META_PROCESS v2 (low heat – docs mostly in place)
+- ✅ BUG-01/02/03/05 shipped; BUG-04 selective unlock outstanding
+- 🟡 Backup pipeline polish + config loader remain
+- ⬆️ Recipient/identity support and tests queued next
 
 🚨 **Critical Context**:
 - **Branch**: admin/meta-process (stay here until process complete)
@@ -15,12 +16,11 @@
 - **Tests**: Run `cargo test --all` + CLI smoke before commits
 
 📋 **Immediate Checklist** (details in docs/procs/TASKS.txt):
-1. Close out META_PROCESS phases 3–6 (see docs/procs/PROCESS.txt).
-2. BUG-01: Preserve original filename extensions on lock/unlock.
-3. BUG-02: Add recursive traversal for lock/unlock/status/verify.
-4. BUG-03: Replace substring matcher with glob support.
-5. BUG-04: Honour unlock options (`preserve_encrypted`, `selective`).
-6. BUG-05: Rework proxy command to reuse PTY automator (drop `expect`).
+1. BUG-04 follow-up: deliver selective unlock + regression coverage.
+2. CAGE-03 follow-up: retention/conflict strategy for backups.
+3. CAGE-06: Implement config file discovery/loading.
+4. CAGE-08/09/10: Design recipient + identity plumbing (post-BUG-04).
+5. TEST-01/03: Refresh CLI & proxy test suites once behaviour stabilises.
 
 🏗️ **Architecture**:
 - **Language**: Rust

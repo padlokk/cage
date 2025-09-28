@@ -1,5 +1,31 @@
 # Continue Log – Bug Slate Progress
 
+## HANDOFF-2025-09-27-1800
+
+### Session Duration: ~45 minutes
+### Branch: main
+### Phase: Validation & backlog reconciliation
+
+### Completed:
+- ✅ Verified BUG-01/02/03/05 landed in `CrudManager` & proxy pipeline (extension suffix, recursion, globbing, PTY proxy).
+- ✅ Documented outstanding work in TASKS/PROCESS/QUICK_REF (selective unlock, backup retention, config loader, recipient/identity backlog).
+- ✅ Added CAGE-10 ticket for identity-key support and adjusted priority queue.
+
+### Findings:
+- 🟡 BUG-04 still missing selective unlock implementation/tests (`src/cage/lifecycle/crud_manager.rs:1004`).
+- 🟡 Backup pipeline lacks retention/conflict handling despite existing `backup_before_lock` work.
+- ⚠️ Core CLI only supports passphrase operations; multi-recipient and identity flows remain proxy-only.
+
+### Next Agent MUST:
+1. Implement selective unlock logic + regression tests (BUG-04).
+2. Design backup retention/conflict handling (CAGE-03 follow-up).
+3. Prototype config file discovery/loading (CAGE-06) to unblock recipient/identity features.
+
+### Context Hash: (pending commit)
+### Files Modified: 4 (docs/procs/TASKS.txt, PROCESS.txt, QUICK_REF.txt, CONTINUE.md)
+
+---
+
 ## HANDOFF-2025-09-27-1130
 
 ### Session Duration: ~2 hours
