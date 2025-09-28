@@ -16,7 +16,7 @@
 - **Tests**: Run `cargo test --all` + CLI smoke before commits
 
 📋 **Immediate Checklist** (details in docs/procs/TASKS.txt):
-1. BUG-04 follow-up: deliver selective unlock + regression coverage.
+1. BUG-04 follow-up: swap selective-mode logs to ASCII & make tests age-aware.
 2. CAGE-03 follow-up: retention/conflict strategy for backups.
 3. CAGE-06: Implement config file discovery/loading.
 4. CAGE-08/09/10: Design recipient + identity plumbing (post-BUG-04).

@@ -23,8 +23,11 @@
 ### BUG-03: Pattern Filters Treat Globs as Literal Substrings [3 pts] ✅
 **Status:** Complete – `globset` matcher is used for lock/unlock/status/verify (`src/cage/lifecycle/crud_manager.rs:1203`).
 
-### BUG-04: Unlock Options Ignored [3 pts] ✅
-**Status:** Complete – Selective unlock implemented with pre-verification that gracefully skips invalid files (`src/cage/lifecycle/crud_manager.rs:978-1016`). Comprehensive regression test suite added (`tests/test_selective_unlock.rs`). All unlock options (`preserve_encrypted`, `verify_before_unlock`, `selective`) now functional.
+### BUG-04: Unlock Options Ignored [3 pts] 🟡
+**Status:** Implementation merged (selective unlock + regression suite), but follow-ups remain before closing out.
+**Next Actions:**
+- [ ] Replace non-ASCII log output in selective mode with ASCII-only messaging (`src/cage/lifecycle/crud_manager.rs:989`).
+- [ ] Ensure selective unlock tests skip gracefully when the `age` binary is unavailable.
 
 ### BUG-05: Proxy Command Still Uses Expect Script [5 pts] ✅
 **Status:** Complete – Proxy command now routes through `PtyAgeAutomator` (`src/bin/cli_age.rs:993`). Follow-up tests still pending (see TEST-03).
@@ -96,6 +99,13 @@
 
 ### TEST-03: Proxy PTY Integration Tests [2 pts]
 **Status:** Pending – implement after stabilising proxy command.
+
+### TEST-04: Gate Age-Dependent Unlock Tests [1 pt]
+**Scope:** Keep BUG-04 regression suite while avoiding hard failures when `age` is missing.
+**Tasks:**
+- [ ] Detect `age` availability in `tests/test_selective_unlock.rs` and skip gracefully when absent.
+- [ ] Document the dependency in TESTING notes / README.
+- [ ] Ensure CI environments without `age` remain green.
 
 ---
 

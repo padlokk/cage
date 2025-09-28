@@ -18,7 +18,8 @@ use rsb::prelude::*;
 
 /// Print the Cage logo
 fn logo() {
-    println!(r#"┌─┐┌─┐┌─┐┌─┐
+    println!(r#"
+┌─┐┌─┐┌─┐┌─┐
 │  ├─┤│ ┬├┤
 └─┘┴ ┴└─┘└─┘"#);
 }
