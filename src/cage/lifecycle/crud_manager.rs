@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 use rsb::visual::glyphs::glyph_enable;
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::strings::{fmt_warning, fmt_deleted, fmt_preserved};
+use crate::cage::strings::{fmt_warning, fmt_deleted, fmt_preserved, fmt_error};
 use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::adapter::AgeAdapter;
 use crate::cage::requests::{LockRequest, UnlockRequest, VerifyRequest, Identity};
@@ -1089,7 +1089,7 @@ impl CrudManager {
         for file in files {
             if let Err(e) = self.lock_single_file(&file, passphrase, options, result) {
                 // Continue processing other files even if one fails
-                eprintln!("Failed to lock {}: {}", file.display(), e);
+                eprintln!("{}", fmt_error(&format!("Failed to lock {}: {}", file.display(), e)));
             }
         }
 
@@ -1147,7 +1147,7 @@ impl CrudManager {
 
                         // In selective mode, skip gracefully; otherwise, error out
                         if options.selective {
-                            eprintln!("[SKIP] {} (selective mode): {}", file.display(), error_msg);
+                            eprintln!("{}", fmt_warning(&format!("Skipping {} (selective mode): {}", file.display(), error_msg)));
                             return Ok(());
                         } else {
                             eprintln!("{}", fmt_warning(&format!("Skipping file that failed verification: {}: {}", file.display(), error_msg)));
@@ -1163,7 +1163,7 @@ impl CrudManager {
 
                     // In selective mode, skip gracefully; otherwise, error out
                     if options.selective {
-                        eprintln!("[SKIP] {} (selective mode): verification failed: {}", file.display(), e);
+                        eprintln!("{}", fmt_warning(&format!("Skipping {} (selective mode): verification failed: {}", file.display(), e)));
                         return Ok(());
                     } else {
                         eprintln!("{}", fmt_warning(&format!("Skipping file that failed verification: {}: {}", file.display(), e)));
@@ -1208,7 +1208,7 @@ impl CrudManager {
         
         for file in files {
             if let Err(e) = self.unlock_single_file(&file, passphrase, options, result) {
-                eprintln!("Failed to unlock {}: {}", file.display(), e);
+                eprintln!("{}", fmt_error(&format!("Failed to unlock {}: {}", file.display(), e)));
             }
         }
 
