@@ -4,7 +4,7 @@
 use std::io::{Read, Write};
 use std::thread;
 use std::time::Duration;
-use portable_pty::*;
+use hub::portable_pty::*;
 use tempfile::TempDir;
 
 #[test]

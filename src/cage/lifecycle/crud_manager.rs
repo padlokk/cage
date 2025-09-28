@@ -975,34 +975,45 @@ impl CrudManager {
             file.with_file_name(output_name)
         };
 
-        // Honor verify_before_unlock option
-        if options.verify_before_unlock {
+        // Verify file integrity if requested (either verify_before_unlock or selective mode)
+        if options.verify_before_unlock || options.selective {
             match self.verify_file_integrity(file) {
                 Ok(status) => {
                     if !status.is_valid() {
                         result.add_failure(file.display().to_string());
                         let error_msg = status.error_message.unwrap_or_else(||
                             "File failed integrity verification".to_string());
-                        eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), error_msg);
-                        return Err(AgeError::InvalidOperation {
-                            operation: "unlock".to_string(),
-                            reason: format!("File failed verification: {}", error_msg),
-                        });
+
+                        // In selective mode, skip gracefully; otherwise, error out
+                        if options.selective {
+                            eprintln!("⏭️  Skipping {} (selective mode): {}", file.display(), error_msg);
+                            return Ok(());
+                        } else {
+                            eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), error_msg);
+                            return Err(AgeError::InvalidOperation {
+                                operation: "unlock".to_string(),
+                                reason: format!("File failed verification: {}", error_msg),
+                            });
+                        }
                     }
                 }
                 Err(e) => {
                     result.add_failure(file.display().to_string());
-                    eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);
-                    return Err(AgeError::InvalidOperation {
-                        operation: "unlock".to_string(),
-                        reason: format!("File failed verification: {}", e),
-                    });
+
+                    // In selective mode, skip gracefully; otherwise, error out
+                    if options.selective {
+                        eprintln!("⏭️  Skipping {} (selective mode): verification failed: {}", file.display(), e);
+                        return Ok(());
+                    } else {
+                        eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);
+                        return Err(AgeError::InvalidOperation {
+                            operation: "unlock".to_string(),
+                            reason: format!("File failed verification: {}", e),
+                        });
+                    }
                 }
             }
         }
-
-        // Note: selective option temporarily removed until proper implementation
-        // TODO: Implement selective unlock with specific criteria
 
         match self.adapter.decrypt(file, &output_path, passphrase) {
             Ok(_) => {
