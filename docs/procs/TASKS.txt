@@ -23,12 +23,8 @@
 ### BUG-03: Pattern Filters Treat Globs as Literal Substrings [3 pts] ✅
 **Status:** Complete – `globset` matcher is used for lock/unlock/status/verify (`src/cage/lifecycle/crud_manager.rs:1203`).
 
-### BUG-04: Unlock Options Ignored [3 pts] 🟡
-**Location:** `unlock_single_file` (`src/cage/lifecycle/crud_manager.rs:933-947`).
-**Status:** Partially complete – `preserve_encrypted` and `verify_before_unlock` ship (`src/cage/lifecycle/crud_manager.rs:1007`), but selective unlock remains TODO and lacks coverage.
-**Next Actions:**
-- Implement selective unlock handling across repository traversal.
-- Add regression tests for both delete/preserve paths and selective filters.
+### BUG-04: Unlock Options Ignored [3 pts] ✅
+**Status:** Complete – Selective unlock implemented with pre-verification that gracefully skips invalid files (`src/cage/lifecycle/crud_manager.rs:978-1016`). Comprehensive regression test suite added (`tests/test_selective_unlock.rs`). All unlock options (`preserve_encrypted`, `verify_before_unlock`, `selective`) now functional.
 
 ### BUG-05: Proxy Command Still Uses Expect Script [5 pts] ✅
 **Status:** Complete – Proxy command now routes through `PtyAgeAutomator` (`src/bin/cli_age.rs:993`). Follow-up tests still pending (see TEST-03).

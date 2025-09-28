@@ -986,7 +986,7 @@ impl CrudManager {
 
                         // In selective mode, skip gracefully; otherwise, error out
                         if options.selective {
-                            eprintln!("⏭️  Skipping {} (selective mode): {}", file.display(), error_msg);
+                            eprintln!("[SKIP] {} (selective mode): {}", file.display(), error_msg);
                             return Ok(());
                         } else {
                             eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), error_msg);
@@ -1002,7 +1002,7 @@ impl CrudManager {
 
                     // In selective mode, skip gracefully; otherwise, error out
                     if options.selective {
-                        eprintln!("⏭️  Skipping {} (selective mode): verification failed: {}", file.display(), e);
+                        eprintln!("[SKIP] {} (selective mode): verification failed: {}", file.display(), e);
                         return Ok(());
                     } else {
                         eprintln!("⚠️  Skipping file that failed verification: {}: {}", file.display(), e);

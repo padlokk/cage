@@ -1,11 +1,18 @@
 //! Selective Unlock Integration Tests (BUG-04 Regression Coverage)
 //! Tests the selective unlock feature that pre-verifies files before unlocking
+//!
+//! Note: These tests require the Age binary to be installed and available in PATH.
+//! Tests will be skipped if Age is not found.
 
 use std::fs;
 use tempfile::TempDir;
 use cage::cage::lifecycle::crud_manager::{CrudManager, LockOptions, UnlockOptions};
 use cage::cage::adapter::ShellAdapter;
 use cage::cage::config::{AgeConfig, OutputFormat};
+
+fn age_available() -> bool {
+    which::which("age").is_ok()
+}
 
 fn setup_test_manager(temp_dir: &TempDir) -> CrudManager {
     let adapter = Box::new(ShellAdapter::new().expect("Failed to create adapter"));
@@ -17,8 +24,13 @@ fn setup_test_manager(temp_dir: &TempDir) -> CrudManager {
 
 #[test]
 fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔥 TEST: Selective unlock skips invalid files");
-    println!("==============================================");
+    if !age_available() {
+        println!("SKIPPED: Age binary not found in PATH");
+        return Ok(());
+    }
+
+    println!("TEST: Selective unlock skips invalid files");
+    println!("===========================================");
 
     let temp_dir = TempDir::new()?;
     let mut manager = setup_test_manager(&temp_dir);
@@ -64,13 +76,18 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
     assert_eq!(unlock_invalid_result.processed_files.len(), 0, "Selective unlock should skip invalid file");
     assert_eq!(unlock_invalid_result.failed_files.len(), 1, "Invalid file should be marked as failure");
 
-    println!("✅ Selective unlock correctly skips invalid files");
+    println!("[PASS] Selective unlock correctly skips invalid files");
     Ok(())
 }
 
 #[test]
 fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔥 TEST: Non-selective unlock attempts all files");
+    if !age_available() {
+        println!("SKIPPED: Age binary not found in PATH");
+        return Ok(());
+    }
+
+    println!("TEST: Non-selective unlock attempts all files");
     println!("=================================================");
 
     let temp_dir = TempDir::new()?;
@@ -102,13 +119,18 @@ fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::err
     let unlock_result = manager.unlock(&encrypted_file, passphrase, unlock_options)?;
     assert_eq!(unlock_result.processed_files.len(), 1, "Non-selective unlock should succeed for valid file");
 
-    println!("✅ Non-selective unlock works correctly");
+    println!("[PASS] Non-selective unlock works correctly");
     Ok(())
 }
 
 #[test]
 fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔥 TEST: Selective unlock with verify_before_unlock");
+    if !age_available() {
+        println!("SKIPPED: Age binary not found in PATH");
+        return Ok(());
+    }
+
+    println!("TEST: Selective unlock with verify_before_unlock");
     println!("===================================================");
 
     let temp_dir = TempDir::new()?;
@@ -145,13 +167,18 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
     let unlocked_content = fs::read_to_string(&test_file)?;
     assert_eq!(unlocked_content, "Content to verify");
 
-    println!("✅ Selective unlock with verification works correctly");
+    println!("[PASS] Selective unlock with verification works correctly");
     Ok(())
 }
 
 #[test]
 fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔥 TEST: Selective unlock directory with mixed valid/invalid files");
+    if !age_available() {
+        println!("SKIPPED: Age binary not found in PATH");
+        return Ok(());
+    }
+
+    println!("TEST: Selective unlock directory with mixed valid/invalid files");
     println!("===================================================================");
 
     let temp_dir = TempDir::new()?;
@@ -194,13 +221,18 @@ fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std:
     assert_eq!(unlock_result.processed_files.len(), 2, "Should unlock 2 valid files");
     assert_eq!(unlock_result.failed_files.len(), 2, "Should skip 2 invalid files");
 
-    println!("✅ Selective unlock handles mixed directories correctly");
+    println!("[PASS] Selective unlock handles mixed directories correctly");
     Ok(())
 }
 
 #[test]
 fn test_preserve_encrypted_with_selective() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔥 TEST: preserve_encrypted works with selective unlock");
+    if !age_available() {
+        println!("SKIPPED: Age binary not found in PATH");
+        return Ok(());
+    }
+
+    println!("TEST: preserve_encrypted works with selective unlock");
     println!("========================================================");
 
     let temp_dir = TempDir::new()?;
@@ -235,6 +267,6 @@ fn test_preserve_encrypted_with_selective() -> Result<(), Box<dyn std::error::Er
     assert!(test_file.exists(), "Unlocked file should exist");
     assert!(encrypted_file.exists(), "Encrypted file should be preserved");
 
-    println!("✅ preserve_encrypted works correctly with selective mode");
+    println!("[PASS] preserve_encrypted works correctly with selective mode");
     Ok(())
 }
