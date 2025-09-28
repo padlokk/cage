@@ -97,6 +97,7 @@ pub enum AgeError {
     /// Adapter-related errors
     AdapterNotImplemented(String),
     InvalidAdapter(String),
+    HealthCheckFailed(String),
     AdapterInitializationFailed {
         adapter_name: String,
         reason: String,
@@ -227,6 +228,10 @@ impl fmt::Display for AgeError {
             
             AgeError::AdapterNotImplemented(details) => {
                 write!(f, "Adapter not implemented: {}", details)
+            }
+
+            AgeError::HealthCheckFailed(reason) => {
+                write!(f, "Health check failed: {}", reason)
             }
             
             AgeError::InvalidAdapter(adapter_name) => {

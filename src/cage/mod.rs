@@ -14,6 +14,7 @@
 //! - **Production Ready**: Robust error handling and monitoring integration
 
 pub mod adapter;
+pub mod adapter_v2;  // Enhanced adapter with streaming (CAGE-12)
 pub mod age_engine;
 pub mod tty_automation;
 pub mod pty_wrap;  // New PTY automation module
@@ -26,6 +27,7 @@ pub mod passphrase;
 pub mod in_place;
 pub mod progress;
 pub mod strings;  // Centralized string constants (SEC-01)
+pub mod requests;  // Request structs for unified API (CAGE-11)
 
 // Re-export core types for convenience
 pub use adapter::{AgeAdapter, AdapterFactory};
