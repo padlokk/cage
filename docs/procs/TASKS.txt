@@ -87,25 +87,26 @@
 - [ ] Surface CLI flags and config for identity management.
 - [ ] Add regression tests covering identity-driven unlock.
 
-### CAGE-11: CageConfig & Operation Request API [5 pts] 🟡
+### CAGE-11: CageConfig & Operation Request API [5 pts] ✅
 **Location:** `src/cage/config.rs`, `src/cage/lifecycle/`
 **Scope:** Introduce `CageConfig` and typed request structs (LockRequest, UnlockRequest, RotateRequest) to unify CLI and library entry points.
-**Status:** Structs and CRUD/CLI wiring completed; documentation update still pending.
+**Status:** Request structs in place, CRUD/CLI wiring complete, documentation updated.
 **Tasks:**
 - [x] Design request structs covering existing CLI flags.
 - [x] Refactor `CrudManager` methods to accept request structs.
 - [x] Provide builder/compatibility helpers for CLI usage.
-- [ ] Update docs/examples in `docs/LIBRARY_USAGE.md`.
+- [x] Update docs/examples in `docs/LIBRARY_USAGE.md`.
 
 ### CAGE-12: Adapter Interface Refresh [5 pts] 🟡
 **Location:** `src/cage/adapter.rs`, `src/cage/age_engine.rs`
 **Scope:** Extend `AgeAdapter` to support file + streaming operations with a unified trait.
-**Status:** V2 trait and compatibility wrapper landed; streaming methods still TODO.
+**Status:** V2 trait and compatibility wrapper landed; passphrase-based streaming implemented via temp staging, remaining work for identity/recipient support.
 **Tasks:**
 - [x] Add stream-based methods (Reader/Writer) to the trait.
 - [x] Wrap existing Shell adapter with V2 compatibility.
-- [ ] Implement streaming encrypt/decrypt in ShellAdapterV2.
-- [ ] Ensure health checks & factory expose new capabilities.
+- [x] Implement basic streaming encrypt/decrypt in ShellAdapterV2 (passphrase flows).
+- [ ] Extend streaming to support identity files / recipients.
+- [x] Ensure health checks & factory expose new capabilities.
 
 ### CAGE-13: Streaming Encryption & Decryption [8 pts]
 **Location:** Adapter + CRUD pipeline + CLI

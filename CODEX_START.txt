@@ -29,19 +29,23 @@ Those documents track current workstreams, handoffs, and priorities.
    options, and other knobs centrally.
 3. **Streaming Support**: Provide streaming encrypt/decrypt (Readers/Writers)
    for large-file workflows, avoiding temporary files.
-4. **SSH Key Support**: Accept SSH identities for encrypt/decrypt operations.
+4. **SSH Key Support**: Accept SSH identities for encrypt/decrypt operations
+   across both file and streaming flows.
 5. **ASCII Armor**: Continue supporting ASCII-armor output (already present).
 6. **Deterministic/Derived Keys**: Allow derived key workflows (`age --derive`).
 7. **Multi-Recipient Lifecycle**: First-class handling of recipient sets,
    including lifecycle management and audit metadata.
+8. **Streaming Identity Parity**: Stream APIs must honor identity files and
+   recipient lists, not just passphrase inputs.
 
 --------------------------------------------------------------------------------
  Security & Quality Concerns
 --------------------------------------------------------------------------------
 - **Binary Snooping**: Centralize user-facing strings and sensitive literals to
   minimize exposure in compiled binaries (dedicated `strings` module or similar).
-- **Test Gating**: Age-dependent tests (e.g. selective unlock suite) must skip
-  gracefully when the `age` binary is unavailable to keep CI green.
+- **Test Gating**: Age-dependent tests (e.g. selective unlock suite, streaming
+  round-trip) must skip gracefully when the `age` binary is unavailable to keep
+  CI green.
 - **Audit & Telemetry**: Enhanced logging without leaking secrets; structured
   events for downstream systems.
 - **Parity Validation**: UAT should verify both CLI and library code paths for
@@ -62,7 +66,7 @@ Those documents track current workstreams, handoffs, and priorities.
 --------------------------------------------------------------------------------
  Useful References
 --------------------------------------------------------------------------------
-- `docs/LIBRARY_USAGE.md` – Library integration examples.
+- `docs/LIBRARY_USAGE.md` – Library integration examples (request API & streaming).
 - `docs/procs/PROCESS.txt` – Workflow rules & priority context.
 - `docs/ref/ROADMAP.md` – Long-term roadmap & milestones.
 - `src/cage/` – Core library modules (adapter, lifecycle, config, etc.).

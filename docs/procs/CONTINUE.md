@@ -37,10 +37,11 @@
 - ✅ CAGE-11 wiring: CLI uses `lock_with_request` / `unlock_with_request`; tests confirm request builders.
 - ✅ TEST-04 gating: selective-unlock tests skip gracefully when `age` binary missing.
 - ✅ AdapterFactory now returns `AdapterV1Compat<ShellAdapterV2>` to expose the new trait surface.
+- ✅ ShellAdapterV2 supports passphrase streaming plus recipient-based encryption and identity-file decryption flows.
 
 ### Partial:
 - 🟡 CAGE-11 doc update still pending (`docs/LIBRARY_USAGE.md`).
-- 🟡 CAGE-12 streaming methods still return `AdapterNotImplemented`; needs follow-through.
+- 🟡 CAGE-12: Streaming implemented for passphrase + basic recipients/identity files; SSH identities & advanced modes remain TODO.
 
 ### Next Agent MUST:
 1. Update docs/LIBRARY_USAGE.md with request API usage (CAGE-11).
