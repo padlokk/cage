@@ -24,7 +24,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2"
 rpassword = "7.3"  # Secure terminal passphrase input
-which = "6.0"      # Find binaries in PATH
+which = "8.0"      # Find binaries in PATH - TODO make sure the version bump doesnt break anything
 globset = "0.4"    # Glob pattern matching for file filters
 
 [target.'cfg(unix)'.dependencies]
