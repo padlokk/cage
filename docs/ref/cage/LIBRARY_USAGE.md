@@ -734,6 +734,72 @@ This will generate and open the full API documentation with all available method
 
 ---
 
+## 🔍 Audit & Telemetry
+
+### Structured Logging (OBS-01)
+
+Cage supports both human-readable and machine-readable audit trails for Padlock/Ignite integration:
+
+#### Configuration
+
+```toml
+# cage.toml
+[telemetry]
+format = "json"  # Options: "text" (default) or "json"
+
+[audit]
+logging = true
+log_path = "/var/log/cage/audit.json"
+```
+
+#### JSON Event Format
+
+```json
+{
+  "timestamp": "2025-09-29T12:34:56Z",
+  "level": "INFO",
+  "component": "cage_automation",
+  "event_type": "encryption",
+  "path": "/data/secret.txt",
+  "identity_type": "passphrase",
+  "recipient_count": 2,
+  "recipient_group_hash": "a1b2c3d4e5f6",
+  "success": true
+}
+```
+
+#### Library Usage
+
+```rust
+use cage::cage::{
+    config::TelemetryFormat,
+    security::AuditLogger,
+};
+
+// Create logger with JSON format
+let logger = AuditLogger::with_format(
+    Some(log_path),
+    TelemetryFormat::Json
+)?;
+
+// Log structured events
+logger.log_encryption_event(
+    path,
+    Some(recipients),
+    "passphrase",
+    true
+)?;
+```
+
+#### Field Redaction
+
+Sensitive data is automatically redacted:
+- Recipient keys are hashed (not exposed in plaintext)
+- Passphrases are never logged
+- File paths can be anonymized via configuration
+
+---
+
 ## 🚀 Migration Guide
 
 ### From 0.1.x to 0.3.x

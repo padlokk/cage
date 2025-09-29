@@ -5,10 +5,12 @@
 //!
 //! Security Guardian: Edgar - Production security and audit framework
 
+use super::config::TelemetryFormat;
 use super::error::{AgeError, AgeResult};
 use super::operations::{OperationResult, RepositoryStatus};
 #[allow(unused_imports)]
 use chrono::{DateTime, Utc};
+use serde_json::json;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,6 +19,7 @@ use std::path::{Path, PathBuf};
 pub struct AuditLogger {
     component: String,
     log_file: Option<std::fs::File>,
+    telemetry_format: TelemetryFormat,
 }
 
 impl AuditLogger {
@@ -37,6 +40,7 @@ impl AuditLogger {
         Ok(Self {
             component: "cage_automation".to_string(),
             log_file,
+            telemetry_format: TelemetryFormat::default(),
         })
     }
 
@@ -51,7 +55,15 @@ impl AuditLogger {
         Ok(Self {
             component: "cage_automation".to_string(),
             log_file: Some(log_file),
+            telemetry_format: TelemetryFormat::default(),
         })
+    }
+
+    /// Create audit logger with specific telemetry format
+    pub fn with_format(log_path_opt: Option<PathBuf>, format: TelemetryFormat) -> AgeResult<Self> {
+        let mut logger = Self::new(log_path_opt)?;
+        logger.telemetry_format = format;
+        Ok(logger)
     }
 
     /// Log operation start
@@ -167,6 +179,103 @@ impl AuditLogger {
         self.log_event("INFO", &message)
     }
 
+    /// Log structured encryption event with metadata
+    pub fn log_encryption_event(
+        &self,
+        path: &Path,
+        recipients: Option<Vec<String>>,
+        identity_type: &str,
+        success: bool,
+    ) -> AgeResult<()> {
+        if matches!(self.telemetry_format, TelemetryFormat::Json) {
+            let recipient_hash = recipients
+                .as_ref()
+                .map(|r| format!("{:x}", md5::compute(r.join(",").as_bytes())));
+
+            let event = json!({
+                "event_type": "encryption",
+                "path": path.display().to_string(),
+                "identity_type": identity_type,
+                "recipient_count": recipients.as_ref().map(|r| r.len()).unwrap_or(0),
+                "recipient_group_hash": recipient_hash,
+                "success": success,
+            });
+            self.log_json_event("INFO", event)
+        } else {
+            let msg = if success {
+                format!("ENCRYPTION {} identity:{} recipients:{}",
+                    path.display(),
+                    identity_type,
+                    recipients.as_ref().map(|r| r.len()).unwrap_or(0))
+            } else {
+                format!("ENCRYPTION_FAILED {} identity:{}", path.display(), identity_type)
+            };
+            self.log_event("INFO", &msg)
+        }
+    }
+
+    /// Log structured decryption event with metadata
+    pub fn log_decryption_event(
+        &self,
+        path: &Path,
+        identity_type: &str,
+        success: bool,
+    ) -> AgeResult<()> {
+        if matches!(self.telemetry_format, TelemetryFormat::Json) {
+            let event = json!({
+                "event_type": "decryption",
+                "path": path.display().to_string(),
+                "identity_type": identity_type,
+                "success": success,
+            });
+            self.log_json_event("INFO", event)
+        } else {
+            let msg = if success {
+                format!("DECRYPTION {} identity:{}", path.display(), identity_type)
+            } else {
+                format!("DECRYPTION_FAILED {} identity:{}", path.display(), identity_type)
+            };
+            self.log_event("INFO", &msg)
+        }
+    }
+
+    /// Log structured JSON event
+    fn log_json_event(&self, level: &str, mut event: serde_json::Value) -> AgeResult<()> {
+        // Add common fields
+        if let Some(obj) = event.as_object_mut() {
+            obj.insert("timestamp".to_string(), json!(Utc::now().to_rfc3339()));
+            obj.insert("level".to_string(), json!(level));
+            obj.insert("component".to_string(), json!(self.component));
+        }
+
+        let log_entry = format!("{}\n", event.to_string());
+
+        // Output
+        eprint!("{}", log_entry);
+
+        // Also log to file if configured
+        if let Some(ref mut file) = &mut self.log_file.as_ref() {
+            let mut file_handle = file.try_clone().map_err(|e| AgeError::AuditLogFailed {
+                operation: "file_write".to_string(),
+                reason: e.to_string(),
+            })?;
+
+            file_handle
+                .write_all(log_entry.as_bytes())
+                .map_err(|e| AgeError::AuditLogFailed {
+                    operation: "write".to_string(),
+                    reason: e.to_string(),
+                })?;
+
+            file_handle.flush().map_err(|e| AgeError::AuditLogFailed {
+                operation: "flush".to_string(),
+                reason: e.to_string(),
+            })?;
+        }
+
+        Ok(())
+    }
+
     /// Log emergency operation
     pub fn log_emergency_operation(&self, operation: &str, path: &Path) -> AgeResult<()> {
         let message = format!("EMERGENCY_OPERATION {} {}", operation, path.display());
@@ -175,11 +284,28 @@ impl AuditLogger {
 
     /// Core event logging function
     fn log_event(&self, level: &str, message: &str) -> AgeResult<()> {
-        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-        let log_entry = format!(
-            "[{}] [{}] [{}] {}\n",
-            timestamp, level, self.component, message
-        );
+        let timestamp = Utc::now();
+
+        let log_entry = match self.telemetry_format {
+            TelemetryFormat::Text => {
+                format!(
+                    "[{}] [{}] [{}] {}\n",
+                    timestamp.format("%Y-%m-%d %H:%M:%S UTC"),
+                    level,
+                    self.component,
+                    message
+                )
+            }
+            TelemetryFormat::Json => {
+                let json_event = json!({
+                    "timestamp": timestamp.to_rfc3339(),
+                    "level": level,
+                    "component": self.component,
+                    "message": message,
+                });
+                format!("{}\n", json_event.to_string())
+            }
+        };
 
         // Always log to stderr for immediate visibility
         eprint!("{}", log_entry);

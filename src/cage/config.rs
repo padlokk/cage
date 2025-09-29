@@ -93,6 +93,22 @@ impl Default for TtyMethod {
     }
 }
 
+/// Telemetry output format for audit trails
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TelemetryFormat {
+    /// Human-readable text format (default)
+    Text,
+    /// Machine-readable JSON format for ingestion
+    Json,
+}
+
+impl Default for TelemetryFormat {
+    fn default() -> Self {
+        TelemetryFormat::Text
+    }
+}
+
 /// Security validation level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecurityLevel {
@@ -203,6 +219,9 @@ pub struct AgeConfig {
 
     /// Default streaming strategy (temp, pipe, auto)
     pub streaming_strategy: Option<String>,
+
+    /// Telemetry output format for audit trails (text or json)
+    pub telemetry_format: TelemetryFormat,
 }
 
 impl AgeConfig {
@@ -516,6 +535,7 @@ impl Default for AgeConfig {
             backup_directory: None,
             backup_retention: RetentionPolicyConfig::default(),
             streaming_strategy: None,
+            telemetry_format: TelemetryFormat::default(),
         }
     }
 }
