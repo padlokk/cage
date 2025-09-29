@@ -39,10 +39,10 @@ pub mod cage;
 
 // Re-export core types for convenience
 pub use cage::{
-    AgeAdapter, AdapterFactory, AgeAutomator, AgeConfig, OutputFormat, TtyMethod,
-    AgeError, AgeResult, Operation, FileEncryption, RepositoryOperations,
-    RepositoryStatus, OperationResult, CrudManager, LockOptions, UnlockOptions,
-    VerificationResult, AuditLogger, SecurityValidator, PassphraseManager, PassphraseMode
+    AdapterFactory, AgeAdapter, AgeAutomator, AgeConfig, AgeError, AgeResult, AuditLogger,
+    CrudManager, FileEncryption, LockOptions, Operation, OperationResult, OutputFormat,
+    PassphraseManager, PassphraseMode, RepositoryOperations, RepositoryStatus, SecurityValidator,
+    TtyMethod, UnlockOptions, VerificationResult,
 };
 
 /// Library version - synchronized with Cargo.toml
@@ -57,5 +57,5 @@ pub const FEATURES: &[&str] = &[
     "AGE_ENCRYPTION",
     "BATCH_PROCESSING",
     "SECURITY_VALIDATION",
-    "ASCII_ARMOR_SUPPORT"
+    "ASCII_ARMOR_SUPPORT",
 ];

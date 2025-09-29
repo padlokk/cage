@@ -4,11 +4,11 @@
 //! Note: These tests require the Age binary to be installed and available in PATH.
 //! Tests will be skipped if Age is not found.
 
-use std::fs;
-use tempfile::TempDir;
-use cage::cage::lifecycle::crud_manager::{CrudManager, LockOptions, UnlockOptions};
 use cage::cage::adapter::ShellAdapter;
 use cage::cage::config::{AgeConfig, OutputFormat};
+use cage::cage::lifecycle::crud_manager::{CrudManager, LockOptions, UnlockOptions};
+use std::fs;
+use tempfile::TempDir;
 
 fn age_available() -> bool {
     which::which("age").is_ok()
@@ -52,7 +52,10 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
     };
     let passphrase = "test_password_123";
     let lock_result = manager.lock(&test_file, passphrase, lock_options)?;
-    assert!(lock_result.processed_files.len() > 0, "Failed to lock test file");
+    assert!(
+        lock_result.processed_files.len() > 0,
+        "Failed to lock test file"
+    );
 
     // Create an invalid file with .cage extension
     let invalid_file = temp_dir.path().join("invalid.txt.cage");
@@ -67,7 +70,11 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
         preserve_encrypted: true,
     };
     let unlock_result = manager.unlock(&valid_encrypted, passphrase, unlock_options)?;
-    assert_eq!(unlock_result.processed_files.len(), 1, "Selective unlock should succeed for valid file");
+    assert_eq!(
+        unlock_result.processed_files.len(),
+        1,
+        "Selective unlock should succeed for valid file"
+    );
 
     // Try to unlock invalid file - should skip
     let unlock_options2 = UnlockOptions {
@@ -77,8 +84,16 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
         preserve_encrypted: true,
     };
     let unlock_invalid_result = manager.unlock(&invalid_file, passphrase, unlock_options2)?;
-    assert_eq!(unlock_invalid_result.processed_files.len(), 0, "Selective unlock should skip invalid file");
-    assert_eq!(unlock_invalid_result.failed_files.len(), 1, "Invalid file should be marked as failure");
+    assert_eq!(
+        unlock_invalid_result.processed_files.len(),
+        0,
+        "Selective unlock should skip invalid file"
+    );
+    assert_eq!(
+        unlock_invalid_result.failed_files.len(),
+        1,
+        "Invalid file should be marked as failure"
+    );
 
     println!("[PASS] Selective unlock correctly skips invalid files");
     Ok(())
@@ -121,7 +136,11 @@ fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::err
 
     let encrypted_file = test_file.with_extension("txt.cage");
     let unlock_result = manager.unlock(&encrypted_file, passphrase, unlock_options)?;
-    assert_eq!(unlock_result.processed_files.len(), 1, "Non-selective unlock should succeed for valid file");
+    assert_eq!(
+        unlock_result.processed_files.len(),
+        1,
+        "Non-selective unlock should succeed for valid file"
+    );
 
     println!("[PASS] Non-selective unlock works correctly");
     Ok(())
@@ -165,7 +184,11 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
     let encrypted_file = test_file.with_extension("txt.cage");
     let unlock_result = manager.unlock(&encrypted_file, passphrase, unlock_options)?;
 
-    assert_eq!(unlock_result.processed_files.len(), 1, "Unlock should succeed for verified file");
+    assert_eq!(
+        unlock_result.processed_files.len(),
+        1,
+        "Unlock should succeed for verified file"
+    );
 
     // Verify the unlocked content
     let unlocked_content = fs::read_to_string(&test_file)?;
@@ -222,8 +245,16 @@ fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std:
     let unlock_result = manager.unlock(temp_dir.path(), passphrase, unlock_options)?;
 
     // Should unlock 2 valid files and skip 2 invalid files
-    assert_eq!(unlock_result.processed_files.len(), 2, "Should unlock 2 valid files");
-    assert_eq!(unlock_result.failed_files.len(), 2, "Should skip 2 invalid files");
+    assert_eq!(
+        unlock_result.processed_files.len(),
+        2,
+        "Should unlock 2 valid files"
+    );
+    assert_eq!(
+        unlock_result.failed_files.len(),
+        2,
+        "Should skip 2 invalid files"
+    );
 
     println!("[PASS] Selective unlock handles mixed directories correctly");
     Ok(())
@@ -269,7 +300,10 @@ fn test_preserve_encrypted_with_selective() -> Result<(), Box<dyn std::error::Er
 
     // Verify both files exist
     assert!(test_file.exists(), "Unlocked file should exist");
-    assert!(encrypted_file.exists(), "Encrypted file should be preserved");
+    assert!(
+        encrypted_file.exists(),
+        "Encrypted file should be preserved"
+    );
 
     println!("[PASS] preserve_encrypted works correctly with selective mode");
     Ok(())

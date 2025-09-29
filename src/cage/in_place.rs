@@ -10,11 +10,11 @@
 //! - Layer 4: DANGER_MODE=1 environment variable
 //! - Layer 5: --i-am-sure automation override
 
-use std::path::{Path, PathBuf};
-use std::io::{self, Write};
-use chrono::Utc;
-use crate::cage::strings::fmt_warning;
 use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::strings::fmt_warning;
+use chrono::Utc;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 /// Recovery file manager for creating and managing .tmp.recover files
 pub struct RecoveryManager {
@@ -31,7 +31,12 @@ impl RecoveryManager {
     }
 
     /// Create recovery file with passphrase and instructions
-    pub fn create_recovery_file(&self, original: &Path, passphrase: &str, operation: &str) -> AgeResult<PathBuf> {
+    pub fn create_recovery_file(
+        &self,
+        original: &Path,
+        passphrase: &str,
+        operation: &str,
+    ) -> AgeResult<PathBuf> {
         if !self.create_recovery || self.danger_mode {
             return Err(AgeError::InvalidOperation {
                 operation: "create_recovery_file".to_string(),
@@ -40,7 +45,8 @@ impl RecoveryManager {
         }
 
         let recovery_path = original.with_extension("tmp.recover");
-        let content = format!(r#"# CAGE RECOVERY INFORMATION
+        let content = format!(
+            r#"# CAGE RECOVERY INFORMATION
 # Generated: {}
 # Original: {}
 # Operation: {}
@@ -86,7 +92,9 @@ pub struct SafetyValidator {
 
 impl SafetyValidator {
     pub fn new(danger_mode: bool, i_am_sure: bool) -> Self {
-        let env_danger = std::env::var("DANGER_MODE").map(|v| v == "1").unwrap_or(false);
+        let env_danger = std::env::var("DANGER_MODE")
+            .map(|v| v == "1")
+            .unwrap_or(false);
 
         Self {
             danger_mode,
@@ -111,13 +119,17 @@ impl SafetyValidator {
             if !self.env_danger {
                 return Err(AgeError::InvalidOperation {
                     operation: "in-place-danger".to_string(),
-                    reason: "DANGER_MODE=1 environment variable required with --danger-mode".to_string(),
+                    reason: "DANGER_MODE=1 environment variable required with --danger-mode"
+                        .to_string(),
                 });
             }
 
             if !self.i_am_sure {
                 // Prompt for confirmation
-                eprintln!("{}", fmt_warning("DANGER MODE: This action is UNRECOVERABLE!"));
+                eprintln!(
+                    "{}",
+                    fmt_warning("DANGER MODE: This action is UNRECOVERABLE!")
+                );
                 eprintln!("   File: {}", file.display());
                 eprintln!("   No recovery file will be created.");
                 eprintln!("   If encryption fails or you forget the passphrase, your file is LOST FOREVER.");
@@ -131,11 +143,13 @@ impl SafetyValidator {
                 })?;
 
                 let mut input = String::new();
-                io::stdin().read_line(&mut input).map_err(|e| AgeError::IoError {
-                    operation: "read_line".to_string(),
-                    context: "confirmation_input".to_string(),
-                    source: e,
-                })?;
+                io::stdin()
+                    .read_line(&mut input)
+                    .map_err(|e| AgeError::IoError {
+                        operation: "read_line".to_string(),
+                        context: "confirmation_input".to_string(),
+                        source: e,
+                    })?;
 
                 if input.trim() != "DELETE MY FILE" {
                     return Err(AgeError::InvalidOperation {
@@ -169,7 +183,12 @@ impl InPlaceOperation {
     }
 
     /// Execute in-place lock operation
-    pub fn execute_lock<F>(&mut self, passphrase: &str, danger_mode: bool, encrypt_fn: F) -> AgeResult<()>
+    pub fn execute_lock<F>(
+        &mut self,
+        passphrase: &str,
+        danger_mode: bool,
+        encrypt_fn: F,
+    ) -> AgeResult<()>
     where
         F: FnOnce(&Path, &Path, &str) -> AgeResult<()>,
     {
@@ -179,7 +198,7 @@ impl InPlaceOperation {
             self.recovery_file = Some(recovery_manager.create_recovery_file(
                 &self.original,
                 passphrase,
-                "encrypt"
+                "encrypt",
             )?);
         }
 
@@ -220,7 +239,8 @@ impl InPlaceOperation {
         {
             if let Ok(_modified) = metadata.modified() {
                 use std::os::unix::fs::MetadataExt;
-                let _atime = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(metadata.atime() as u64);
+                let _atime = std::time::SystemTime::UNIX_EPOCH
+                    + std::time::Duration::from_secs(metadata.atime() as u64);
 
                 // Use filetime crate if available, or ignore if not critical
                 // This is optional metadata preservation
@@ -284,11 +304,9 @@ mod tests {
         std::fs::write(&test_file, "test content").unwrap();
 
         let recovery_manager = RecoveryManager::new(true, false);
-        let recovery_path = recovery_manager.create_recovery_file(
-            &test_file,
-            "testpass",
-            "encrypt"
-        ).unwrap();
+        let recovery_path = recovery_manager
+            .create_recovery_file(&test_file, "testpass", "encrypt")
+            .unwrap();
 
         assert!(recovery_path.exists());
         let content = std::fs::read_to_string(&recovery_path).unwrap();

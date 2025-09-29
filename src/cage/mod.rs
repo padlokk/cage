@@ -14,34 +14,34 @@
 //! - **Production Ready**: Robust error handling and monitoring integration
 
 pub mod adapter;
-pub mod adapter_v2;  // Enhanced adapter with streaming (CAGE-12)
+pub mod adapter_v2; // Enhanced adapter with streaming (CAGE-12)
 pub mod age_engine;
-pub mod tty_automation;
-pub mod pty_wrap;  // New PTY automation module
-pub mod operations;
-pub mod lifecycle;
-pub mod security;
-pub mod error;
 pub mod config;
-pub mod passphrase;
+pub mod error;
 pub mod in_place;
+pub mod lifecycle;
+pub mod operations;
+pub mod passphrase;
 pub mod progress;
-pub mod strings;  // Centralized string constants (SEC-01)
-pub mod requests;  // Request structs for unified API (CAGE-11)
+pub mod pty_wrap; // New PTY automation module
+pub mod requests;
+pub mod security;
+pub mod strings; // Centralized string constants (SEC-01)
+pub mod tty_automation; // Request structs for unified API (CAGE-11)
 
 // Re-export core types for convenience
-pub use adapter::{AgeAdapter, AdapterFactory};
+pub use adapter::{AdapterFactory, AgeAdapter};
 pub use age_engine::AgeAutomator;
 pub use config::{AgeConfig, OutputFormat, TtyMethod};
 pub use error::{AgeError, AgeResult};
-pub use operations::{
-    Operation, FileEncryption, RepositoryOperations, RepositoryStatus, OperationResult
-};
+pub use in_place::{InPlaceOperation, InPlaceOptions, RecoveryManager, SafetyValidator};
 pub use lifecycle::{CrudManager, LockOptions, UnlockOptions, VerificationResult};
-pub use security::{AuditLogger, SecurityValidator};
+pub use operations::{
+    FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus,
+};
 pub use passphrase::{PassphraseManager, PassphraseMode};
-pub use in_place::{InPlaceOperation, InPlaceOptions, SafetyValidator, RecoveryManager};
-pub use progress::{ProgressManager, ProgressStyle, ProgressReporter, TerminalReporter};
+pub use progress::{ProgressManager, ProgressReporter, ProgressStyle, TerminalReporter};
+pub use security::{AuditLogger, SecurityValidator};
 
 /// Module version synchronized with Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

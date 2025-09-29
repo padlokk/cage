@@ -7,22 +7,23 @@
 use std::path::{Path, PathBuf};
 
 // Import cage library modules
-use cage::{
-    CrudManager, LockOptions, UnlockOptions,
-    OutputFormat, PassphraseManager, PassphraseMode
-};
-use cage::cage::requests::{LockRequest, UnlockRequest, Identity};
 use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
+use cage::cage::requests::{Identity, LockRequest, UnlockRequest};
+use cage::{
+    CrudManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode, UnlockOptions,
+};
 
 // Import RSB utilities for enhanced CLI experience
 use rsb::prelude::*;
 
 /// Print the Cage logo
 fn logo() {
-    println!(r#"
+    println!(
+        r#"
 ┌─┐┌─┐┌─┐┌─┐
 │  ├─┤│ ┬├┤
-└─┘┴ ┴└─┘└─┘"#);
+└─┘┴ ┴└─┘└─┘"#
+    );
 }
 
 /// Main function using RSB bootstrap
@@ -48,7 +49,10 @@ fn main() {
     // Print banner with enhanced information
     println!("🔒 Cage - Age Encryption Automation CLI");
     println!("🛡️ Secure Age encryption with PTY automation");
-    println!("📦 Version: {} | Built with RSB Framework", env!("CARGO_PKG_VERSION"));
+    println!(
+        "📦 Version: {} | Built with RSB Framework",
+        env!("CARGO_PKG_VERSION")
+    );
 
     if is_true("opt_verbose") {
         println!("🔍 Verbose mode enabled");
@@ -130,7 +134,11 @@ fn cmd_lock(args: Args) -> i32 {
     // Get passphrase securely
     let passphrase_manager = PassphraseManager::new();
     let passphrase = if is_true("opt_stdin_passphrase") {
-        match passphrase_manager.get_passphrase_with_mode("Enter passphrase", false, PassphraseMode::Stdin) {
+        match passphrase_manager.get_passphrase_with_mode(
+            "Enter passphrase",
+            false,
+            PassphraseMode::Stdin,
+        ) {
             Ok(pass) => pass,
             Err(e) => {
                 stderr!("❌ Failed to read passphrase from stdin: {}", e);
@@ -155,7 +163,11 @@ fn cmd_lock(args: Args) -> i32 {
 
     let recursive = is_true("opt_recursive");
     let pattern = get_var("opt_pattern");
-    let pattern = if pattern.is_empty() { None } else { Some(pattern) };
+    let pattern = if pattern.is_empty() {
+        None
+    } else {
+        Some(pattern)
+    };
     let backup = is_true("opt_backup");
     let verbose = is_true("opt_verbose");
     let show_progress = is_true("opt_progress");
@@ -179,9 +191,23 @@ fn cmd_lock(args: Args) -> i32 {
 
     // Handle in-place operations with safety checks
     if in_place {
-        match execute_in_place_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose, danger_mode, i_am_sure, show_progress) {
+        match execute_in_place_lock_operation(
+            paths,
+            &passphrase,
+            recursive,
+            pattern,
+            backup,
+            format,
+            audit_log,
+            verbose,
+            danger_mode,
+            i_am_sure,
+            show_progress,
+        ) {
             Ok(_) => {
-                if verbose { echo!("✅ In-place lock operation completed"); }
+                if verbose {
+                    echo!("✅ In-place lock operation completed");
+                }
                 0
             }
             Err(e) => {
@@ -190,9 +216,21 @@ fn cmd_lock(args: Args) -> i32 {
             }
         }
     } else {
-        match execute_lock_operation(paths, &passphrase, recursive, pattern, backup, format, audit_log, verbose, show_progress) {
+        match execute_lock_operation(
+            paths,
+            &passphrase,
+            recursive,
+            pattern,
+            backup,
+            format,
+            audit_log,
+            verbose,
+            show_progress,
+        ) {
             Ok(_) => {
-                if verbose { echo!("✅ Lock operation completed"); }
+                if verbose {
+                    echo!("✅ Lock operation completed");
+                }
                 0
             }
             Err(e) => {
@@ -221,7 +259,11 @@ fn cmd_unlock(args: Args) -> i32 {
     // Get passphrase securely (same pattern as lock)
     let passphrase_manager = PassphraseManager::new();
     let passphrase = if is_true("opt_stdin_passphrase") {
-        match passphrase_manager.get_passphrase_with_mode("Enter passphrase", false, PassphraseMode::Stdin) {
+        match passphrase_manager.get_passphrase_with_mode(
+            "Enter passphrase",
+            false,
+            PassphraseMode::Stdin,
+        ) {
             Ok(pass) => pass,
             Err(e) => {
                 stderr!("❌ Failed to read passphrase from stdin: {}", e);
@@ -243,7 +285,11 @@ fn cmd_unlock(args: Args) -> i32 {
 
     let selective = is_true("opt_selective");
     let pattern = get_var("opt_pattern");
-    let pattern = if pattern.is_empty() { None } else { Some(pattern) };
+    let pattern = if pattern.is_empty() {
+        None
+    } else {
+        Some(pattern)
+    };
     let preserve = is_true("opt_preserve");
     let verbose = is_true("opt_verbose");
     let show_progress = is_true("opt_progress");
@@ -254,9 +300,20 @@ fn cmd_unlock(args: Args) -> i32 {
         None
     };
 
-    match execute_unlock_operation(paths, &passphrase, selective, pattern, preserve, audit_log, verbose, show_progress) {
+    match execute_unlock_operation(
+        paths,
+        &passphrase,
+        selective,
+        pattern,
+        preserve,
+        audit_log,
+        verbose,
+        show_progress,
+    ) {
         Ok(_) => {
-            if verbose { echo!("✅ Unlock operation completed"); }
+            if verbose {
+                echo!("✅ Unlock operation completed");
+            }
             0
         }
         Err(e) => {
@@ -303,7 +360,11 @@ fn cmd_rotate(args: Args) -> i32 {
             stderr!("⚠️  Warning: Old passphrase on command line is insecure");
             old_pass_var
         } else if is_true("opt_stdin_passphrase") {
-            match passphrase_manager.get_passphrase_with_mode("Enter old passphrase", false, PassphraseMode::Stdin) {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter old passphrase",
+                false,
+                PassphraseMode::Stdin,
+            ) {
                 Ok(pass) => pass,
                 Err(e) => {
                     stderr!("❌ Failed to read old passphrase from stdin: {}", e);
@@ -329,7 +390,11 @@ fn cmd_rotate(args: Args) -> i32 {
             stderr!("⚠️  Warning: New passphrase on command line is insecure");
             new_pass_var
         } else if is_true("opt_stdin_passphrase") {
-            match passphrase_manager.get_passphrase_with_mode("Enter new passphrase", false, PassphraseMode::Stdin) {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter new passphrase",
+                false,
+                PassphraseMode::Stdin,
+            ) {
                 Ok(pass) => pass,
                 Err(e) => {
                     stderr!("❌ Failed to read new passphrase from stdin: {}", e);
@@ -337,7 +402,8 @@ fn cmd_rotate(args: Args) -> i32 {
                 }
             }
         } else {
-            match passphrase_manager.get_passphrase("Enter new passphrase", true) {  // confirm=true for new passphrase
+            match passphrase_manager.get_passphrase("Enter new passphrase", true) {
+                // confirm=true for new passphrase
                 Ok(pass) => pass,
                 Err(e) => {
                     stderr!("❌ Failed to get new passphrase: {}", e);
@@ -350,9 +416,17 @@ fn cmd_rotate(args: Args) -> i32 {
     let backup = is_true("opt_backup");
     let verbose = is_true("opt_verbose");
 
-    match execute_rotate_operation(&repository, &old_passphrase, &new_passphrase, backup, verbose) {
+    match execute_rotate_operation(
+        &repository,
+        &old_passphrase,
+        &new_passphrase,
+        backup,
+        verbose,
+    ) {
         Ok(_) => {
-            if verbose { echo!("✅ Key rotation completed"); }
+            if verbose {
+                echo!("✅ Key rotation completed");
+            }
             0
         }
         Err(e) => {
@@ -374,7 +448,9 @@ fn cmd_verify(args: Args) -> i32 {
 
     match execute_verify_operation(&path, verbose) {
         Ok(_) => {
-            if verbose { echo!("✅ Verification completed"); }
+            if verbose {
+                echo!("✅ Verification completed");
+            }
             0
         }
         Err(e) => {
@@ -395,7 +471,11 @@ fn cmd_batch(args: Args) -> i32 {
 
     let operation = get_var("opt_operation");
     let pattern = get_var("opt_pattern");
-    let pattern = if pattern.is_empty() { None } else { Some(pattern) };
+    let pattern = if pattern.is_empty() {
+        None
+    } else {
+        Some(pattern)
+    };
 
     if operation.is_empty() {
         stderr!("❌ Operation type required");
@@ -417,7 +497,11 @@ fn cmd_batch(args: Args) -> i32 {
             }
             pass_var
         } else if is_true("opt_stdin_passphrase") {
-            match passphrase_manager.get_passphrase_with_mode("Enter passphrase for batch operation", false, PassphraseMode::Stdin) {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter passphrase for batch operation",
+                false,
+                PassphraseMode::Stdin,
+            ) {
                 Ok(pass) => pass,
                 Err(e) => {
                     stderr!("❌ Failed to read passphrase from stdin: {}", e);
@@ -425,8 +509,13 @@ fn cmd_batch(args: Args) -> i32 {
                 }
             }
         } else {
-            echo!("⚠️  Batch operation will apply to multiple files in {}", directory.display());
-            match passphrase_manager.get_passphrase(&format!("Enter passphrase for batch {}", operation), false) {
+            echo!(
+                "⚠️  Batch operation will apply to multiple files in {}",
+                directory.display()
+            );
+            match passphrase_manager
+                .get_passphrase(&format!("Enter passphrase for batch {}", operation), false)
+            {
                 Ok(pass) => pass,
                 Err(e) => {
                     stderr!("❌ Failed to get passphrase: {}", e);
@@ -440,7 +529,9 @@ fn cmd_batch(args: Args) -> i32 {
 
     match execute_batch_operation(&directory, &operation, &passphrase, pattern, verbose) {
         Ok(_) => {
-            if verbose { echo!("✅ Batch operation completed"); }
+            if verbose {
+                echo!("✅ Batch operation completed");
+            }
             0
         }
         Err(e) => {
@@ -456,7 +547,8 @@ fn cmd_test(_args: Args) -> i32 {
         return run_progress_demo();
     }
 
-    echo!(r#"🧪 Running Age Automation Test Suite...
+    echo!(
+        r#"🧪 Running Age Automation Test Suite...
 
 Available Tests:
   --progress-demo    Demonstrate progress indicators and styles
@@ -469,13 +561,15 @@ Planned Tests:
   - Compatibility tests
 
 Usage: cage test --progress-demo
-✅ Test suite framework ready for implementation"#);
+✅ Test suite framework ready for implementation"#
+    );
     0
 }
 
 /// Show demonstration using RSB dispatch
 fn cmd_demo(_args: Args) -> i32 {
-    echo!(r#"🎭 Cage - Age Encryption Demonstration
+    echo!(
+        r#"🎭 Cage - Age Encryption Demonstration
 🔒 Secure Age automation with PTY support
 
 This demonstration showcases Age encryption operations:
@@ -501,7 +595,8 @@ This demonstration showcases Age encryption operations:
 ⚠️  Insecure (not recommended):
   cage lock file.txt --passphrase secret --i-am-sure  # Visible in process list!
 
-✅ Cage Age encryption automation ready"#);
+✅ Cage Age encryption automation ready"#
+    );
     0
 }
 
@@ -551,16 +646,25 @@ fn execute_lock_operation(
     };
 
     for (index, path) in paths.iter().enumerate() {
-        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> = if let Some(ref pm) = progress_manager {
-            let style = if paths.len() > 1 {
-                ProgressStyle::Counter { total: paths.len() as u64 }
+        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> =
+            if let Some(ref pm) = progress_manager {
+                let style = if paths.len() > 1 {
+                    ProgressStyle::Counter {
+                        total: paths.len() as u64,
+                    }
+                } else {
+                    ProgressStyle::Spinner
+                };
+                Some(pm.start_task(
+                    &format!(
+                        "🔒 Encrypting {}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ),
+                    style,
+                ))
             } else {
-                ProgressStyle::Spinner
+                None
             };
-            Some(pm.start_task(&format!("🔒 Encrypting {}", path.file_name().unwrap_or_default().to_string_lossy()), style))
-        } else {
-            None
-        };
 
         if verbose && progress_task.is_none() {
             echo!("  Locking: {}", path.display());
@@ -571,12 +675,10 @@ fn execute_lock_operation(
         }
 
         // Use the new request API (CAGE-11)
-        let lock_request = LockRequest::new(
-            path.clone(),
-            Identity::Passphrase(passphrase.to_string())
-        )
-        .with_format(options.format)
-        .recursive(options.recursive);
+        let lock_request =
+            LockRequest::new(path.clone(), Identity::Passphrase(passphrase.to_string()))
+                .with_format(options.format)
+                .recursive(options.recursive);
 
         let lock_request = match options.pattern_filter.clone() {
             Some(pattern_val) => lock_request.with_pattern(pattern_val),
@@ -586,7 +688,11 @@ fn execute_lock_operation(
         let result = match crud_manager.lock_with_request(&lock_request) {
             Ok(result) => {
                 if let Some(ref task) = progress_task {
-                    task.complete(&format!("✓ Encrypted {} ({} files)", path.display(), result.processed_files.len()));
+                    task.complete(&format!(
+                        "✓ Encrypted {} ({} files)",
+                        path.display(),
+                        result.processed_files.len()
+                    ));
                 }
                 result
             }
@@ -629,7 +735,7 @@ fn execute_in_place_lock_operation(
     i_am_sure: bool,
     show_progress: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use cage::cage::{SafetyValidator, InPlaceOperation};
+    use cage::cage::{InPlaceOperation, SafetyValidator};
 
     if verbose {
         echo!("🔐 Executing in-place lock operation with safety checks...");
@@ -666,16 +772,25 @@ fn execute_in_place_lock_operation(
     };
 
     for (index, path) in paths.iter().enumerate() {
-        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> = if let Some(ref pm) = progress_manager {
-            let style = if paths.len() > 1 {
-                ProgressStyle::Counter { total: paths.len() as u64 }
+        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> =
+            if let Some(ref pm) = progress_manager {
+                let style = if paths.len() > 1 {
+                    ProgressStyle::Counter {
+                        total: paths.len() as u64,
+                    }
+                } else {
+                    ProgressStyle::Spinner
+                };
+                Some(pm.start_task(
+                    &format!(
+                        "🔒 In-place encrypting {}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ),
+                    style,
+                ))
             } else {
-                ProgressStyle::Spinner
+                None
             };
-            Some(pm.start_task(&format!("🔒 In-place encrypting {}", path.file_name().unwrap_or_default().to_string_lossy()), style))
-        } else {
-            None
-        };
 
         if verbose && progress_task.is_none() {
             echo!("  🔒 In-place locking: {}", path.display());
@@ -684,17 +799,18 @@ fn execute_in_place_lock_operation(
         // If recursive, we need to handle directories differently
         if recursive && path.is_dir() {
             if let Some(ref task) = progress_task {
-                task.update(index as u64 + 1, &format!("Processing directory {}", path.display()));
+                task.update(
+                    index as u64 + 1,
+                    &format!("Processing directory {}", path.display()),
+                );
             }
 
             // For recursive in-place, we process each file individually
             // Use the new request API (CAGE-11)
-            let lock_request = LockRequest::new(
-                path.clone(),
-                Identity::Passphrase(passphrase.to_string())
-            )
-            .with_format(options.format)
-            .recursive(options.recursive);
+            let lock_request =
+                LockRequest::new(path.clone(), Identity::Passphrase(passphrase.to_string()))
+                    .with_format(options.format)
+                    .recursive(options.recursive);
 
             let lock_request = match options.pattern_filter.clone() {
                 Some(pattern_val) => lock_request.with_pattern(pattern_val),
@@ -704,13 +820,21 @@ fn execute_in_place_lock_operation(
             let result = match crud_manager.lock_with_request(&lock_request) {
                 Ok(result) => {
                     if let Some(ref task) = progress_task {
-                        task.complete(&format!("✓ Directory encrypted {} ({} files)", path.display(), result.processed_files.len()));
+                        task.complete(&format!(
+                            "✓ Directory encrypted {} ({} files)",
+                            path.display(),
+                            result.processed_files.len()
+                        ));
                     }
                     result
                 }
                 Err(e) => {
                     if let Some(ref task) = progress_task {
-                        task.fail(&format!("✗ Failed to encrypt directory {}: {}", path.display(), e));
+                        task.fail(&format!(
+                            "✗ Failed to encrypt directory {}: {}",
+                            path.display(),
+                            e
+                        ));
                     }
                     return Err(e.into());
                 }
@@ -767,7 +891,10 @@ fn execute_in_place_lock_operation(
 
             if let Some(ref task) = progress_task {
                 let recovery_msg = if !danger_mode {
-                    format!("✓ File encrypted in-place {} (recovery file created)", path.display())
+                    format!(
+                        "✓ File encrypted in-place {} (recovery file created)",
+                        path.display()
+                    )
                 } else {
                     format!("✓ File encrypted in-place {} (danger mode)", path.display())
                 };
@@ -777,7 +904,10 @@ fn execute_in_place_lock_operation(
             if verbose {
                 echo!("    ✅ In-place operation completed for {}", path.display());
                 if !danger_mode {
-                    echo!("    📝 Recovery file created: {}.tmp.recover", path.display());
+                    echo!(
+                        "    📝 Recovery file created: {}.tmp.recover",
+                        path.display()
+                    );
                     echo!("    ⚠️  Delete recovery file once you've verified encryption!");
                 }
             }
@@ -836,16 +966,25 @@ fn execute_unlock_operation(
     };
 
     for (index, path) in paths.iter().enumerate() {
-        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> = if let Some(ref pm) = progress_manager {
-            let style = if paths.len() > 1 {
-                ProgressStyle::Counter { total: paths.len() as u64 }
+        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> =
+            if let Some(ref pm) = progress_manager {
+                let style = if paths.len() > 1 {
+                    ProgressStyle::Counter {
+                        total: paths.len() as u64,
+                    }
+                } else {
+                    ProgressStyle::Spinner
+                };
+                Some(pm.start_task(
+                    &format!(
+                        "🔓 Decrypting {}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ),
+                    style,
+                ))
             } else {
-                ProgressStyle::Spinner
+                None
             };
-            Some(pm.start_task(&format!("🔓 Decrypting {}", path.file_name().unwrap_or_default().to_string_lossy()), style))
-        } else {
-            None
-        };
 
         if verbose && progress_task.is_none() {
             echo!("  Unlocking: {}", path.display());
@@ -856,12 +995,10 @@ fn execute_unlock_operation(
         }
 
         // Use the new request API (CAGE-11)
-        let unlock_request = UnlockRequest::new(
-            path.clone(),
-            Identity::Passphrase(passphrase.to_string())
-        )
-        .selective(options.selective)
-        .preserve_encrypted(options.preserve_encrypted);
+        let unlock_request =
+            UnlockRequest::new(path.clone(), Identity::Passphrase(passphrase.to_string()))
+                .selective(options.selective)
+                .preserve_encrypted(options.preserve_encrypted);
 
         let unlock_request = match options.pattern_filter.clone() {
             Some(pattern_val) => unlock_request.with_pattern(pattern_val),
@@ -871,7 +1008,11 @@ fn execute_unlock_operation(
         let result = match crud_manager.unlock_with_request(&unlock_request) {
             Ok(result) => {
                 if let Some(ref task) = progress_task {
-                    task.complete(&format!("✓ Decrypted {} ({} files)", path.display(), result.processed_files.len()));
+                    task.complete(&format!(
+                        "✓ Decrypted {} ({} files)",
+                        path.display(),
+                        result.processed_files.len()
+                    ));
                 }
                 result
             }
@@ -910,7 +1051,8 @@ fn execute_status_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
         "⚠️  Repository has mixed encryption state"
     };
 
-    echo!("📊 Repository Status:
+    echo!(
+        "📊 Repository Status:
   Total files: {}
   Encrypted files: {}
   Unencrypted files: {}
@@ -965,7 +1107,8 @@ fn execute_verify_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
     let crud_manager = CrudManager::with_defaults()?;
     let result = crud_manager.verify(path)?;
 
-    echo!("🔍 Verification Result:
+    echo!(
+        "🔍 Verification Result:
   Verified files: {}
   Failed files: {}
   Overall status: {}",
@@ -993,13 +1136,19 @@ fn execute_batch_operation(
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if verbose {
-        echo!("📦 Batch {} operation on: {}", operation, directory.display());
+        echo!(
+            "📦 Batch {} operation on: {}",
+            operation,
+            directory.display()
+        );
     }
 
     let mut crud_manager = CrudManager::with_defaults()?;
-    let result = crud_manager.batch_process(directory, pattern.as_deref(), operation, passphrase)?;
+    let result =
+        crud_manager.batch_process(directory, pattern.as_deref(), operation, passphrase)?;
 
-    echo!("📦 Batch Operation Result:
+    echo!(
+        "📦 Batch Operation Result:
   Operation: {}
   Processed files: {}
   Failed files: {}
@@ -1086,9 +1235,10 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
 
     // Add remaining positional arguments (files) - only add file paths
     for remaining_arg in args.remaining() {
-        if !remaining_arg.starts_with("--") &&
-           !remaining_arg.contains("target/debug/cage") &&
-           std::path::Path::new(&remaining_arg).exists() {
+        if !remaining_arg.starts_with("--")
+            && !remaining_arg.contains("target/debug/cage")
+            && std::path::Path::new(&remaining_arg).exists()
+        {
             age_args.push(remaining_arg);
         }
     }
@@ -1105,7 +1255,9 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
     echo!("🔧 Age command: age {}", age_args.join(" "));
 
     // Check if this requires PTY automation (passphrase operations)
-    let is_encrypt = age_args.iter().any(|arg| arg == "-p" || arg == "--passphrase");
+    let is_encrypt = age_args
+        .iter()
+        .any(|arg| arg == "-p" || arg == "--passphrase");
     let is_decrypt = age_args.iter().any(|arg| arg == "-d" || arg == "--decrypt");
     let needs_pty = is_encrypt || is_decrypt; // Both encrypt and decrypt may need PTY for passphrases
 
@@ -1121,7 +1273,7 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
             passphrase_manager.get_passphrase_with_mode(
                 "Enter passphrase for Age operation",
                 false,
-                PassphraseMode::Stdin
+                PassphraseMode::Stdin,
             )?
         } else {
             passphrase_manager.get_passphrase("Enter passphrase for Age operation", false)?
@@ -1134,7 +1286,6 @@ fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
         if !output.is_empty() {
             print!("{}", output);
         }
-
     } else {
         echo!("⚡ Direct Age execution (no passphrase needed)");
 
@@ -1252,11 +1403,19 @@ fn run_progress_demo() -> i32 {
 
     // Demo 3: Byte Progress (Large File)
     echo!("💾 Demo 3: Byte Progress (Large File)");
-    let bytes_task = manager.start_task("Encrypting large file", ProgressStyle::Bytes { total_bytes: 1048576 }); // 1MB
+    let bytes_task = manager.start_task(
+        "Encrypting large file",
+        ProgressStyle::Bytes {
+            total_bytes: 1048576,
+        },
+    ); // 1MB
     let chunk_size = 65536; // 64KB chunks
     for i in (0..1048576).step_by(chunk_size) {
         let current = std::cmp::min(i + chunk_size, 1048576);
-        bytes_task.update(current as u64, &format!("Processing chunk at {}KB", current / 1024));
+        bytes_task.update(
+            current as u64,
+            &format!("Processing chunk at {}KB", current / 1024),
+        );
         thread::sleep(Duration::from_millis(50));
     }
     bytes_task.complete("✓ Large file encrypted");
@@ -1264,8 +1423,17 @@ fn run_progress_demo() -> i32 {
 
     // Demo 4: Counter Style
     echo!("🔢 Demo 4: Counter Style (Key Rotation)");
-    let counter_task = manager.start_task("Rotating encryption keys", ProgressStyle::Counter { total: 5 });
-    let files = ["config.json", "secrets.txt", "database.db", "logs.txt", "backup.zip"];
+    let counter_task = manager.start_task(
+        "Rotating encryption keys",
+        ProgressStyle::Counter { total: 5 },
+    );
+    let files = [
+        "config.json",
+        "secrets.txt",
+        "database.db",
+        "logs.txt",
+        "backup.zip",
+    ];
     for (i, file) in files.iter().enumerate() {
         counter_task.update(i as u64 + 1, &format!("Rotating key for {}", file));
         thread::sleep(Duration::from_millis(300));

@@ -6,11 +6,11 @@
 //! - Environment variable fallback
 //! - Command line argument detection and warnings
 
-use std::io::{self, Write};
+use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::strings::{fmt_info, fmt_warning};
 use rpassword::read_password;
 use rsb::visual::glyphs::glyph;
-use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::strings::{fmt_warning, fmt_info};
+use std::io::{self, Write};
 
 /// Passphrase input modes for different scenarios
 #[derive(Debug, Clone, PartialEq)]
@@ -84,7 +84,12 @@ impl PassphraseManager {
     }
 
     /// Get passphrase with explicit mode
-    pub fn get_passphrase_with_mode(&self, prompt: &str, confirm: bool, mode: PassphraseMode) -> AgeResult<String> {
+    pub fn get_passphrase_with_mode(
+        &self,
+        prompt: &str,
+        confirm: bool,
+        mode: PassphraseMode,
+    ) -> AgeResult<String> {
         match mode {
             PassphraseMode::Interactive => self.prompt_interactive(prompt, confirm),
             PassphraseMode::Stdin => self.read_from_stdin(),
@@ -128,9 +133,11 @@ impl PassphraseManager {
 
         // Print prompt to stderr to avoid interfering with stdout
         eprint!("{} {}: ", glyph("lock"), prompt);
-        io::stderr().flush().map_err(|e| AgeError::PassphraseError {
-            message: format!("Failed to flush stderr: {}", e),
-        })?;
+        io::stderr()
+            .flush()
+            .map_err(|e| AgeError::PassphraseError {
+                message: format!("Failed to flush stderr: {}", e),
+            })?;
 
         let passphrase = read_password().map_err(|e| AgeError::PassphraseError {
             message: format!("Failed to read passphrase: {}", e),
@@ -145,9 +152,11 @@ impl PassphraseManager {
         // Confirmation for critical operations
         if confirm {
             eprint!("{} Confirm {}: ", glyph("lock"), prompt);
-            io::stderr().flush().map_err(|e| AgeError::PassphraseError {
-                message: format!("Failed to flush stderr: {}", e),
-            })?;
+            io::stderr()
+                .flush()
+                .map_err(|e| AgeError::PassphraseError {
+                    message: format!("Failed to flush stderr: {}", e),
+                })?;
 
             let confirmation = read_password().map_err(|e| AgeError::PassphraseError {
                 message: format!("Failed to read confirmation: {}", e),
@@ -169,9 +178,11 @@ impl PassphraseManager {
     /// Read passphrase from stdin (for scripting/automation)
     fn read_from_stdin(&self) -> AgeResult<String> {
         let mut input = String::new();
-        io::stdin().read_line(&mut input).map_err(|e| AgeError::PassphraseError {
-            message: format!("Failed to read from stdin: {}", e),
-        })?;
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(|e| AgeError::PassphraseError {
+                message: format!("Failed to read from stdin: {}", e),
+            })?;
 
         let passphrase = input.trim().to_string();
         if passphrase.is_empty() {
@@ -192,7 +203,10 @@ impl PassphraseManager {
 
     /// Warn about insecure command line usage
     fn warn_insecure_usage(&self) {
-        eprintln!("{}", fmt_warning("WARNING: Passphrase provided on command line!"));
+        eprintln!(
+            "{}",
+            fmt_warning("WARNING: Passphrase provided on command line!")
+        );
         eprintln!("   This is insecure and visible in process list and shell history.");
         eprintln!("   Use interactive prompt or CAGE_PASSPHRASE environment variable instead.");
         eprintln!("   For automation, use --stdin-passphrase flag.");
@@ -206,11 +220,17 @@ impl PassphraseManager {
         }
 
         if passphrase.len() < 12 && !passphrase.chars().any(|c| c.is_ascii_punctuation()) {
-            eprintln!("{}", fmt_info("Tip: Consider adding special characters for stronger security."));
+            eprintln!(
+                "{}",
+                fmt_info("Tip: Consider adding special characters for stronger security.")
+            );
         }
 
         if passphrase.to_lowercase() == passphrase {
-            eprintln!("{}", fmt_info("Tip: Mix of uppercase and lowercase letters improves security."));
+            eprintln!(
+                "{}",
+                fmt_info("Tip: Mix of uppercase and lowercase letters improves security.")
+            );
         }
 
         // Don't fail on weak passwords, just warn
@@ -264,15 +284,28 @@ mod tests {
 
     #[test]
     fn test_insecure_usage_detection() {
-        let args1 = vec!["cage".to_string(), "lock".to_string(), "--passphrase".to_string(), "secret123".to_string()];
+        let args1 = vec![
+            "cage".to_string(),
+            "lock".to_string(),
+            "--passphrase".to_string(),
+            "secret123".to_string(),
+        ];
         let detected = PassphraseManager::detect_insecure_usage(&args1);
         assert_eq!(detected, Some("secret123".to_string()));
 
-        let args2 = vec!["cage".to_string(), "lock".to_string(), "--passphrase=mysecret".to_string()];
+        let args2 = vec![
+            "cage".to_string(),
+            "lock".to_string(),
+            "--passphrase=mysecret".to_string(),
+        ];
         let detected = PassphraseManager::detect_insecure_usage(&args2);
         assert_eq!(detected, Some("mysecret".to_string()));
 
-        let args3 = vec!["cage".to_string(), "lock".to_string(), "file.txt".to_string()];
+        let args3 = vec![
+            "cage".to_string(),
+            "lock".to_string(),
+            "file.txt".to_string(),
+        ];
         let detected = PassphraseManager::detect_insecure_usage(&args3);
         assert_eq!(detected, None);
     }
@@ -293,7 +326,10 @@ mod tests {
         // Test environment variable detection
         std::env::set_var("CAGE_PASSPHRASE", "test123");
         let mode = manager.detect_best_mode().unwrap();
-        assert_eq!(mode, PassphraseMode::Environment("CAGE_PASSPHRASE".to_string()));
+        assert_eq!(
+            mode,
+            PassphraseMode::Environment("CAGE_PASSPHRASE".to_string())
+        );
         std::env::remove_var("CAGE_PASSPHRASE");
 
         // Test stdin mode detection

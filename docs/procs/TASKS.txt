@@ -105,7 +105,7 @@
 - [x] Add stream-based methods (Reader/Writer) to the trait.
 - [x] Wrap existing Shell adapter with V2 compatibility.
 - [x] Implement basic streaming encrypt/decrypt in ShellAdapterV2 (passphrase flows).
-- [ ] Extend streaming to support identity files / recipients.
+- [x] Extend streaming to support identity files / recipients.
 - [x] Ensure health checks & factory expose new capabilities.
 
 ### CAGE-13: Streaming Encryption & Decryption [8 pts]

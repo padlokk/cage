@@ -5,14 +5,14 @@
 //!
 //! Security Guardian: Edgar - Production file operation framework
 
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::time::Instant;
+use super::{FileEncryption, Operation, OperationResult};
 use crate::cage::adapter::AgeAdapter;
 use crate::cage::config::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::security::{AuditLogger, SecurityValidator};
-use super::{Operation, FileEncryption, OperationResult};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 /// File encryption operation with comprehensive validation
 pub struct FileEncryptOperation {
@@ -36,7 +36,7 @@ impl FileEncryptOperation {
     ) -> AgeResult<Self> {
         let audit_logger = AuditLogger::new(None)?;
         let validator = SecurityValidator::new(true);
-        
+
         Ok(Self {
             adapter,
             input_path: input.to_path_buf(),
@@ -47,7 +47,7 @@ impl FileEncryptOperation {
             validator,
         })
     }
-    
+
     /// Create with audit file logging
     pub fn with_audit_file(
         adapter: Box<dyn AgeAdapter>,
@@ -59,7 +59,7 @@ impl FileEncryptOperation {
     ) -> AgeResult<Self> {
         let audit_logger = AuditLogger::with_file("file_encrypt", audit_path)?;
         let validator = SecurityValidator::new(true);
-        
+
         Ok(Self {
             adapter,
             input_path: input.to_path_buf(),
@@ -76,54 +76,80 @@ impl Operation for FileEncryptOperation {
     fn operation_name(&self) -> &'static str {
         "file_encrypt"
     }
-    
+
     fn validate_preconditions(&self) -> AgeResult<()> {
         // Validate input file exists and is readable
         if !self.input_path.exists() {
-            return Err(AgeError::file_error("read", self.input_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found")));
+            return Err(AgeError::file_error(
+                "read",
+                self.input_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found"),
+            ));
         }
-        
+
         if !self.input_path.is_file() {
-            return Err(AgeError::file_error("read", self.input_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Input path is not a file")));
+            return Err(AgeError::file_error(
+                "read",
+                self.input_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Input path is not a file"),
+            ));
         }
-        
+
         // Validate output path security
         self.validator.validate_file_path(&self.output_path)?;
-        
+
         // Validate passphrase security
-        self.validator.validate_passphrase_security(&self.passphrase)?;
-        
+        self.validator
+            .validate_passphrase_security(&self.passphrase)?;
+
         // Check if output file already exists (warn but allow)
         if self.output_path.exists() {
-            self.audit_logger.log_warning(&format!("Output file already exists: {}", self.output_path.display()))?;
+            self.audit_logger.log_warning(&format!(
+                "Output file already exists: {}",
+                self.output_path.display()
+            ))?;
         }
-        
+
         // Validate adapter health
         self.adapter.health_check()?;
-        
-        self.audit_logger.log_info("File encryption preconditions validated")?;
+
+        self.audit_logger
+            .log_info("File encryption preconditions validated")?;
         Ok(())
     }
-    
+
     fn execute(&self) -> AgeResult<()> {
-        self.audit_logger.log_operation_start("encrypt", &self.input_path, &self.output_path)?;
-        
-        let result = self.adapter.encrypt(&self.input_path, &self.output_path, &self.passphrase, self.format);
-        
+        self.audit_logger
+            .log_operation_start("encrypt", &self.input_path, &self.output_path)?;
+
+        let result = self.adapter.encrypt(
+            &self.input_path,
+            &self.output_path,
+            &self.passphrase,
+            self.format,
+        );
+
         match &result {
             Ok(_) => {
-                self.audit_logger.log_operation_success("encrypt", &self.input_path, &self.output_path)?;
+                self.audit_logger.log_operation_success(
+                    "encrypt",
+                    &self.input_path,
+                    &self.output_path,
+                )?;
             }
             Err(e) => {
-                self.audit_logger.log_operation_failure("encrypt", &self.input_path, &self.output_path, e)?;
+                self.audit_logger.log_operation_failure(
+                    "encrypt",
+                    &self.input_path,
+                    &self.output_path,
+                    e,
+                )?;
             }
         }
-        
+
         result
     }
-    
+
     fn validate_postconditions(&self) -> AgeResult<()> {
         // Verify output file was created
         if !self.output_path.exists() {
@@ -133,11 +159,11 @@ impl Operation for FileEncryptOperation {
                 reason: "Output file was not created".to_string(),
             });
         }
-        
+
         // Verify output file has content
         let metadata = fs::metadata(&self.output_path)
             .map_err(|e| AgeError::file_error("stat", self.output_path.clone(), e))?;
-        
+
         if metadata.len() == 0 {
             return Err(AgeError::EncryptionFailed {
                 input: self.input_path.clone(),
@@ -145,8 +171,9 @@ impl Operation for FileEncryptOperation {
                 reason: "Output file is empty".to_string(),
             });
         }
-        
-        self.audit_logger.log_info("File encryption postconditions validated")?;
+
+        self.audit_logger
+            .log_info("File encryption postconditions validated")?;
         Ok(())
     }
 }
@@ -171,7 +198,7 @@ impl FileDecryptOperation {
     ) -> AgeResult<Self> {
         let audit_logger = AuditLogger::new(None)?;
         let validator = SecurityValidator::new(true);
-        
+
         Ok(Self {
             adapter,
             input_path: input.to_path_buf(),
@@ -181,7 +208,7 @@ impl FileDecryptOperation {
             validator,
         })
     }
-    
+
     /// Create with audit file logging
     pub fn with_audit_file(
         adapter: Box<dyn AgeAdapter>,
@@ -192,7 +219,7 @@ impl FileDecryptOperation {
     ) -> AgeResult<Self> {
         let audit_logger = AuditLogger::with_file("file_decrypt", audit_path)?;
         let validator = SecurityValidator::new(true);
-        
+
         Ok(Self {
             adapter,
             input_path: input.to_path_buf(),
@@ -208,53 +235,73 @@ impl Operation for FileDecryptOperation {
     fn operation_name(&self) -> &'static str {
         "file_decrypt"
     }
-    
+
     fn validate_preconditions(&self) -> AgeResult<()> {
         // Validate input file exists and appears to be encrypted
         if !self.input_path.exists() {
-            return Err(AgeError::file_error("read", self.input_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found")));
+            return Err(AgeError::file_error(
+                "read",
+                self.input_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found"),
+            ));
         }
-        
+
         // Basic heuristic to check if file might be encrypted
         let content = fs::read(&self.input_path)
             .map_err(|e| AgeError::file_error("read", self.input_path.clone(), e))?;
-        
+
         // Check for Age header
-        if !content.starts_with(b"age-encryption.org/v1") && !content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----") {
-            self.audit_logger.log_warning("Input file does not appear to be Age encrypted")?;
+        if !content.starts_with(b"age-encryption.org/v1")
+            && !content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----")
+        {
+            self.audit_logger
+                .log_warning("Input file does not appear to be Age encrypted")?;
         }
-        
+
         // Validate output path security
         self.validator.validate_file_path(&self.output_path)?;
-        
+
         // Validate passphrase security
-        self.validator.validate_passphrase_security(&self.passphrase)?;
-        
+        self.validator
+            .validate_passphrase_security(&self.passphrase)?;
+
         // Validate adapter health
         self.adapter.health_check()?;
-        
-        self.audit_logger.log_info("File decryption preconditions validated")?;
+
+        self.audit_logger
+            .log_info("File decryption preconditions validated")?;
         Ok(())
     }
-    
+
     fn execute(&self) -> AgeResult<()> {
-        self.audit_logger.log_operation_start("decrypt", &self.input_path, &self.output_path)?;
-        
-        let result = self.adapter.decrypt(&self.input_path, &self.output_path, &self.passphrase);
-        
+        self.audit_logger
+            .log_operation_start("decrypt", &self.input_path, &self.output_path)?;
+
+        let result = self
+            .adapter
+            .decrypt(&self.input_path, &self.output_path, &self.passphrase);
+
         match &result {
             Ok(_) => {
-                self.audit_logger.log_operation_success("decrypt", &self.input_path, &self.output_path)?;
+                self.audit_logger.log_operation_success(
+                    "decrypt",
+                    &self.input_path,
+                    &self.output_path,
+                )?;
             }
             Err(e) => {
-                self.audit_logger.log_operation_failure("decrypt", &self.input_path, &self.output_path, e)?;
+                self.audit_logger.log_operation_failure(
+                    "decrypt",
+                    &self.input_path,
+                    &self.output_path,
+                    e,
+                )?;
             }
         }
-        
+
         result
     }
-    
+
     fn validate_postconditions(&self) -> AgeResult<()> {
         // Verify output file was created
         if !self.output_path.exists() {
@@ -264,11 +311,11 @@ impl Operation for FileDecryptOperation {
                 reason: "Output file was not created".to_string(),
             });
         }
-        
+
         // Verify output file has content
         let metadata = fs::metadata(&self.output_path)
             .map_err(|e| AgeError::file_error("stat", self.output_path.clone(), e))?;
-        
+
         if metadata.len() == 0 {
             return Err(AgeError::DecryptionFailed {
                 input: self.input_path.clone(),
@@ -276,8 +323,9 @@ impl Operation for FileDecryptOperation {
                 reason: "Output file is empty".to_string(),
             });
         }
-        
-        self.audit_logger.log_info("File decryption postconditions validated")?;
+
+        self.audit_logger
+            .log_info("File decryption postconditions validated")?;
         Ok(())
     }
 }
@@ -295,19 +343,25 @@ impl FileOperationsManager {
     pub fn new(adapter: Box<dyn AgeAdapter>) -> AgeResult<Self> {
         let audit_logger = AuditLogger::new(None)?;
         let validator = SecurityValidator::new(true);
-        
+
         Ok(Self {
             adapter,
             audit_logger,
             validator,
         })
     }
-    
+
     /// Perform file encryption with full operation framework
-    pub fn encrypt_with_validation(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<OperationResult> {
+    pub fn encrypt_with_validation(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
         let mut result = OperationResult::new();
-        
+
         // Create and execute operation
         let operation = FileEncryptOperation::new(
             // Note: In production, we'd need to clone the adapter properly
@@ -318,75 +372,92 @@ impl FileOperationsManager {
             passphrase,
             format,
         )?;
-        
+
         match operation.perform() {
             Ok(_) => {
                 result.add_success(input.to_string_lossy().to_string());
-                self.audit_logger.log_info(&format!("File encryption completed: {}", input.display()))?;
+                self.audit_logger
+                    .log_info(&format!("File encryption completed: {}", input.display()))?;
             }
             Err(e) => {
                 result.add_failure(input.to_string_lossy().to_string());
-                self.audit_logger.log_error(&format!("File encryption failed: {} - {}", input.display(), e))?;
+                self.audit_logger.log_error(&format!(
+                    "File encryption failed: {} - {}",
+                    input.display(),
+                    e
+                ))?;
                 return Err(e);
             }
         }
-        
+
         result.finalize(start_time);
         Ok(result)
     }
-    
+
     /// Perform file decryption with full operation framework
-    pub fn decrypt_with_validation(&self, input: &Path, output: &Path, passphrase: &str) -> AgeResult<OperationResult> {
+    pub fn decrypt_with_validation(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
         let mut result = OperationResult::new();
-        
+
         // Create and execute operation
-        let operation = FileDecryptOperation::new(
-            self.adapter.clone_box(),
-            input,
-            output,
-            passphrase,
-        )?;
-        
+        let operation =
+            FileDecryptOperation::new(self.adapter.clone_box(), input, output, passphrase)?;
+
         match operation.perform() {
             Ok(_) => {
                 result.add_success(input.to_string_lossy().to_string());
-                self.audit_logger.log_info(&format!("File decryption completed: {}", input.display()))?;
+                self.audit_logger
+                    .log_info(&format!("File decryption completed: {}", input.display()))?;
             }
             Err(e) => {
                 result.add_failure(input.to_string_lossy().to_string());
-                self.audit_logger.log_error(&format!("File decryption failed: {} - {}", input.display(), e))?;
+                self.audit_logger.log_error(&format!(
+                    "File decryption failed: {} - {}",
+                    input.display(),
+                    e
+                ))?;
                 return Err(e);
             }
         }
-        
+
         result.finalize(start_time);
         Ok(result)
     }
 }
 
 impl FileEncryption for FileOperationsManager {
-    fn encrypt_file(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+    fn encrypt_file(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
         self.encrypt_with_validation(input, output, passphrase, format)?;
         Ok(())
     }
-    
+
     fn decrypt_file(&self, input: &Path, output: &Path, passphrase: &str) -> AgeResult<()> {
         self.decrypt_with_validation(input, output, passphrase)?;
         Ok(())
     }
-    
+
     fn is_encrypted_file(&self, path: &Path) -> AgeResult<bool> {
         if !path.exists() {
             return Ok(false);
         }
-        
-        let content = fs::read(path)
-            .map_err(|e| AgeError::file_error("read", path.to_path_buf(), e))?;
-        
+
+        let content =
+            fs::read(path).map_err(|e| AgeError::file_error("read", path.to_path_buf(), e))?;
+
         // Check for Age headers
-        Ok(content.starts_with(b"age-encryption.org/v1") || 
-           content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----"))
+        Ok(content.starts_with(b"age-encryption.org/v1")
+            || content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----"))
     }
 }
 
@@ -405,6 +476,8 @@ mod tests {
     #[ignore] // TODO: FileEncryptOperation requires complex setup with adapter, audit_logger, validator
     fn test_file_encryption_operation_creation() {
         // This test needs proper adapter, audit_logger and validator setup
-        println!("FileEncryptOperation test temporarily disabled - requires complex initialization");
+        println!(
+            "FileEncryptOperation test temporarily disabled - requires complex initialization"
+        );
     }
 }

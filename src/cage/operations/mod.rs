@@ -8,24 +8,24 @@
 pub mod file_operations;
 pub mod repository_operations;
 
-use std::path::Path;
-use super::error::AgeResult;
 use super::config::OutputFormat;
+use super::error::AgeResult;
+use std::path::Path;
 
 /// Core operation trait defining common operation behavior
 pub trait Operation {
     /// Get operation name for logging
     fn operation_name(&self) -> &'static str;
-    
+
     /// Validate operation preconditions
     fn validate_preconditions(&self) -> AgeResult<()>;
-    
+
     /// Execute the operation
     fn execute(&self) -> AgeResult<()>;
-    
+
     /// Validate operation postconditions
     fn validate_postconditions(&self) -> AgeResult<()>;
-    
+
     /// Full operation with validation
     fn perform(&self) -> AgeResult<()> {
         self.validate_preconditions()?;
@@ -38,11 +38,17 @@ pub trait Operation {
 /// Trait for file-based encryption operations
 pub trait FileEncryption {
     /// Encrypt a single file
-    fn encrypt_file(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()>;
-    
+    fn encrypt_file(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()>;
+
     /// Decrypt a single file
     fn decrypt_file(&self, input: &Path, output: &Path, passphrase: &str) -> AgeResult<()>;
-    
+
     /// Check if file is encrypted (basic heuristic)
     fn is_encrypted_file(&self, path: &Path) -> AgeResult<bool>;
 }
@@ -50,11 +56,16 @@ pub trait FileEncryption {
 /// Trait for repository-level operations
 pub trait RepositoryOperations {
     /// Encrypt all files in directory
-    fn encrypt_repository(&self, repo_path: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()>;
-    
+    fn encrypt_repository(
+        &self,
+        repo_path: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()>;
+
     /// Decrypt all encrypted files in directory
     fn decrypt_repository(&self, repo_path: &Path, passphrase: &str) -> AgeResult<()>;
-    
+
     /// Get repository encryption status
     fn repository_status(&self, repo_path: &Path) -> AgeResult<RepositoryStatus>;
 }
@@ -77,15 +88,17 @@ impl RepositoryStatus {
             failed_files: Vec::new(),
         }
     }
-    
+
     pub fn is_fully_encrypted(&self) -> bool {
-        self.total_files > 0 && self.encrypted_files == self.total_files && self.failed_files.is_empty()
+        self.total_files > 0
+            && self.encrypted_files == self.total_files
+            && self.failed_files.is_empty()
     }
-    
+
     pub fn is_fully_decrypted(&self) -> bool {
         self.encrypted_files == 0 && self.failed_files.is_empty()
     }
-    
+
     pub fn encryption_percentage(&self) -> f64 {
         if self.total_files == 0 {
             0.0
@@ -115,21 +128,21 @@ impl OperationResult {
             execution_time_ms: 0,
         }
     }
-    
+
     pub fn add_success(&mut self, file_path: String) {
         self.processed_files.push(file_path);
         self.total_processed += 1;
     }
-    
+
     pub fn add_failure(&mut self, file_path: String) {
         self.failed_files.push(file_path);
     }
-    
+
     pub fn finalize(&mut self, start_time: std::time::Instant) {
         self.execution_time_ms = start_time.elapsed().as_millis() as u64;
         self.success = self.failed_files.is_empty() && self.total_processed > 0;
     }
-    
+
     pub fn success_rate(&self) -> f64 {
         let total = self.processed_files.len() + self.failed_files.len();
         if total == 0 {

@@ -6,13 +6,13 @@
 //!
 //! Security Guardian: Edgar - Production implementation of proven automation patterns
 
-use std::process::{Command, Stdio};
-use std::path::Path;
+use super::config::{OutputFormat, TtyMethod};
+use super::error::{AgeError, AgeResult};
 use std::fs;
+use std::path::Path;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 use tempfile::TempDir;
-use super::error::{AgeError, AgeResult};
-use super::config::{OutputFormat, TtyMethod};
 
 /// TTY automation engine using proven pilot methods
 #[allow(dead_code)]
@@ -27,12 +27,11 @@ pub struct TtyAutomator {
 impl TtyAutomator {
     /// Create new TTY automator with secure temporary directory
     pub fn new() -> AgeResult<Self> {
-        let temp_dir = tempfile::tempdir()
-            .map_err(|e| AgeError::TemporaryResourceError {
-                resource_type: "directory".to_string(),
-                operation: "create".to_string(),
-                reason: e.to_string(),
-            })?;
+        let temp_dir = tempfile::tempdir().map_err(|e| AgeError::TemporaryResourceError {
+            resource_type: "directory".to_string(),
+            operation: "create".to_string(),
+            reason: e.to_string(),
+        })?;
 
         Ok(Self {
             temp_dir,
@@ -42,11 +41,20 @@ impl TtyAutomator {
     }
 
     /// Encrypt file using proven TTY automation
-    pub fn encrypt(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+    pub fn encrypt(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
         // Validate inputs
         if !input.exists() {
-            return Err(AgeError::file_error("read", input.to_path_buf(), 
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found")));
+            return Err(AgeError::file_error(
+                "read",
+                input.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found"),
+            ));
         }
 
         // Try script method first (proven fastest)
@@ -71,8 +79,11 @@ impl TtyAutomator {
     pub fn decrypt(&self, input: &Path, output: &Path, passphrase: &str) -> AgeResult<()> {
         // Validate inputs
         if !input.exists() {
-            return Err(AgeError::file_error("read", input.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found")));
+            return Err(AgeError::file_error(
+                "read",
+                input.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Input file not found"),
+            ));
         }
 
         // Try script method first
@@ -94,23 +105,29 @@ impl TtyAutomator {
     }
 
     /// Method 1: Script command TTY automation (proven fastest)
-    fn encrypt_with_script(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+    fn encrypt_with_script(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
         let mut age_cmd = vec!["age", "-p"];
-        
+
         // Add ASCII armor flag if requested
         if matches!(format, OutputFormat::AsciiArmor) {
             age_cmd.push("-a");
         }
-        
+
         let output_str = output.to_string_lossy();
         let input_str = input.to_string_lossy();
         age_cmd.extend(["-o", &output_str, &input_str]);
-        
+
         let script_cmd = format!(
             "script -q -c \"{} << 'EOF'\n{}\n{}\nEOF\" /dev/null",
             age_cmd.join(" "),
             passphrase,
-            passphrase  // Confirmation
+            passphrase // Confirmation
         );
 
         let result = Command::new("sh")
@@ -131,16 +148,25 @@ impl TtyAutomator {
             Err(AgeError::EncryptionFailed {
                 input: input.to_path_buf(),
                 output: output.to_path_buf(),
-                reason: format!("Script method failed: {}", String::from_utf8_lossy(&result.stderr)),
+                reason: format!(
+                    "Script method failed: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                ),
             })
         }
     }
 
     /// Method 2: Expect automation (proven most reliable)
-    fn encrypt_with_expect(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+    fn encrypt_with_expect(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
         // Create expect script
         let expect_script = self.temp_dir.path().join("encrypt.exp");
-        
+
         let mut age_cmd = vec!["age", "-p"];
         if matches!(format, OutputFormat::AsciiArmor) {
             age_cmd.push("-a");
@@ -201,7 +227,10 @@ expect {{
             Err(AgeError::EncryptionFailed {
                 input: input.to_path_buf(),
                 output: output.to_path_buf(),
-                reason: format!("Expect method failed: {}", String::from_utf8_lossy(&result.stderr)),
+                reason: format!(
+                    "Expect method failed: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                ),
             })
         }
     }
@@ -233,7 +262,10 @@ expect {{
             Err(AgeError::DecryptionFailed {
                 input: input.to_path_buf(),
                 output: output.to_path_buf(),
-                reason: format!("Script decryption failed: {}", String::from_utf8_lossy(&result.stderr)),
+                reason: format!(
+                    "Script decryption failed: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                ),
             })
         }
     }
@@ -241,7 +273,7 @@ expect {{
     /// Expect-based decryption
     fn decrypt_with_expect(&self, input: &Path, output: &Path, passphrase: &str) -> AgeResult<()> {
         let expect_script = self.temp_dir.path().join("decrypt.exp");
-        
+
         let expect_content = format!(
             r#"#!/usr/bin/expect -f
 set timeout 30
@@ -290,7 +322,10 @@ expect {{
             Err(AgeError::DecryptionFailed {
                 input: input.to_path_buf(),
                 output: output.to_path_buf(),
-                reason: format!("Expect decryption failed: {}", String::from_utf8_lossy(&result.stderr)),
+                reason: format!(
+                    "Expect decryption failed: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                ),
             })
         }
     }
@@ -302,7 +337,9 @@ expect {{
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .map_err(|_| AgeError::AgeBinaryNotFound("age command not found in PATH".to_string()))?;
+            .map_err(|_| {
+                AgeError::AgeBinaryNotFound("age command not found in PATH".to_string())
+            })?;
         Ok(())
     }
 
@@ -316,7 +353,7 @@ expect {{
             .status()
             .is_ok();
 
-        // Check expect command  
+        // Check expect command
         let expect_available = Command::new("expect")
             .arg("-v")
             .stdout(Stdio::null())
@@ -338,7 +375,7 @@ expect {{
     pub fn perform_health_check(&self) -> AgeResult<()> {
         self.check_age_binary()?;
         self.check_automation_methods()?;
-        
+
         // TODO: Implement full encrypt/decrypt cycle test
         Ok(())
     }
@@ -346,15 +383,25 @@ expect {{
     /// Get available automation methods
     pub fn available_methods(&self) -> Vec<String> {
         let mut methods = Vec::new();
-        
-        if Command::new("script").arg("--version").stdout(Stdio::null()).status().is_ok() {
+
+        if Command::new("script")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .status()
+            .is_ok()
+        {
             methods.push("script".to_string());
         }
-        
-        if Command::new("expect").arg("-v").stdout(Stdio::null()).status().is_ok() {
+
+        if Command::new("expect")
+            .arg("-v")
+            .stdout(Stdio::null())
+            .status()
+            .is_ok()
+        {
             methods.push("expect".to_string());
         }
-        
+
         methods
     }
 

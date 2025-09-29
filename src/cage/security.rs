@@ -5,13 +5,13 @@
 //!
 //! Security Guardian: Edgar - Production security and audit framework
 
+use super::error::{AgeError, AgeResult};
+use super::operations::{OperationResult, RepositoryStatus};
+#[allow(unused_imports)]
+use chrono::{DateTime, Utc};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-#[allow(unused_imports)]
-use chrono::{DateTime, Utc};
-use super::error::{AgeError, AgeResult};
-use super::operations::{OperationResult, RepositoryStatus};
 
 /// Audit logger for security events and operations
 pub struct AuditLogger {
@@ -23,11 +23,13 @@ impl AuditLogger {
     /// Create new audit logger for specified component
     pub fn new(log_path_opt: Option<PathBuf>) -> AgeResult<Self> {
         let log_file = if let Some(log_path) = log_path_opt {
-            Some(OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&log_path)
-                .map_err(|e| AgeError::file_error("open", log_path.to_path_buf(), e))?)
+            Some(
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&log_path)
+                    .map_err(|e| AgeError::file_error("open", log_path.to_path_buf(), e))?,
+            )
         } else {
             None
         };
@@ -53,21 +55,52 @@ impl AuditLogger {
     }
 
     /// Log operation start
-    pub fn log_operation_start(&self, operation: &str, input: &Path, output: &Path) -> AgeResult<()> {
-        let message = format!("OPERATION_START {} {} -> {}", operation, input.display(), output.display());
+    pub fn log_operation_start(
+        &self,
+        operation: &str,
+        input: &Path,
+        output: &Path,
+    ) -> AgeResult<()> {
+        let message = format!(
+            "OPERATION_START {} {} -> {}",
+            operation,
+            input.display(),
+            output.display()
+        );
         self.log_event("INFO", &message)
     }
 
     /// Log operation success
-    pub fn log_operation_success(&self, operation: &str, input: &Path, output: &Path) -> AgeResult<()> {
-        let message = format!("OPERATION_SUCCESS {} {} -> {}", operation, input.display(), output.display());
+    pub fn log_operation_success(
+        &self,
+        operation: &str,
+        input: &Path,
+        output: &Path,
+    ) -> AgeResult<()> {
+        let message = format!(
+            "OPERATION_SUCCESS {} {} -> {}",
+            operation,
+            input.display(),
+            output.display()
+        );
         self.log_event("INFO", &message)
     }
 
     /// Log operation failure
-    pub fn log_operation_failure(&self, operation: &str, input: &Path, output: &Path, error: &AgeError) -> AgeResult<()> {
-        let message = format!("OPERATION_FAILURE {} {} -> {} ERROR: {}", 
-            operation, input.display(), output.display(), error);
+    pub fn log_operation_failure(
+        &self,
+        operation: &str,
+        input: &Path,
+        output: &Path,
+        error: &AgeError,
+    ) -> AgeResult<()> {
+        let message = format!(
+            "OPERATION_FAILURE {} {} -> {} ERROR: {}",
+            operation,
+            input.display(),
+            output.display(),
+            error
+        );
         self.log_event("ERROR", &message)
     }
 
@@ -99,16 +132,32 @@ impl AuditLogger {
     }
 
     /// Log operation complete
-    pub fn log_operation_complete(&self, operation: &str, path: &Path, result: &OperationResult) -> AgeResult<()> {
-        let message = format!("OPERATION_COMPLETE {} {} - processed: {}, failed: {}, duration: {}ms", 
-            operation, path.display(), result.processed_files.len(), result.failed_files.len(), result.execution_time_ms);
+    pub fn log_operation_complete(
+        &self,
+        operation: &str,
+        path: &Path,
+        result: &OperationResult,
+    ) -> AgeResult<()> {
+        let message = format!(
+            "OPERATION_COMPLETE {} {} - processed: {}, failed: {}, duration: {}ms",
+            operation,
+            path.display(),
+            result.processed_files.len(),
+            result.failed_files.len(),
+            result.execution_time_ms
+        );
         self.log_event("INFO", &message)
     }
 
     /// Log status check
     pub fn log_status_check(&self, path: &Path, status: &RepositoryStatus) -> AgeResult<()> {
-        let message = format!("STATUS_CHECK {} - total: {}, encrypted: {}, unencrypted: {}", 
-            path.display(), status.total_files, status.encrypted_files, status.unencrypted_files);
+        let message = format!(
+            "STATUS_CHECK {} - total: {}, encrypted: {}, unencrypted: {}",
+            path.display(),
+            status.total_files,
+            status.encrypted_files,
+            status.unencrypted_files
+        );
         self.log_event("INFO", &message)
     }
 
@@ -127,30 +176,32 @@ impl AuditLogger {
     /// Core event logging function
     fn log_event(&self, level: &str, message: &str) -> AgeResult<()> {
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-        let log_entry = format!("[{}] [{}] [{}] {}\n", timestamp, level, self.component, message);
+        let log_entry = format!(
+            "[{}] [{}] [{}] {}\n",
+            timestamp, level, self.component, message
+        );
 
         // Always log to stderr for immediate visibility
         eprint!("{}", log_entry);
 
         // Also log to file if configured
         if let Some(ref mut file) = &mut self.log_file.as_ref() {
-            let mut file_handle = file.try_clone()
-                .map_err(|e| AgeError::AuditLogFailed {
-                    operation: "file_write".to_string(),
-                    reason: e.to_string(),
-                })?;
-            
-            file_handle.write_all(log_entry.as_bytes())
+            let mut file_handle = file.try_clone().map_err(|e| AgeError::AuditLogFailed {
+                operation: "file_write".to_string(),
+                reason: e.to_string(),
+            })?;
+
+            file_handle
+                .write_all(log_entry.as_bytes())
                 .map_err(|e| AgeError::AuditLogFailed {
                     operation: "write".to_string(),
                     reason: e.to_string(),
                 })?;
-            
-            file_handle.flush()
-                .map_err(|e| AgeError::AuditLogFailed {
-                    operation: "flush".to_string(),
-                    reason: e.to_string(),
-                })?;
+
+            file_handle.flush().map_err(|e| AgeError::AuditLogFailed {
+                operation: "flush".to_string(),
+                reason: e.to_string(),
+            })?;
         }
 
         Ok(())
@@ -236,15 +287,23 @@ mod tests {
     #[test]
     fn test_security_validator() {
         let validator = SecurityValidator::new(true);
-        
+
         // Test path traversal detection
-        assert!(validator.validate_file_path(Path::new("../etc/passwd")).is_err());
-        
+        assert!(validator
+            .validate_file_path(Path::new("../etc/passwd"))
+            .is_err());
+
         // Test valid path
-        assert!(validator.validate_file_path(Path::new("./test.txt")).is_ok());
-        
+        assert!(validator
+            .validate_file_path(Path::new("./test.txt"))
+            .is_ok());
+
         // Test injection detection
-        assert!(validator.validate_passphrase_security("password$(rm -rf /)").is_err());
-        assert!(validator.validate_passphrase_security("validpassword").is_ok());
+        assert!(validator
+            .validate_passphrase_security("password$(rm -rf /)")
+            .is_err());
+        assert!(validator
+            .validate_passphrase_security("validpassword")
+            .is_ok());
     }
 }

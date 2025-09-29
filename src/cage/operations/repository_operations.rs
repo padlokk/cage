@@ -6,15 +6,15 @@
 //!
 //! Security Guardian: Edgar - Production repository operation framework
 
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::time::Instant;
+use super::file_operations::FileOperationsManager;
+use super::{FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus};
 use crate::cage::adapter::AgeAdapter;
 use crate::cage::config::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::security::{AuditLogger, SecurityValidator};
-use super::{Operation, RepositoryOperations, RepositoryStatus, OperationResult, FileEncryption};
-use super::file_operations::FileOperationsManager;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 /// Repository encryption operation with comprehensive batch processing
 pub struct RepositoryEncryptOperation {
@@ -38,7 +38,7 @@ impl RepositoryEncryptOperation {
         let audit_logger = AuditLogger::new(None)?;
         let validator = SecurityValidator::new(true);
         let file_manager = FileOperationsManager::new(adapter.clone_box())?;
-        
+
         Ok(Self {
             adapter,
             repo_path: repo_path.to_path_buf(),
@@ -49,20 +49,20 @@ impl RepositoryEncryptOperation {
             file_manager,
         })
     }
-    
+
     /// Get all files in repository that can be encrypted
     fn discover_files(&self) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
-        
+
         fn visit_dir(dir: &Path, files: &mut Vec<PathBuf>) -> AgeResult<()> {
             let entries = fs::read_dir(dir)
                 .map_err(|e| AgeError::file_error("read_dir", dir.to_path_buf(), e))?;
-            
+
             for entry in entries {
-                let entry = entry
-                    .map_err(|e| AgeError::file_error("read_entry", dir.to_path_buf(), e))?;
+                let entry =
+                    entry.map_err(|e| AgeError::file_error("read_entry", dir.to_path_buf(), e))?;
                 let path = entry.path();
-                
+
                 if path.is_file() {
                     // Skip already encrypted files
                     if let Some(ext) = path.extension() {
@@ -75,10 +75,11 @@ impl RepositoryEncryptOperation {
                     // Skip hidden directories and common non-data directories
                     if let Some(name) = path.file_name() {
                         let name_str = name.to_string_lossy();
-                        if name_str.starts_with('.') || 
-                           name_str == "target" || 
-                           name_str == "node_modules" ||
-                           name_str == ".git" {
+                        if name_str.starts_with('.')
+                            || name_str == "target"
+                            || name_str == "node_modules"
+                            || name_str == ".git"
+                        {
                             continue;
                         }
                     }
@@ -87,7 +88,7 @@ impl RepositoryEncryptOperation {
             }
             Ok(())
         }
-        
+
         visit_dir(&self.repo_path, &mut files)?;
         Ok(files)
     }
@@ -97,68 +98,97 @@ impl Operation for RepositoryEncryptOperation {
     fn operation_name(&self) -> &'static str {
         "repository_encrypt"
     }
-    
+
     fn validate_preconditions(&self) -> AgeResult<()> {
         // Validate repository path exists and is directory
         if !self.repo_path.exists() {
-            return Err(AgeError::file_error("read", self.repo_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Repository path not found")));
+            return Err(AgeError::file_error(
+                "read",
+                self.repo_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Repository path not found"),
+            ));
         }
-        
+
         if !self.repo_path.is_dir() {
-            return Err(AgeError::file_error("read", self.repo_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Repository path is not a directory")));
+            return Err(AgeError::file_error(
+                "read",
+                self.repo_path.clone(),
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Repository path is not a directory",
+                ),
+            ));
         }
-        
+
         // Validate repository path security
         self.validator.validate_file_path(&self.repo_path)?;
-        
+
         // Validate passphrase security
-        self.validator.validate_passphrase_security(&self.passphrase)?;
-        
+        self.validator
+            .validate_passphrase_security(&self.passphrase)?;
+
         // Validate adapter health
         self.adapter.health_check()?;
-        
-        self.audit_logger.log_info(&format!("Repository encryption preconditions validated: {}", self.repo_path.display()))?;
+
+        self.audit_logger.log_info(&format!(
+            "Repository encryption preconditions validated: {}",
+            self.repo_path.display()
+        ))?;
         Ok(())
     }
-    
+
     fn execute(&self) -> AgeResult<()> {
         let start_time = Instant::now();
-        self.audit_logger.log_info(&format!("Starting repository encryption: {}", self.repo_path.display()))?;
-        
+        self.audit_logger.log_info(&format!(
+            "Starting repository encryption: {}",
+            self.repo_path.display()
+        ))?;
+
         // Discover files to encrypt
         let files = self.discover_files()?;
-        self.audit_logger.log_info(&format!("Discovered {} files for encryption", files.len()))?;
-        
+        self.audit_logger
+            .log_info(&format!("Discovered {} files for encryption", files.len()))?;
+
         let mut processed = 0;
         let mut failed = 0;
-        
+
         for file_path in files {
-            let output_path = file_path.with_extension(
-                format!("{}.age", file_path.extension().unwrap_or_default().to_string_lossy())
-            );
-            
-            match self.file_manager.encrypt_file(&file_path, &output_path, &self.passphrase, self.format) {
+            let output_path = file_path.with_extension(format!(
+                "{}.age",
+                file_path.extension().unwrap_or_default().to_string_lossy()
+            ));
+
+            match self.file_manager.encrypt_file(
+                &file_path,
+                &output_path,
+                &self.passphrase,
+                self.format,
+            ) {
                 Ok(_) => {
                     processed += 1;
-                    self.audit_logger.log_info(&format!("Encrypted: {} -> {}", 
-                        file_path.display(), output_path.display()))?;
+                    self.audit_logger.log_info(&format!(
+                        "Encrypted: {} -> {}",
+                        file_path.display(),
+                        output_path.display()
+                    ))?;
                 }
                 Err(e) => {
                     failed += 1;
-                    self.audit_logger.log_error(&format!("Failed to encrypt {}: {}", 
-                        file_path.display(), e))?;
+                    self.audit_logger.log_error(&format!(
+                        "Failed to encrypt {}: {}",
+                        file_path.display(),
+                        e
+                    ))?;
                 }
             }
         }
-        
+
         let duration = start_time.elapsed();
         self.audit_logger.log_info(&format!(
             "Repository encryption completed: {} processed, {} failed, duration: {:?}",
             processed, failed, duration
         ))?;
-        
+
         if failed > 0 {
             return Err(AgeError::RepositoryOperationFailed {
                 operation: "encrypt".to_string(),
@@ -166,26 +196,30 @@ impl Operation for RepositoryEncryptOperation {
                 reason: format!("Processed: {}, Failed: {}", processed, failed),
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn validate_postconditions(&self) -> AgeResult<()> {
         // Verify that encrypted files were created
         let files = self.discover_files()?;
         let mut encrypted_count = 0;
-        
+
         for file_path in files {
-            let output_path = file_path.with_extension(
-                format!("{}.age", file_path.extension().unwrap_or_default().to_string_lossy())
-            );
-            
+            let output_path = file_path.with_extension(format!(
+                "{}.age",
+                file_path.extension().unwrap_or_default().to_string_lossy()
+            ));
+
             if output_path.exists() {
                 encrypted_count += 1;
             }
         }
-        
-        self.audit_logger.log_info(&format!("Repository encryption postconditions: {} encrypted files", encrypted_count))?;
+
+        self.audit_logger.log_info(&format!(
+            "Repository encryption postconditions: {} encrypted files",
+            encrypted_count
+        ))?;
         Ok(())
     }
 }
@@ -210,7 +244,7 @@ impl RepositoryDecryptOperation {
         let audit_logger = AuditLogger::new(None)?;
         let validator = SecurityValidator::new(true);
         let file_manager = FileOperationsManager::new(adapter.clone_box())?;
-        
+
         Ok(Self {
             adapter,
             repo_path: repo_path.to_path_buf(),
@@ -220,20 +254,20 @@ impl RepositoryDecryptOperation {
             file_manager,
         })
     }
-    
+
     /// Get all encrypted files in repository
     fn discover_encrypted_files(&self) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
-        
+
         fn visit_dir(dir: &Path, files: &mut Vec<PathBuf>) -> AgeResult<()> {
             let entries = fs::read_dir(dir)
                 .map_err(|e| AgeError::file_error("read_dir", dir.to_path_buf(), e))?;
-            
+
             for entry in entries {
-                let entry = entry
-                    .map_err(|e| AgeError::file_error("read_entry", dir.to_path_buf(), e))?;
+                let entry =
+                    entry.map_err(|e| AgeError::file_error("read_entry", dir.to_path_buf(), e))?;
                 let path = entry.path();
-                
+
                 if path.is_file() {
                     // Check if file is encrypted
                     if let Some(ext) = path.extension() {
@@ -253,7 +287,7 @@ impl RepositoryDecryptOperation {
             }
             Ok(())
         }
-        
+
         visit_dir(&self.repo_path, &mut files)?;
         Ok(files)
     }
@@ -263,67 +297,95 @@ impl Operation for RepositoryDecryptOperation {
     fn operation_name(&self) -> &'static str {
         "repository_decrypt"
     }
-    
+
     fn validate_preconditions(&self) -> AgeResult<()> {
         // Validate repository path exists and is directory
         if !self.repo_path.exists() {
-            return Err(AgeError::file_error("read", self.repo_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Repository path not found")));
+            return Err(AgeError::file_error(
+                "read",
+                self.repo_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Repository path not found"),
+            ));
         }
-        
+
         if !self.repo_path.is_dir() {
-            return Err(AgeError::file_error("read", self.repo_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Repository path is not a directory")));
+            return Err(AgeError::file_error(
+                "read",
+                self.repo_path.clone(),
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Repository path is not a directory",
+                ),
+            ));
         }
-        
+
         // Validate repository path security
         self.validator.validate_file_path(&self.repo_path)?;
-        
+
         // Validate passphrase security
-        self.validator.validate_passphrase_security(&self.passphrase)?;
-        
+        self.validator
+            .validate_passphrase_security(&self.passphrase)?;
+
         // Validate adapter health
         self.adapter.health_check()?;
-        
-        self.audit_logger.log_info(&format!("Repository decryption preconditions validated: {}", self.repo_path.display()))?;
+
+        self.audit_logger.log_info(&format!(
+            "Repository decryption preconditions validated: {}",
+            self.repo_path.display()
+        ))?;
         Ok(())
     }
-    
+
     fn execute(&self) -> AgeResult<()> {
         let start_time = Instant::now();
-        self.audit_logger.log_info(&format!("Starting repository decryption: {}", self.repo_path.display()))?;
-        
+        self.audit_logger.log_info(&format!(
+            "Starting repository decryption: {}",
+            self.repo_path.display()
+        ))?;
+
         // Discover encrypted files to decrypt
         let files = self.discover_encrypted_files()?;
-        self.audit_logger.log_info(&format!("Discovered {} encrypted files for decryption", files.len()))?;
-        
+        self.audit_logger.log_info(&format!(
+            "Discovered {} encrypted files for decryption",
+            files.len()
+        ))?;
+
         let mut processed = 0;
         let mut failed = 0;
-        
+
         for file_path in files {
             // Remove .age extension for output
             let output_path = file_path.with_extension("");
-            
-            match self.file_manager.decrypt_file(&file_path, &output_path, &self.passphrase) {
+
+            match self
+                .file_manager
+                .decrypt_file(&file_path, &output_path, &self.passphrase)
+            {
                 Ok(_) => {
                     processed += 1;
-                    self.audit_logger.log_info(&format!("Decrypted: {} -> {}", 
-                        file_path.display(), output_path.display()))?;
+                    self.audit_logger.log_info(&format!(
+                        "Decrypted: {} -> {}",
+                        file_path.display(),
+                        output_path.display()
+                    ))?;
                 }
                 Err(e) => {
                     failed += 1;
-                    self.audit_logger.log_error(&format!("Failed to decrypt {}: {}", 
-                        file_path.display(), e))?;
+                    self.audit_logger.log_error(&format!(
+                        "Failed to decrypt {}: {}",
+                        file_path.display(),
+                        e
+                    ))?;
                 }
             }
         }
-        
+
         let duration = start_time.elapsed();
         self.audit_logger.log_info(&format!(
             "Repository decryption completed: {} processed, {} failed, duration: {:?}",
             processed, failed, duration
         ))?;
-        
+
         if failed > 0 {
             return Err(AgeError::RepositoryOperationFailed {
                 operation: "decrypt".to_string(),
@@ -331,24 +393,27 @@ impl Operation for RepositoryDecryptOperation {
                 reason: format!("Processed: {}, Failed: {}", processed, failed),
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn validate_postconditions(&self) -> AgeResult<()> {
         // Verify that decrypted files were created
         let files = self.discover_encrypted_files()?;
         let mut decrypted_count = 0;
-        
+
         for file_path in files {
             let output_path = file_path.with_extension("");
-            
+
             if output_path.exists() {
                 decrypted_count += 1;
             }
         }
-        
-        self.audit_logger.log_info(&format!("Repository decryption postconditions: {} decrypted files", decrypted_count))?;
+
+        self.audit_logger.log_info(&format!(
+            "Repository decryption postconditions: {} decrypted files",
+            decrypted_count
+        ))?;
         Ok(())
     }
 }
@@ -368,7 +433,7 @@ impl RepositoryOperationsManager {
         let audit_logger = AuditLogger::new(None)?;
         let validator = SecurityValidator::new(true);
         let file_manager = FileOperationsManager::new(adapter.clone_box())?;
-        
+
         Ok(Self {
             adapter,
             audit_logger,
@@ -376,89 +441,118 @@ impl RepositoryOperationsManager {
             file_manager,
         })
     }
-    
+
     /// Perform repository encryption with full operation framework
-    pub fn encrypt_with_validation(&self, repo_path: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<OperationResult> {
+    pub fn encrypt_with_validation(
+        &self,
+        repo_path: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
         let mut result = OperationResult::new();
-        
+
         let operation = RepositoryEncryptOperation::new(
             self.adapter.clone_box(),
             repo_path,
             passphrase,
             format,
         )?;
-        
+
         match operation.perform() {
             Ok(_) => {
                 result.add_success(repo_path.to_string_lossy().to_string());
-                self.audit_logger.log_info(&format!("Repository encryption completed: {}", repo_path.display()))?;
+                self.audit_logger.log_info(&format!(
+                    "Repository encryption completed: {}",
+                    repo_path.display()
+                ))?;
             }
             Err(e) => {
                 result.add_failure(repo_path.to_string_lossy().to_string());
-                self.audit_logger.log_error(&format!("Repository encryption failed: {} - {}", repo_path.display(), e))?;
+                self.audit_logger.log_error(&format!(
+                    "Repository encryption failed: {} - {}",
+                    repo_path.display(),
+                    e
+                ))?;
                 return Err(e);
             }
         }
-        
+
         result.finalize(start_time);
         Ok(result)
     }
-    
+
     /// Perform repository decryption with full operation framework
-    pub fn decrypt_with_validation(&self, repo_path: &Path, passphrase: &str) -> AgeResult<OperationResult> {
+    pub fn decrypt_with_validation(
+        &self,
+        repo_path: &Path,
+        passphrase: &str,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
         let mut result = OperationResult::new();
-        
-        let operation = RepositoryDecryptOperation::new(
-            self.adapter.clone_box(),
-            repo_path,
-            passphrase,
-        )?;
-        
+
+        let operation =
+            RepositoryDecryptOperation::new(self.adapter.clone_box(), repo_path, passphrase)?;
+
         match operation.perform() {
             Ok(_) => {
                 result.add_success(repo_path.to_string_lossy().to_string());
-                self.audit_logger.log_info(&format!("Repository decryption completed: {}", repo_path.display()))?;
+                self.audit_logger.log_info(&format!(
+                    "Repository decryption completed: {}",
+                    repo_path.display()
+                ))?;
             }
             Err(e) => {
                 result.add_failure(repo_path.to_string_lossy().to_string());
-                self.audit_logger.log_error(&format!("Repository decryption failed: {} - {}", repo_path.display(), e))?;
+                self.audit_logger.log_error(&format!(
+                    "Repository decryption failed: {} - {}",
+                    repo_path.display(),
+                    e
+                ))?;
                 return Err(e);
             }
         }
-        
+
         result.finalize(start_time);
         Ok(result)
     }
 }
 
 impl RepositoryOperations for RepositoryOperationsManager {
-    fn encrypt_repository(&self, repo_path: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+    fn encrypt_repository(
+        &self,
+        repo_path: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
         self.encrypt_with_validation(repo_path, passphrase, format)?;
         Ok(())
     }
-    
+
     fn decrypt_repository(&self, repo_path: &Path, passphrase: &str) -> AgeResult<()> {
         self.decrypt_with_validation(repo_path, passphrase)?;
         Ok(())
     }
-    
+
     fn repository_status(&self, repo_path: &Path) -> AgeResult<RepositoryStatus> {
         let mut status = RepositoryStatus::new();
-        
-        fn count_files(dir: &Path, status: &mut RepositoryStatus, file_manager: &FileOperationsManager) -> AgeResult<()> {
+
+        fn count_files(
+            dir: &Path,
+            status: &mut RepositoryStatus,
+            file_manager: &FileOperationsManager,
+        ) -> AgeResult<()> {
             let entries = fs::read_dir(dir)
                 .map_err(|e| AgeError::file_error("read_dir", dir.to_path_buf(), e))?;
-            
+
             for entry in entries {
-                let entry = entry
-                    .map_err(|e| AgeError::file_error("read_entry", dir.to_path_buf(), e))?;
+                let entry =
+                    entry.map_err(|e| AgeError::file_error("read_entry", dir.to_path_buf(), e))?;
                 let path = entry.path();
-                
+
                 if path.is_file() {
                     status.total_files += 1;
-                    
+
                     match file_manager.is_encrypted_file(&path) {
                         Ok(true) => status.encrypted_files += 1,
                         Ok(false) => status.unencrypted_files += 1,
@@ -468,9 +562,10 @@ impl RepositoryOperations for RepositoryOperationsManager {
                     // Skip hidden directories
                     if let Some(name) = path.file_name() {
                         let name_str = name.to_string_lossy();
-                        if !name_str.starts_with('.') && 
-                           name_str != "target" && 
-                           name_str != "node_modules" {
+                        if !name_str.starts_with('.')
+                            && name_str != "target"
+                            && name_str != "node_modules"
+                        {
                             count_files(&path, status, file_manager)?;
                         }
                     }
@@ -478,7 +573,7 @@ impl RepositoryOperations for RepositoryOperationsManager {
             }
             Ok(())
         }
-        
+
         count_files(repo_path, &mut status, &self.file_manager)?;
         Ok(status)
     }

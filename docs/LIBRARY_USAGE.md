@@ -98,6 +98,48 @@ let legacy_options = LockOptions {
 let result = crud_manager.lock(&std::path::Path::new("legacy.txt"), "pass", legacy_options)?;
 ```
 
+### 2. Streaming Encryption/Decryption
+
+`ShellAdapterV2` backs both file and stream operations. Streaming currently
+supports:
+
+- Passphrase-based encrypt/decrypt (`Identity::Passphrase`).
+- Identity-file decrypt (`Identity::IdentityFile` or `Identity::SshKey`).
+- Public-key encryption via recipient lists (`Recipient::PublicKey`,
+  `Recipient::MultipleKeys`, `Recipient::RecipientsFile`, `Recipient::SshRecipients`).
+
+```rust
+use cage::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+use cage::cage::requests::{Identity, Recipient};
+use cage::cage::config::OutputFormat;
+
+let adapter = ShellAdapterV2::new()?;
+
+// Stream encrypt to recipients
+let mut plaintext = std::io::Cursor::new(b"stream me".to_vec());
+let mut ciphertext = Vec::new();
+adapter.encrypt_stream(
+    &mut plaintext,
+    &mut ciphertext,
+    &Identity::Passphrase("unused".into()),
+    Some(&[Recipient::PublicKey("age1...".into())]),
+    OutputFormat::Binary,
+)?;
+
+// Stream decrypt with identity file
+let mut cipher_cursor = std::io::Cursor::new(ciphertext);
+let mut recovered = Vec::new();
+adapter.decrypt_stream(
+    &mut cipher_cursor,
+    &mut recovered,
+    &Identity::IdentityFile(std::path::PathBuf::from("~/.config/age/keys.txt")),
+)?;
+```
+
+> **Note:** SSH identity/recipient support now works for passphrase and stream
+> flows where compatible. Remaining roadmap items cover self-recipient and
+> derived-key scenarios.
+
 ### 2. Progress Framework
 
 Professional progress indicators with multiple styles and terminal features.

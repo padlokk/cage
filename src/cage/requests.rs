@@ -3,8 +3,8 @@
 //! This module provides typed request structs to unify CLI and library entry points,
 //! enabling a clean API for all encryption operations while maintaining backward compatibility.
 
+use crate::cage::config::{AgeConfig, OutputFormat};
 use std::path::PathBuf;
-use crate::cage::config::{OutputFormat, AgeConfig};
 
 // ============================================================================
 // COMMON REQUEST OPTIONS
@@ -490,7 +490,7 @@ mod tests {
     fn test_lock_request_builder() {
         let request = LockRequest::new(
             PathBuf::from("/test/file.txt"),
-            Identity::Passphrase("test123".to_string())
+            Identity::Passphrase("test123".to_string()),
         )
         .recursive(true)
         .with_pattern("*.txt".to_string())
@@ -503,12 +503,10 @@ mod tests {
 
     #[test]
     fn test_unlock_request_builder() {
-        let request = UnlockRequest::new(
-            PathBuf::from("/test/file.cage"),
-            Identity::PromptPassphrase
-        )
-        .selective(true)
-        .preserve_encrypted(true);
+        let request =
+            UnlockRequest::new(PathBuf::from("/test/file.cage"), Identity::PromptPassphrase)
+                .selective(true)
+                .preserve_encrypted(true);
 
         assert!(request.selective);
         assert!(request.preserve_encrypted);

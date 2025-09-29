@@ -6,24 +6,22 @@
 //!
 //! Security Guardian: Edgar - Production CRUD coordination with authority integration
 
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
-use std::collections::{HashMap, HashSet};
 
-use rsb::visual::glyphs::glyph_enable;
-use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::strings::{fmt_warning, fmt_deleted, fmt_preserved, fmt_error};
-use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::adapter::AgeAdapter;
-use crate::cage::requests::{LockRequest, UnlockRequest, VerifyRequest, Identity};
+use crate::cage::config::{AgeConfig, OutputFormat};
+use crate::cage::error::{AgeError, AgeResult};
+use crate::cage::operations::{OperationResult, RepositoryStatus};
+use crate::cage::requests::{Identity, LockRequest, UnlockRequest, VerifyRequest};
+use crate::cage::security::AuditLogger;
+use crate::cage::strings::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
 use crate::cage::tty_automation::TtyAutomator;
-use crate::cage::security::AuditLogger;
-use crate::cage::operations::{
-    RepositoryStatus, OperationResult
-};
 use globset::{Glob, GlobMatcher};
+use rsb::visual::glyphs::glyph_enable;
 
 /// Options for lock operations
 #[derive(Debug, Clone)]
@@ -210,8 +208,11 @@ impl BackupManager {
     /// Create backup of a file
     pub fn create_backup(&self, file_path: &Path) -> AgeResult<BackupInfo> {
         if !file_path.exists() {
-            return Err(AgeError::file_error("backup", file_path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found")));
+            return Err(AgeError::file_error(
+                "backup",
+                file_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"),
+            ));
         }
 
         let backup_path = self.generate_backup_path(file_path)?;
@@ -219,15 +220,17 @@ impl BackupManager {
         // Handle backup conflicts
         if backup_path.exists() {
             let conflict_path = self.generate_conflict_path(&backup_path)?;
-            std::fs::rename(&backup_path, &conflict_path)
-                .map_err(|e| AgeError::file_error("move_existing_backup", backup_path.clone(), e))?;
+            std::fs::rename(&backup_path, &conflict_path).map_err(|e| {
+                AgeError::file_error("move_existing_backup", backup_path.clone(), e)
+            })?;
         }
 
         // Create backup directory if needed
         if let Some(parent) = backup_path.parent() {
             if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| AgeError::file_error("create_backup_dir", parent.to_path_buf(), e))?;
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    AgeError::file_error("create_backup_dir", parent.to_path_buf(), e)
+                })?;
             }
         }
 
@@ -239,21 +242,23 @@ impl BackupManager {
             original_path: file_path.to_path_buf(),
             backup_path,
             created_at: std::time::SystemTime::now(),
-            size_bytes: std::fs::metadata(file_path)
-                .map(|m| m.len())
-                .unwrap_or(0),
+            size_bytes: std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0),
         })
     }
 
     /// Restore from backup
     pub fn restore_backup(&self, backup_info: &BackupInfo) -> AgeResult<()> {
         if !backup_info.backup_path.exists() {
-            return Err(AgeError::file_error("restore", backup_info.backup_path.clone(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Backup file not found")));
+            return Err(AgeError::file_error(
+                "restore",
+                backup_info.backup_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Backup file not found"),
+            ));
         }
 
-        std::fs::copy(&backup_info.backup_path, &backup_info.original_path)
-            .map_err(|e| AgeError::file_error("restore_backup", backup_info.original_path.clone(), e))?;
+        std::fs::copy(&backup_info.backup_path, &backup_info.original_path).map_err(|e| {
+            AgeError::file_error("restore_backup", backup_info.original_path.clone(), e)
+        })?;
 
         Ok(())
     }
@@ -261,24 +266,30 @@ impl BackupManager {
     /// Clean up backup file
     pub fn cleanup_backup(&self, backup_info: &BackupInfo) -> AgeResult<()> {
         if backup_info.backup_path.exists() {
-            std::fs::remove_file(&backup_info.backup_path)
-                .map_err(|e| AgeError::file_error("cleanup_backup", backup_info.backup_path.clone(), e))?;
+            std::fs::remove_file(&backup_info.backup_path).map_err(|e| {
+                AgeError::file_error("cleanup_backup", backup_info.backup_path.clone(), e)
+            })?;
         }
         Ok(())
     }
 
     /// Generate backup path for a file
     fn generate_backup_path(&self, file_path: &Path) -> AgeResult<PathBuf> {
-        let file_name = file_path.file_name()
-            .ok_or_else(|| AgeError::file_error("get_filename", file_path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename")))?;
+        let file_name = file_path.file_name().ok_or_else(|| {
+            AgeError::file_error(
+                "get_filename",
+                file_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename"),
+            )
+        })?;
 
         let backup_filename = format!("{}{}", file_name.to_string_lossy(), self.backup_extension);
 
         let backup_path = if let Some(ref backup_dir) = self.backup_dir {
             backup_dir.join(backup_filename)
         } else {
-            file_path.parent()
+            file_path
+                .parent()
                 .unwrap_or_else(|| Path::new("."))
                 .join(backup_filename)
         };
@@ -309,10 +320,7 @@ pub struct BackupInfo {
 
 impl BackupInfo {
     pub fn age_seconds(&self) -> u64 {
-        self.created_at
-            .elapsed()
-            .unwrap_or_default()
-            .as_secs()
+        self.created_at.elapsed().unwrap_or_default().as_secs()
     }
 }
 
@@ -329,7 +337,11 @@ pub struct FileVerificationStatus {
 
 impl FileVerificationStatus {
     pub fn is_valid(&self) -> bool {
-        self.is_encrypted && self.format_valid && self.header_valid && self.size_check && self.error_message.is_none()
+        self.is_encrypted
+            && self.format_valid
+            && self.header_valid
+            && self.size_check
+            && self.error_message.is_none()
     }
 }
 
@@ -368,10 +380,7 @@ pub struct OperationRecord {
 
 impl CrudManager {
     /// Create new CrudManager with specified adapter and configuration
-    pub fn new(
-        adapter: Box<dyn AgeAdapter>,
-        config: AgeConfig,
-    ) -> AgeResult<Self> {
+    pub fn new(adapter: Box<dyn AgeAdapter>, config: AgeConfig) -> AgeResult<Self> {
         // Enable RSB glyphs for visual output
         glyph_enable();
 
@@ -455,12 +464,18 @@ impl CrudManager {
     }
 
     /// Verify operation using request struct (CAGE-11)
-    pub fn verify_with_request(&mut self, request: &VerifyRequest) -> AgeResult<VerificationResult> {
+    pub fn verify_with_request(
+        &mut self,
+        request: &VerifyRequest,
+    ) -> AgeResult<VerificationResult> {
         // Current verify method doesn't support passphrase parameter
         // TODO: Extend verify to support deep verification with passphrase
         if request.deep_verify && request.identity.is_some() {
             // For now, just warn that deep verify is not yet implemented
-            eprintln!("{}", fmt_warning("Deep verification with passphrase not yet implemented"));
+            eprintln!(
+                "{}",
+                fmt_warning("Deep verification with passphrase not yet implemented")
+            );
         }
 
         self.verify(&request.target)
@@ -471,16 +486,24 @@ impl CrudManager {
     // ========================================================================================
 
     /// CREATE: Lock (encrypt) files or repositories
-    pub fn lock(&mut self, path: &Path, passphrase: &str, options: LockOptions) -> AgeResult<OperationResult> {
+    pub fn lock(
+        &mut self,
+        path: &Path,
+        passphrase: &str,
+        options: LockOptions,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
         self.audit_logger.log_operation_start_single("lock", path)?;
-        
+
         let mut result = OperationResult::new();
-        
+
         // Validate preconditions
         if !path.exists() {
-            return Err(AgeError::file_error("read", path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found")));
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
         }
 
         // Validate passphrase
@@ -503,18 +526,23 @@ impl CrudManager {
         // Record operation
         self.record_operation("lock", path, true, &result);
         result.finalize(start_time);
-        
-        self.audit_logger.log_operation_complete("lock", path, &result)?;
+
+        self.audit_logger
+            .log_operation_complete("lock", path, &result)?;
         Ok(result)
     }
 
     /// READ: Status - Check encryption status and repository state
     pub fn status(&self, path: &Path) -> AgeResult<RepositoryStatus> {
-        self.audit_logger.log_operation_start_single("status", path)?;
-        
+        self.audit_logger
+            .log_operation_start_single("status", path)?;
+
         if !path.exists() {
-            return Err(AgeError::file_error("read", path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found")));
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
         }
 
         let status = if path.is_file() {
@@ -528,9 +556,15 @@ impl CrudManager {
     }
 
     /// UPDATE: Rotate - Key rotation while maintaining access
-    pub fn rotate(&mut self, repository: &Path, old_passphrase: &str, new_passphrase: &str) -> AgeResult<OperationResult> {
+    pub fn rotate(
+        &mut self,
+        repository: &Path,
+        old_passphrase: &str,
+        new_passphrase: &str,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
-        self.audit_logger.log_operation_start_single("rotate", repository)?;
+        self.audit_logger
+            .log_operation_start_single("rotate", repository)?;
 
         let mut result = OperationResult::new();
 
@@ -562,7 +596,10 @@ impl CrudManager {
             });
         }
 
-        self.audit_logger.log_info(&format!("Starting key rotation for {} encrypted files", status.encrypted_files))?;
+        self.audit_logger.log_info(&format!(
+            "Starting key rotation for {} encrypted files",
+            status.encrypted_files
+        ))?;
 
         // Collect all encrypted files for rotation
         let mut encrypted_files = Vec::new();
@@ -586,12 +623,17 @@ impl CrudManager {
                 Ok(_) => {
                     successful_rotations += 1;
                     result.add_success(file_path.to_string_lossy().to_string());
-                    self.audit_logger.log_info(&format!("Rotated key for: {}", file_path.display()))?;
+                    self.audit_logger
+                        .log_info(&format!("Rotated key for: {}", file_path.display()))?;
                 }
                 Err(e) => {
                     failed_rotations.push(format!("{}: {}", file_path.display(), e));
                     result.add_failure(file_path.to_string_lossy().to_string());
-                    self.audit_logger.log_error(&format!("Failed to rotate key for {}: {}", file_path.display(), e))?;
+                    self.audit_logger.log_error(&format!(
+                        "Failed to rotate key for {}: {}",
+                        file_path.display(),
+                        e
+                    ))?;
                 }
             }
         }
@@ -602,14 +644,21 @@ impl CrudManager {
             std::fs::remove_dir_all(&backup_dir)
                 .map_err(|e| AgeError::file_error("cleanup_backup", backup_dir, e))?;
 
-            self.audit_logger.log_info(&format!("Key rotation completed successfully for {} files", successful_rotations))?;
+            self.audit_logger.log_info(&format!(
+                "Key rotation completed successfully for {} files",
+                successful_rotations
+            ))?;
         } else {
             // Partial failure - rollback successful rotations
-            self.audit_logger.log_error(&format!("Key rotation failed for {} files, rolling back {} successful rotations",
-                failed_rotations.len(), successful_rotations))?;
+            self.audit_logger.log_error(&format!(
+                "Key rotation failed for {} files, rolling back {} successful rotations",
+                failed_rotations.len(),
+                successful_rotations
+            ))?;
 
             if let Err(rollback_err) = self.rollback_rotation(&encrypted_files, &backup_dir) {
-                self.audit_logger.log_error(&format!("CRITICAL: Rollback failed: {}", rollback_err))?;
+                self.audit_logger
+                    .log_error(&format!("CRITICAL: Rollback failed: {}", rollback_err))?;
                 return Err(AgeError::RepositoryOperationFailed {
                     operation: "rotate_rollback".to_string(),
                     repository: repository.to_path_buf(),
@@ -628,7 +677,8 @@ impl CrudManager {
         self.record_operation("rotate", repository, true, &result);
         result.finalize(start_time);
 
-        self.audit_logger.log_operation_complete("rotate", repository, &result)?;
+        self.audit_logger
+            .log_operation_complete("rotate", repository, &result)?;
         Ok(result)
     }
 
@@ -638,7 +688,8 @@ impl CrudManager {
             .map_err(|e| AgeError::file_error("read_dir", directory.to_path_buf(), e))?;
 
         for entry in entries {
-            let entry = entry.map_err(|e| AgeError::file_error("read_entry", directory.to_path_buf(), e))?;
+            let entry = entry
+                .map_err(|e| AgeError::file_error("read_entry", directory.to_path_buf(), e))?;
             let path = entry.path();
 
             if path.is_file() {
@@ -661,12 +712,12 @@ impl CrudManager {
             return Ok(false);
         }
 
-        let content = std::fs::read(path)
-            .map_err(|e| AgeError::file_error("read", path.to_path_buf(), e))?;
+        let content =
+            std::fs::read(path).map_err(|e| AgeError::file_error("read", path.to_path_buf(), e))?;
 
         // Check for Age headers
-        Ok(content.starts_with(b"age-encryption.org/v1") ||
-           content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----"))
+        Ok(content.starts_with(b"age-encryption.org/v1")
+            || content.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----"))
     }
 
     /// Rotate key for a single file with backup
@@ -678,19 +729,25 @@ impl CrudManager {
         backup_dir: &Path,
     ) -> AgeResult<()> {
         // Create backup of original file
-        let file_name = file_path.file_name()
-            .ok_or_else(|| AgeError::file_error("get_filename", file_path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename")))?;
+        let file_name = file_path.file_name().ok_or_else(|| {
+            AgeError::file_error(
+                "get_filename",
+                file_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename"),
+            )
+        })?;
 
         let backup_path = backup_dir.join(file_name);
         std::fs::copy(file_path, &backup_path)
             .map_err(|e| AgeError::file_error("backup_file", backup_path, e))?;
 
         // Create temporary decrypted file
-        let temp_decrypted = backup_dir.join(format!("{}.tmp_decrypted", file_name.to_string_lossy()));
+        let temp_decrypted =
+            backup_dir.join(format!("{}.tmp_decrypted", file_name.to_string_lossy()));
 
         // Step 1: Decrypt with old passphrase
-        self.adapter.decrypt(file_path, &temp_decrypted, old_passphrase)
+        self.adapter
+            .decrypt(file_path, &temp_decrypted, old_passphrase)
             .map_err(|e| AgeError::DecryptionFailed {
                 input: file_path.to_path_buf(),
                 output: temp_decrypted.clone(),
@@ -698,7 +755,13 @@ impl CrudManager {
             })?;
 
         // Step 2: Re-encrypt with new passphrase
-        self.adapter.encrypt(&temp_decrypted, file_path, new_passphrase, self.config.output_format)
+        self.adapter
+            .encrypt(
+                &temp_decrypted,
+                file_path,
+                new_passphrase,
+                self.config.output_format,
+            )
             .map_err(|e| AgeError::EncryptionFailed {
                 input: temp_decrypted.clone(),
                 output: file_path.to_path_buf(),
@@ -707,7 +770,8 @@ impl CrudManager {
 
         // Step 3: Verify the re-encrypted file can be decrypted
         let temp_verify = backup_dir.join(format!("{}.tmp_verify", file_name.to_string_lossy()));
-        self.adapter.decrypt(file_path, &temp_verify, new_passphrase)
+        self.adapter
+            .decrypt(file_path, &temp_verify, new_passphrase)
             .map_err(|e| AgeError::DecryptionFailed {
                 input: file_path.to_path_buf(),
                 output: temp_verify.clone(),
@@ -737,9 +801,13 @@ impl CrudManager {
     /// Rollback failed rotation by restoring from backups
     fn rollback_rotation(&self, files: &[PathBuf], backup_dir: &Path) -> AgeResult<()> {
         for file_path in files {
-            let file_name = file_path.file_name()
-                .ok_or_else(|| AgeError::file_error("get_filename", file_path.to_path_buf(),
-                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename")))?;
+            let file_name = file_path.file_name().ok_or_else(|| {
+                AgeError::file_error(
+                    "get_filename",
+                    file_path.to_path_buf(),
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename"),
+                )
+            })?;
 
             let backup_path = backup_dir.join(file_name);
             if backup_path.exists() {
@@ -756,16 +824,25 @@ impl CrudManager {
     }
 
     /// DELETE: Unlock (decrypt) files with controlled access
-    pub fn unlock(&mut self, path: &Path, passphrase: &str, options: UnlockOptions) -> AgeResult<OperationResult> {
+    pub fn unlock(
+        &mut self,
+        path: &Path,
+        passphrase: &str,
+        options: UnlockOptions,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
-        self.audit_logger.log_operation_start_single("unlock", path)?;
-        
+        self.audit_logger
+            .log_operation_start_single("unlock", path)?;
+
         let mut result = OperationResult::new();
-        
+
         // Validate preconditions
         if !path.exists() {
-            return Err(AgeError::file_error("read", path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found")));
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
         }
 
         self.validate_passphrase(passphrase)?;
@@ -790,8 +867,9 @@ impl CrudManager {
 
         self.record_operation("unlock", path, true, &result);
         result.finalize(start_time);
-        
-        self.audit_logger.log_operation_complete("unlock", path, &result)?;
+
+        self.audit_logger
+            .log_operation_complete("unlock", path, &result)?;
         Ok(result)
     }
 
@@ -801,8 +879,9 @@ impl CrudManager {
 
     /// ALLOW: Add recipients to authority chain
     pub fn allow(&mut self, recipient: &str) -> AgeResult<AuthorityResult> {
-        self.audit_logger.log_authority_operation("allow", recipient)?;
-        
+        self.audit_logger
+            .log_authority_operation("allow", recipient)?;
+
         // Validate recipient format
         if recipient.is_empty() {
             return Err(AgeError::InvalidOperation {
@@ -823,8 +902,9 @@ impl CrudManager {
 
     /// REVOKE: Remove recipients from authority chain  
     pub fn revoke(&mut self, recipient: &str) -> AgeResult<AuthorityResult> {
-        self.audit_logger.log_authority_operation("revoke", recipient)?;
-        
+        self.audit_logger
+            .log_authority_operation("revoke", recipient)?;
+
         if recipient.is_empty() {
             return Err(AgeError::InvalidOperation {
                 operation: "revoke".to_string(),
@@ -843,8 +923,9 @@ impl CrudManager {
 
     /// RESET: Emergency repository unlock/reset
     pub fn reset(&mut self, repository: &Path, confirmation: &str) -> AgeResult<EmergencyResult> {
-        self.audit_logger.log_emergency_operation("reset", repository)?;
-        
+        self.audit_logger
+            .log_emergency_operation("reset", repository)?;
+
         // Require explicit confirmation for destructive operation
         if confirmation != "CONFIRM_RESET" {
             return Err(AgeError::InvalidOperation {
@@ -880,11 +961,15 @@ impl CrudManager {
 
     /// VERIFY: Integrity checking and validation
     pub fn verify(&self, path: &Path) -> AgeResult<VerificationResult> {
-        self.audit_logger.log_operation_start_single("verify", path)?;
-        
+        self.audit_logger
+            .log_operation_start_single("verify", path)?;
+
         if !path.exists() {
-            return Err(AgeError::file_error("read", path.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found")));
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
         }
 
         let mut verified_files = Vec::new();
@@ -897,9 +982,15 @@ impl CrudManager {
                     if status.is_valid() {
                         verified_files.push(path.display().to_string());
                     } else {
-                        let error_msg = status.error_message.unwrap_or_else(||
-                            format!("Verification failed: encrypted={}, format={}, header={}, size={}",
-                                status.is_encrypted, status.format_valid, status.header_valid, status.size_check));
+                        let error_msg = status.error_message.unwrap_or_else(|| {
+                            format!(
+                                "Verification failed: encrypted={}, format={}, header={}, size={}",
+                                status.is_encrypted,
+                                status.format_valid,
+                                status.header_valid,
+                                status.size_check
+                            )
+                        });
                         failed_files.push(format!("{}: {}", path.display(), error_msg));
                     }
                 }
@@ -919,9 +1010,14 @@ impl CrudManager {
     }
 
     /// EMERGENCY: Fail-safe recovery operations
-    pub fn emergency_unlock(&mut self, repository: &Path, emergency_passphrase: &str) -> AgeResult<EmergencyResult> {
-        self.audit_logger.log_emergency_operation("emergency_unlock", repository)?;
-        
+    pub fn emergency_unlock(
+        &mut self,
+        repository: &Path,
+        emergency_passphrase: &str,
+    ) -> AgeResult<EmergencyResult> {
+        self.audit_logger
+            .log_emergency_operation("emergency_unlock", repository)?;
+
         if !repository.exists() || !repository.is_dir() {
             return Err(AgeError::InvalidOperation {
                 operation: "emergency_unlock".to_string(),
@@ -946,10 +1042,17 @@ impl CrudManager {
     }
 
     /// BATCH: Bulk operations for directories/repositories
-    pub fn batch_process(&mut self, directory: &Path, pattern: Option<&str>, operation: &str, passphrase: &str) -> AgeResult<OperationResult> {
+    pub fn batch_process(
+        &mut self,
+        directory: &Path,
+        pattern: Option<&str>,
+        operation: &str,
+        passphrase: &str,
+    ) -> AgeResult<OperationResult> {
         let start_time = Instant::now();
-        self.audit_logger.log_operation_start_single(&format!("batch_{}", operation), directory)?;
-        
+        self.audit_logger
+            .log_operation_start_single(&format!("batch_{}", operation), directory)?;
+
         if !directory.exists() || !directory.is_dir() {
             return Err(AgeError::InvalidOperation {
                 operation: "batch".to_string(),
@@ -958,20 +1061,30 @@ impl CrudManager {
         }
 
         let mut result = OperationResult::new();
-        
+
         // Collect files matching pattern
         let files = self.collect_files_with_pattern(directory, pattern)?;
-        
+
         // Process files in batches for performance
         for file in files {
             match operation {
                 "lock" => {
-                    if let Err(e) = self.lock_single_file(&file, passphrase, &LockOptions::default(), &mut result) {
+                    if let Err(e) = self.lock_single_file(
+                        &file,
+                        passphrase,
+                        &LockOptions::default(),
+                        &mut result,
+                    ) {
                         result.add_failure(format!("Failed to lock {}: {}", file.display(), e));
                     }
                 }
                 "unlock" => {
-                    if let Err(e) = self.unlock_single_file(&file, passphrase, &UnlockOptions::default(), &mut result) {
+                    if let Err(e) = self.unlock_single_file(
+                        &file,
+                        passphrase,
+                        &UnlockOptions::default(),
+                        &mut result,
+                    ) {
                         result.add_failure(format!("Failed to unlock {}: {}", file.display(), e));
                     }
                 }
@@ -984,10 +1097,19 @@ impl CrudManager {
             }
         }
 
-        self.record_operation(&format!("batch_{}", operation), directory, result.success, &result);
+        self.record_operation(
+            &format!("batch_{}", operation),
+            directory,
+            result.success,
+            &result,
+        );
         result.finalize(start_time);
-        
-        self.audit_logger.log_operation_complete(&format!("batch_{}", operation), directory, &result)?;
+
+        self.audit_logger.log_operation_complete(
+            &format!("batch_{}", operation),
+            directory,
+            &result,
+        )?;
         Ok(result)
     }
 
@@ -1015,7 +1137,13 @@ impl CrudManager {
     }
 
     /// Lock a single file
-    fn lock_single_file(&self, file: &Path, passphrase: &str, options: &LockOptions, result: &mut OperationResult) -> AgeResult<()> {
+    fn lock_single_file(
+        &self,
+        file: &Path,
+        passphrase: &str,
+        options: &LockOptions,
+        result: &mut OperationResult,
+    ) -> AgeResult<()> {
         let output_path = {
             let mut path = file.as_os_str().to_os_string();
             path.push(self.config.extension_with_dot());
@@ -1030,11 +1158,18 @@ impl CrudManager {
             match backup_manager.create_backup(file) {
                 Ok(info) => {
                     backup_info = Some(info);
-                    self.audit_logger.log_info(&format!("Created backup: {} -> {}",
-                        file.display(), backup_info.as_ref().unwrap().backup_path.display()))?;
+                    self.audit_logger.log_info(&format!(
+                        "Created backup: {} -> {}",
+                        file.display(),
+                        backup_info.as_ref().unwrap().backup_path.display()
+                    ))?;
                 }
                 Err(e) => {
-                    self.audit_logger.log_error(&format!("Failed to create backup for {}: {}", file.display(), e))?;
+                    self.audit_logger.log_error(&format!(
+                        "Failed to create backup for {}: {}",
+                        file.display(),
+                        e
+                    ))?;
                     result.add_failure(file.display().to_string());
                     return Err(e);
                 }
@@ -1042,7 +1177,10 @@ impl CrudManager {
         }
 
         // Perform encryption
-        match self.adapter.encrypt(file, &output_path, passphrase, options.format) {
+        match self
+            .adapter
+            .encrypt(file, &output_path, passphrase, options.format)
+        {
             Ok(_) => {
                 result.add_success(file.display().to_string());
 
@@ -1051,11 +1189,16 @@ impl CrudManager {
                     let backup_manager = BackupManager::new();
                     if backup_manager.cleanup_on_success {
                         if let Err(e) = backup_manager.cleanup_backup(&backup) {
-                            self.audit_logger.log_warning(&format!("Failed to cleanup backup {}: {}",
-                                backup.backup_path.display(), e))?;
+                            self.audit_logger.log_warning(&format!(
+                                "Failed to cleanup backup {}: {}",
+                                backup.backup_path.display(),
+                                e
+                            ))?;
                         } else {
-                            self.audit_logger.log_info(&format!("Cleaned up backup: {}",
-                                backup.backup_path.display()))?;
+                            self.audit_logger.log_info(&format!(
+                                "Cleaned up backup: {}",
+                                backup.backup_path.display()
+                            ))?;
                         }
                     }
                 }
@@ -1069,11 +1212,16 @@ impl CrudManager {
                 if let Some(backup) = backup_info {
                     let backup_manager = BackupManager::new();
                     if let Err(restore_err) = backup_manager.restore_backup(&backup) {
-                        self.audit_logger.log_error(&format!("CRITICAL: Failed to restore backup {}: {}",
-                            backup.backup_path.display(), restore_err))?;
+                        self.audit_logger.log_error(&format!(
+                            "CRITICAL: Failed to restore backup {}: {}",
+                            backup.backup_path.display(),
+                            restore_err
+                        ))?;
                     } else {
-                        self.audit_logger.log_info(&format!("Restored from backup: {}",
-                            backup.backup_path.display()))?;
+                        self.audit_logger.log_info(&format!(
+                            "Restored from backup: {}",
+                            backup.backup_path.display()
+                        ))?;
                     }
                 }
 
@@ -1083,13 +1231,23 @@ impl CrudManager {
     }
 
     /// Lock repository (directory)
-    fn lock_repository(&self, repository: &Path, passphrase: &str, options: &LockOptions, result: &mut OperationResult) -> AgeResult<()> {
-        let files = self.collect_files_with_pattern(repository, options.pattern_filter.as_deref())?;
-        
+    fn lock_repository(
+        &self,
+        repository: &Path,
+        passphrase: &str,
+        options: &LockOptions,
+        result: &mut OperationResult,
+    ) -> AgeResult<()> {
+        let files =
+            self.collect_files_with_pattern(repository, options.pattern_filter.as_deref())?;
+
         for file in files {
             if let Err(e) = self.lock_single_file(&file, passphrase, options, result) {
                 // Continue processing other files even if one fails
-                eprintln!("{}", fmt_error(&format!("Failed to lock {}: {}", file.display(), e)));
+                eprintln!(
+                    "{}",
+                    fmt_error(&format!("Failed to lock {}: {}", file.display(), e))
+                );
             }
         }
 
@@ -1097,24 +1255,35 @@ impl CrudManager {
     }
 
     /// Unlock a single file
-    fn unlock_single_file(&self, file: &Path, passphrase: &str, options: &UnlockOptions, result: &mut OperationResult) -> AgeResult<()> {
+    fn unlock_single_file(
+        &self,
+        file: &Path,
+        passphrase: &str,
+        options: &UnlockOptions,
+        result: &mut OperationResult,
+    ) -> AgeResult<()> {
         // Determine output path by stripping only the configured extension suffix
         let output_path = {
-            let file_name_os = file.file_name()
-                .ok_or_else(|| {
-                    result.add_failure(file.display().to_string());
-                    AgeError::InvalidOperation {
-                        operation: "unlock".to_string(),
-                        reason: format!("Cannot extract filename from path: {}", file.display()),
-                    }
-                })?;
+            let file_name_os = file.file_name().ok_or_else(|| {
+                result.add_failure(file.display().to_string());
+                AgeError::InvalidOperation {
+                    operation: "unlock".to_string(),
+                    reason: format!("Cannot extract filename from path: {}", file.display()),
+                }
+            })?;
 
             // Try UTF-8 conversion for standard filename handling
             let file_name = match file_name_os.to_str() {
                 Some(name) => name,
                 None => {
                     result.add_failure(file.display().to_string());
-                    eprintln!("{}", fmt_warning(&format!("Skipping file with non-UTF8 filename: {}", file.display())));
+                    eprintln!(
+                        "{}",
+                        fmt_warning(&format!(
+                            "Skipping file with non-UTF8 filename: {}",
+                            file.display()
+                        ))
+                    );
                     return Err(AgeError::InvalidOperation {
                         operation: "unlock".to_string(),
                         reason: format!("Non-UTF8 filename not supported: {}", file.display()),
@@ -1125,10 +1294,21 @@ impl CrudManager {
             let suffix = self.config.extension_with_dot();
             if !file_name.ends_with(&suffix) {
                 result.add_failure(file.display().to_string());
-                eprintln!("{}", fmt_warning(&format!("Skipping file without {} extension: {}", suffix, file.display())));
+                eprintln!(
+                    "{}",
+                    fmt_warning(&format!(
+                        "Skipping file without {} extension: {}",
+                        suffix,
+                        file.display()
+                    ))
+                );
                 return Err(AgeError::InvalidOperation {
                     operation: "unlock".to_string(),
-                    reason: format!("File does not have {} extension: {}", suffix, file.display()),
+                    reason: format!(
+                        "File does not have {} extension: {}",
+                        suffix,
+                        file.display()
+                    ),
                 });
             }
 
@@ -1142,15 +1322,30 @@ impl CrudManager {
                 Ok(status) => {
                     if !status.is_valid() {
                         result.add_failure(file.display().to_string());
-                        let error_msg = status.error_message.unwrap_or_else(||
-                            "File failed integrity verification".to_string());
+                        let error_msg = status
+                            .error_message
+                            .unwrap_or_else(|| "File failed integrity verification".to_string());
 
                         // In selective mode, skip gracefully; otherwise, error out
                         if options.selective {
-                            eprintln!("{}", fmt_warning(&format!("Skipping {} (selective mode): {}", file.display(), error_msg)));
+                            eprintln!(
+                                "{}",
+                                fmt_warning(&format!(
+                                    "Skipping {} (selective mode): {}",
+                                    file.display(),
+                                    error_msg
+                                ))
+                            );
                             return Ok(());
                         } else {
-                            eprintln!("{}", fmt_warning(&format!("Skipping file that failed verification: {}: {}", file.display(), error_msg)));
+                            eprintln!(
+                                "{}",
+                                fmt_warning(&format!(
+                                    "Skipping file that failed verification: {}: {}",
+                                    file.display(),
+                                    error_msg
+                                ))
+                            );
                             return Err(AgeError::InvalidOperation {
                                 operation: "unlock".to_string(),
                                 reason: format!("File failed verification: {}", error_msg),
@@ -1163,10 +1358,24 @@ impl CrudManager {
 
                     // In selective mode, skip gracefully; otherwise, error out
                     if options.selective {
-                        eprintln!("{}", fmt_warning(&format!("Skipping {} (selective mode): verification failed: {}", file.display(), e)));
+                        eprintln!(
+                            "{}",
+                            fmt_warning(&format!(
+                                "Skipping {} (selective mode): verification failed: {}",
+                                file.display(),
+                                e
+                            ))
+                        );
                         return Ok(());
                     } else {
-                        eprintln!("{}", fmt_warning(&format!("Skipping file that failed verification: {}: {}", file.display(), e)));
+                        eprintln!(
+                            "{}",
+                            fmt_warning(&format!(
+                                "Skipping file that failed verification: {}: {}",
+                                file.display(),
+                                e
+                            ))
+                        );
                         return Err(AgeError::InvalidOperation {
                             operation: "unlock".to_string(),
                             reason: format!("File failed verification: {}", e),
@@ -1184,7 +1393,14 @@ impl CrudManager {
                 if !options.preserve_encrypted {
                     // Delete the encrypted file after successful unlock
                     if let Err(e) = std::fs::remove_file(file) {
-                        eprintln!("{}", fmt_warning(&format!("Failed to delete encrypted file {}: {}", file.display(), e)));
+                        eprintln!(
+                            "{}",
+                            fmt_warning(&format!(
+                                "Failed to delete encrypted file {}: {}",
+                                file.display(),
+                                e
+                            ))
+                        );
                         // Don't fail the operation if we can't delete the encrypted file
                     } else {
                         eprintln!("{}", fmt_deleted(&file.display().to_string()));
@@ -1203,12 +1419,22 @@ impl CrudManager {
     }
 
     /// Unlock repository (directory)
-    fn unlock_repository(&self, repository: &Path, passphrase: &str, options: &UnlockOptions, result: &mut OperationResult) -> AgeResult<()> {
-        let files = self.collect_encrypted_files_with_pattern(repository, options.pattern_filter.as_deref())?;
-        
+    fn unlock_repository(
+        &self,
+        repository: &Path,
+        passphrase: &str,
+        options: &UnlockOptions,
+        result: &mut OperationResult,
+    ) -> AgeResult<()> {
+        let files = self
+            .collect_encrypted_files_with_pattern(repository, options.pattern_filter.as_deref())?;
+
         for file in files {
             if let Err(e) = self.unlock_single_file(&file, passphrase, options, result) {
-                eprintln!("{}", fmt_error(&format!("Failed to unlock {}: {}", file.display(), e)));
+                eprintln!(
+                    "{}",
+                    fmt_error(&format!("Failed to unlock {}: {}", file.display(), e))
+                );
             }
         }
 
@@ -1256,13 +1482,19 @@ impl CrudManager {
     fn verify_file_integrity(&self, file: &Path) -> AgeResult<FileVerificationStatus> {
         // Check if file exists and is readable
         if !file.exists() {
-            return Err(AgeError::file_error("verify", file.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found")));
+            return Err(AgeError::file_error(
+                "verify",
+                file.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"),
+            ));
         }
 
         if !file.is_file() {
-            return Err(AgeError::file_error("verify", file.to_path_buf(),
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Path is not a file")));
+            return Err(AgeError::file_error(
+                "verify",
+                file.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Path is not a file"),
+            ));
         }
 
         // Check if file appears to be encrypted
@@ -1278,8 +1510,8 @@ impl CrudManager {
         }
 
         // Read file content for verification
-        let content = std::fs::read(file)
-            .map_err(|e| AgeError::file_error("read", file.to_path_buf(), e))?;
+        let content =
+            std::fs::read(file).map_err(|e| AgeError::file_error("read", file.to_path_buf(), e))?;
 
         let mut status = FileVerificationStatus {
             file_path: file.to_path_buf(),
@@ -1314,7 +1546,8 @@ impl CrudManager {
         // Check for proper header structure
         let header_end = content.iter().position(|&b| b == b'\n');
         if let Some(pos) = header_end {
-            if pos >= 21 && pos < 100 { // Reasonable header length
+            if pos >= 21 && pos < 100 {
+                // Reasonable header length
                 return Ok(true);
             }
         }
@@ -1333,15 +1566,23 @@ impl CrudManager {
 
         // Check for proper ASCII armor structure
         let has_begin = lines[0] == "-----BEGIN AGE ENCRYPTED FILE-----";
-        let has_end = lines.iter().any(|line| *line == "-----END AGE ENCRYPTED FILE-----");
+        let has_end = lines
+            .iter()
+            .any(|line| *line == "-----END AGE ENCRYPTED FILE-----");
 
         Ok(has_begin && has_end)
     }
 
     /// Verify integrity of repository
-    fn verify_repository_integrity(&self, repository: &Path, verified: &mut Vec<String>, failed: &mut Vec<String>) -> AgeResult<()> {
+    fn verify_repository_integrity(
+        &self,
+        repository: &Path,
+        verified: &mut Vec<String>,
+        failed: &mut Vec<String>,
+    ) -> AgeResult<()> {
         for entry in std::fs::read_dir(repository)? {
-            let entry = entry.map_err(|e| AgeError::file_error("read_dir", repository.to_path_buf(), e))?;
+            let entry =
+                entry.map_err(|e| AgeError::file_error("read_dir", repository.to_path_buf(), e))?;
             let path = entry.path();
 
             if path.is_file() {
@@ -1373,11 +1614,10 @@ impl CrudManager {
     /// Collect files matching pattern
     /// Create a glob matcher from pattern string
     fn create_glob_matcher(&self, pattern: &str) -> AgeResult<GlobMatcher> {
-        let glob = Glob::new(pattern)
-            .map_err(|e| AgeError::InvalidOperation {
-                operation: "pattern_matching".to_string(),
-                reason: format!("Invalid glob pattern '{}': {}", pattern, e),
-            })?;
+        let glob = Glob::new(pattern).map_err(|e| AgeError::InvalidOperation {
+            operation: "pattern_matching".to_string(),
+            reason: format!("Invalid glob pattern '{}': {}", pattern, e),
+        })?;
         Ok(glob.compile_matcher())
     }
 
@@ -1391,7 +1631,9 @@ impl CrudManager {
         encrypted_only: bool,
     ) -> AgeResult<()> {
         // Canonicalize to detect symlink loops
-        let canonical = directory.canonicalize().unwrap_or_else(|_| directory.to_path_buf());
+        let canonical = directory
+            .canonicalize()
+            .unwrap_or_else(|_| directory.to_path_buf());
 
         // Prevent symlink loops
         if visited.contains(&canonical) {
@@ -1403,7 +1645,14 @@ impl CrudManager {
         let entries = match std::fs::read_dir(directory) {
             Ok(entries) => entries,
             Err(e) => {
-                eprintln!("{}", fmt_warning(&format!("Skipping directory {}: {}", directory.display(), e)));
+                eprintln!(
+                    "{}",
+                    fmt_warning(&format!(
+                        "Skipping directory {}: {}",
+                        directory.display(),
+                        e
+                    ))
+                );
                 return Ok(());
             }
         };
@@ -1439,14 +1688,24 @@ impl CrudManager {
                 files.push(path);
             } else if path.is_dir() {
                 // Recurse into subdirectory
-                self.traverse_directory_recursive(&path, files, visited, glob_matcher, encrypted_only)?;
+                self.traverse_directory_recursive(
+                    &path,
+                    files,
+                    visited,
+                    glob_matcher,
+                    encrypted_only,
+                )?;
             }
         }
 
         Ok(())
     }
 
-    fn collect_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
+    fn collect_files_with_pattern(
+        &self,
+        directory: &Path,
+        pattern: Option<&str>,
+    ) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
         let mut visited = HashSet::new();
 
@@ -1454,13 +1713,23 @@ impl CrudManager {
         let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
 
         // Use recursive traversal
-        self.traverse_directory_recursive(directory, &mut files, &mut visited, &glob_matcher, false)?;
+        self.traverse_directory_recursive(
+            directory,
+            &mut files,
+            &mut visited,
+            &glob_matcher,
+            false,
+        )?;
 
         Ok(files)
     }
 
     /// Collect encrypted files matching pattern
-    fn collect_encrypted_files_with_pattern(&self, directory: &Path, pattern: Option<&str>) -> AgeResult<Vec<PathBuf>> {
+    fn collect_encrypted_files_with_pattern(
+        &self,
+        directory: &Path,
+        pattern: Option<&str>,
+    ) -> AgeResult<Vec<PathBuf>> {
         let mut files = Vec::new();
         let mut visited = HashSet::new();
 
@@ -1468,16 +1737,34 @@ impl CrudManager {
         let glob_matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
 
         // Use recursive traversal (encrypted_only = true)
-        self.traverse_directory_recursive(directory, &mut files, &mut visited, &glob_matcher, true)?;
+        self.traverse_directory_recursive(
+            directory,
+            &mut files,
+            &mut visited,
+            &glob_matcher,
+            true,
+        )?;
 
         Ok(files)
     }
 
     /// Record operation for audit and recovery purposes
-    fn record_operation(&mut self, operation_type: &str, target_path: &Path, success: bool, result: &OperationResult) {
+    fn record_operation(
+        &mut self,
+        operation_type: &str,
+        target_path: &Path,
+        success: bool,
+        result: &OperationResult,
+    ) {
         let mut details = HashMap::new();
-        details.insert("processed_files".to_string(), result.processed_files.len().to_string());
-        details.insert("failed_files".to_string(), result.failed_files.len().to_string());
+        details.insert(
+            "processed_files".to_string(),
+            result.processed_files.len().to_string(),
+        );
+        details.insert(
+            "failed_files".to_string(),
+            result.failed_files.len().to_string(),
+        );
 
         let record = OperationRecord {
             operation_type: operation_type.to_string(),
@@ -1496,7 +1783,13 @@ impl CrudManager {
     }
 
     /// Encrypt a single file to a specific output path (for in-place operations)
-    pub fn encrypt_to_path(&self, input: &Path, output: &Path, passphrase: &str, format: OutputFormat) -> AgeResult<()> {
+    pub fn encrypt_to_path(
+        &self,
+        input: &Path,
+        output: &Path,
+        passphrase: &str,
+        format: OutputFormat,
+    ) -> AgeResult<()> {
         self.adapter.encrypt(input, output, passphrase, format)
     }
 }
@@ -1516,13 +1809,13 @@ mod tests {
     #[test]
     fn test_passphrase_validation() {
         let crud_manager = CrudManager::with_defaults().unwrap();
-        
+
         // Empty passphrase should fail
         assert!(crud_manager.validate_passphrase("").is_err());
-        
+
         // Normal passphrase should pass
         assert!(crud_manager.validate_passphrase("valid_passphrase").is_ok());
-        
+
         // Very long passphrase should fail
         let long_passphrase = "a".repeat(2000);
         assert!(crud_manager.validate_passphrase(&long_passphrase).is_err());
@@ -1554,7 +1847,10 @@ mod tests {
             let temp_dir = TempDir::new().unwrap();
             let result = crud_manager.rotate(temp_dir.path(), "same_pass", "same_pass");
             assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("must be different"));
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("must be different"));
         } else {
             // Skip test if Age not available
             println!("Skipping key rotation test - Age not available");
@@ -1574,7 +1870,6 @@ mod tests {
             std::fs::write(temp_file.path(), b"plain text content").unwrap();
             let result = crud_manager.is_encrypted_file(temp_file.path()).unwrap();
             assert!(!result);
-
         } else {
             println!("Skipping encrypted file detection test - Age not available");
         }
@@ -1587,16 +1882,24 @@ mod tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             std::fs::write(temp_file.path(), b"plain text content").unwrap();
 
-            let result = crud_manager.verify_file_integrity(temp_file.path()).unwrap();
+            let result = crud_manager
+                .verify_file_integrity(temp_file.path())
+                .unwrap();
             assert!(!result.is_encrypted);
             assert!(!result.is_valid());
             assert!(result.error_message.is_some());
 
             // Test verification of file with Age binary header
             let temp_age_file = tempfile::NamedTempFile::new().unwrap();
-            std::fs::write(temp_age_file.path(), b"age-encryption.org/v1\ntest encrypted content").unwrap();
+            std::fs::write(
+                temp_age_file.path(),
+                b"age-encryption.org/v1\ntest encrypted content",
+            )
+            .unwrap();
 
-            let result = crud_manager.verify_file_integrity(temp_age_file.path()).unwrap();
+            let result = crud_manager
+                .verify_file_integrity(temp_age_file.path())
+                .unwrap();
             assert!(result.is_encrypted);
             assert!(result.format_valid);
             assert!(result.header_valid);
@@ -1606,11 +1909,12 @@ mod tests {
             let ascii_content = b"-----BEGIN AGE ENCRYPTED FILE-----\nencrypted content here\n-----END AGE ENCRYPTED FILE-----";
             std::fs::write(temp_ascii_file.path(), ascii_content).unwrap();
 
-            let result = crud_manager.verify_file_integrity(temp_ascii_file.path()).unwrap();
+            let result = crud_manager
+                .verify_file_integrity(temp_ascii_file.path())
+                .unwrap();
             assert!(result.is_encrypted);
             assert!(result.format_valid);
             assert!(result.header_valid);
-
         } else {
             println!("Skipping file verification test - Age not available");
         }
@@ -1629,7 +1933,6 @@ mod tests {
             let result = crud_manager.verify(temp_dir.path()).unwrap();
             assert!(result.verified_files.is_empty());
             assert!(result.failed_files.is_empty());
-
         } else {
             println!("Skipping verification result test - Age not available");
         }
@@ -1714,11 +2017,19 @@ mod tests {
         let policy = RetentionPolicy::KeepLast(3);
         let backups = create_test_backups(5);
         let to_delete = policy.apply(&backups);
-        assert_eq!(to_delete, vec![3, 4], "Should delete backups beyond index 2");
+        assert_eq!(
+            to_delete,
+            vec![3, 4],
+            "Should delete backups beyond index 2"
+        );
 
         let policy_more = RetentionPolicy::KeepLast(10);
         let to_delete_more = policy_more.apply(&backups);
-        assert_eq!(to_delete_more.len(), 0, "Should keep all when count >= total");
+        assert_eq!(
+            to_delete_more.len(),
+            0,
+            "Should keep all when count >= total"
+        );
     }
 
     #[test]
@@ -1748,7 +2059,11 @@ mod tests {
 
         let policy = RetentionPolicy::KeepDays(7);
         let to_delete = policy.apply(&backups);
-        assert_eq!(to_delete, vec![2], "Should delete backups older than 7 days");
+        assert_eq!(
+            to_delete,
+            vec![2],
+            "Should delete backups older than 7 days"
+        );
     }
 
     #[test]
@@ -1788,7 +2103,11 @@ mod tests {
 
         for policy in policies {
             let to_delete = policy.apply(&[]);
-            assert_eq!(to_delete.len(), 0, "Empty backup list should return empty delete list");
+            assert_eq!(
+                to_delete.len(),
+                0,
+                "Empty backup list should return empty delete list"
+            );
         }
     }
 

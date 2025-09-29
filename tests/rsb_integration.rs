@@ -57,7 +57,7 @@ fn test_rsb_args_wrapper_functionality() {
         "--verbose".to_string(),
         "--format=ascii".to_string(),
         "--pattern".to_string(),
-        "*.txt".to_string()
+        "*.txt".to_string(),
     ];
 
     // Note: This is a conceptual test - actual Args construction
@@ -75,7 +75,8 @@ fn test_rsb_args_wrapper_functionality() {
     assert!(has_verbose);
 
     // Test key-value argument
-    let format_arg = test_args.iter()
+    let format_arg = test_args
+        .iter()
         .find(|arg| arg.starts_with("--format="))
         .map(|arg| arg.split('=').nth(1).unwrap_or(""))
         .unwrap_or("");
@@ -208,8 +209,8 @@ fn test_rsb_configuration_integration() {
 
     // Configuration hierarchy: CLI > project > user > defaults
     set_var("config_format", "binary"); // default
-    set_var("user_format", "ascii");    // user override
-    set_var("cli_format", "binary");    // CLI override
+    set_var("user_format", "ascii"); // user override
+    set_var("cli_format", "binary"); // CLI override
 
     // CLI takes precedence
     let final_format = if !get_var("cli_format").is_empty() {
@@ -228,9 +229,7 @@ fn test_rsb_command_dispatch_patterns() {
     setup_test_environment();
 
     // Test dispatch patterns we'll implement
-    let commands = vec![
-        "lock", "unlock", "status", "rotate", "verify", "batch"
-    ];
+    let commands = vec!["lock", "unlock", "status", "rotate", "verify", "batch"];
 
     for command in commands {
         set_var("current_command", command);
@@ -281,7 +280,11 @@ fn test_rsb_pre_dispatch_patterns() {
             _ => false,
         };
 
-        assert!(is_setup, "Command {} should be handled by pre_dispatch", command);
+        assert!(
+            is_setup,
+            "Command {} should be handled by pre_dispatch",
+            command
+        );
     }
 }
 
@@ -318,7 +321,8 @@ mod integration_smoke_tests {
         assert_eq!(get_var("opt_format"), "binary");
 
         // Test message formatting for cage
-        let status_msg = expand_vars("Cage ${cage_operation}: format=${opt_format}, verbose=${opt_verbose}");
+        let status_msg =
+            expand_vars("Cage ${cage_operation}: format=${opt_format}, verbose=${opt_verbose}");
         assert!(status_msg.contains("integration_test"));
         assert!(status_msg.contains("binary"));
         assert!(status_msg.contains("1"));

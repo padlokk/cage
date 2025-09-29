@@ -1,12 +1,12 @@
 //! Test the new request API (CAGE-11)
 //! Demonstrates that the unified request structs are properly wired into CrudManager
 
-use std::fs;
-use tempfile::TempDir;
-use cage::cage::lifecycle::crud_manager::CrudManager;
 use cage::cage::adapter::ShellAdapter;
 use cage::cage::config::{AgeConfig, OutputFormat};
-use cage::cage::requests::{LockRequest, UnlockRequest, Identity};
+use cage::cage::lifecycle::crud_manager::CrudManager;
+use cage::cage::requests::{Identity, LockRequest, UnlockRequest};
+use std::fs;
+use tempfile::TempDir;
 
 fn age_available() -> bool {
     which::which("age").is_ok()
@@ -40,13 +40,17 @@ fn test_lock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
     // Create lock request
     let lock_request = LockRequest::new(
         test_file.clone(),
-        Identity::Passphrase("test_password_123".to_string())
+        Identity::Passphrase("test_password_123".to_string()),
     )
     .with_format(OutputFormat::Binary);
 
     // Lock using request API
     let lock_result = manager.lock_with_request(&lock_request)?;
-    assert_eq!(lock_result.processed_files.len(), 1, "Should process one file");
+    assert_eq!(
+        lock_result.processed_files.len(),
+        1,
+        "Should process one file"
+    );
 
     // Verify encrypted file exists
     let encrypted_file = test_file.with_extension("txt.cage");
@@ -77,7 +81,7 @@ fn test_unlock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
     // Lock it first
     let lock_request = LockRequest::new(
         test_file.clone(),
-        Identity::Passphrase("unlock_pass_456".to_string())
+        Identity::Passphrase("unlock_pass_456".to_string()),
     );
     manager.lock_with_request(&lock_request)?;
 
@@ -85,20 +89,27 @@ fn test_unlock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
     let encrypted_file = test_file.with_extension("txt.cage");
     let unlock_request = UnlockRequest::new(
         encrypted_file.clone(),
-        Identity::Passphrase("unlock_pass_456".to_string())
+        Identity::Passphrase("unlock_pass_456".to_string()),
     )
     .selective(true)
     .preserve_encrypted(true);
 
     let unlock_result = manager.unlock_with_request(&unlock_request)?;
-    assert_eq!(unlock_result.processed_files.len(), 1, "Should unlock one file");
+    assert_eq!(
+        unlock_result.processed_files.len(),
+        1,
+        "Should unlock one file"
+    );
 
     // Verify content
     let unlocked_content = fs::read_to_string(&test_file)?;
     assert_eq!(unlocked_content, original_content, "Content should match");
 
     // Verify encrypted file preserved
-    assert!(encrypted_file.exists(), "Encrypted file should be preserved");
+    assert!(
+        encrypted_file.exists(),
+        "Encrypted file should be preserved"
+    );
 
     println!("[PASS] Unlock with request API works correctly");
     Ok(())
@@ -125,7 +136,7 @@ fn test_request_api_with_pattern_filter() -> Result<(), Box<dyn std::error::Erro
     // Lock only .txt files using pattern
     let lock_request = LockRequest::new(
         temp_dir.path().to_path_buf(),
-        Identity::Passphrase("pattern_pass".to_string())
+        Identity::Passphrase("pattern_pass".to_string()),
     )
     .recursive(true)
     .with_pattern("*.txt".to_string());
@@ -133,7 +144,11 @@ fn test_request_api_with_pattern_filter() -> Result<(), Box<dyn std::error::Erro
     let lock_result = manager.lock_with_request(&lock_request)?;
 
     // Should lock 2 .txt files, not the .doc file
-    assert_eq!(lock_result.processed_files.len(), 2, "Should lock only .txt files");
+    assert_eq!(
+        lock_result.processed_files.len(),
+        2,
+        "Should lock only .txt files"
+    );
 
     // Verify .txt files are encrypted
     assert!(temp_dir.path().join("file1.txt.cage").exists());
