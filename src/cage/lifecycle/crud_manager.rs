@@ -519,11 +519,13 @@ impl CrudManager {
 
     /// Create new CrudManager with specified adapter and configuration
     pub fn new(adapter: Box<dyn AgeAdapter>, config: AgeConfig) -> AgeResult<Self> {
-        // Enable RSB glyphs for visual output
+        // Enable RSB glyph output for legacy UI strings
         glyph_enable();
 
         if let Some(strategy) = &config.streaming_strategy {
-            std::env::set_var("CAGE_STREAMING_STRATEGY", strategy);
+            if std::env::var("CAGE_STREAMING_STRATEGY").is_err() {
+                std::env::set_var("CAGE_STREAMING_STRATEGY", strategy);
+            }
         }
 
         let audit_logger = AuditLogger::new(config.audit_log_path.clone().map(PathBuf::from))?;

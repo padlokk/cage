@@ -725,9 +725,11 @@ fn execute_lock_operation(
         return Err("No paths provided for lock operation".into());
     }
 
-    if let Identity::Passphrase(pass) = identity {
-        if pass.len() < 8 {
-            stderr!("⚠️  Warning: Passphrase is less than 8 characters. Consider using a stronger passphrase.");
+    if recipients.is_empty() {
+        if let Identity::Passphrase(pass) = identity {
+            if pass.len() < 8 {
+                stderr!("⚠️  Warning: Passphrase is less than 8 characters. Consider using a stronger passphrase.");
+            }
         }
     }
 
