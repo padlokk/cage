@@ -184,7 +184,93 @@ cage config path
 cage config paths
 ```
 
-Quick workflow for editing the config:
+#### Configuration File Format
+
+```toml
+# Streaming strategy (temp, pipe, auto)
+[streaming]
+strategy = "auto"
+
+# Backup behavior
+[backup]
+cleanup_on_success = true
+directory = "~/.local/share/cage/backups"
+retention = "keep-last-5"
+
+# Recipient Groups (persistent multi-recipient sets)
+[recipient_groups.devops]
+name = "devops"
+recipients = ["age1recipient1abc...", "age1recipient2def..."]
+tier = "REPOSITORY"  # Optional: SKULL, MASTER, REPOSITORY, IGNITION, DISTRO
+
+[recipient_groups.devops.metadata]
+created_by = "admin"
+created_at = "2025-09-29"
+purpose = "development_team"
+
+[recipient_groups.security]
+name = "security"
+recipients = ["age1security1xyz...", "age1security2uvw..."]
+tier = "MASTER"
+
+[recipient_groups.security.metadata]
+purpose = "authority_chain"
+level = "high"
+```
+
+#### Recipient Groups
+
+Recipient groups allow you to define reusable sets of recipients that persist across Cage restarts. This is particularly useful for:
+
+- **Team-based encryption**: Define groups for different teams or roles
+- **Authority chains**: Organize recipients by security tier (Ignite integration)
+- **Vault management**: Persistent key sets for Padlock vaults
+
+**Usage example:**
+
+```bash
+# Encrypt to a predefined group
+cage lock secret.txt --recipient-group devops
+
+# Any member of the group can decrypt
+cage unlock secret.txt.cage --identity ~/.ssh/id_ed25519
+
+# Groups persist - defined once in config, used everywhere
+```
+
+**Programmatic API:**
+
+```rust
+use cage::cage::config::AgeConfig;
+use cage::cage::requests::{RecipientGroup, AuthorityTier};
+
+// Load config with recipient groups
+let mut config = AgeConfig::load_from_path("cage.toml")?;
+
+// Access existing groups
+let devops = config.get_recipient_group("devops").unwrap();
+println!("Recipients: {:?}", devops.recipients);
+
+// Add new group programmatically
+let mut backup = RecipientGroup::new("backup".to_string());
+backup.add_recipient("age1backup1...".to_string());
+backup.set_tier(Some(AuthorityTier::Distro));
+config.add_recipient_group(backup);
+
+// Save changes back to file
+config.save_to_file("cage.toml")?;
+```
+
+**Authority Tiers** (for Ignite/Padlock integration):
+- `SKULL` (X) - Top-level authority
+- `MASTER` (M) - Operational authority
+- `REPOSITORY` (R) - Per-repo authority
+- `IGNITION` (I) - Automation authority
+- `DISTRO` (D) - Distribution authority
+
+Groups without a tier are still valid and can be used for general team encryption.
+
+#### Quick Configuration Setup
 
 ```bash
 # Ensure the config directory exists
@@ -193,19 +279,8 @@ mkdir -p ~/.config/cage
 # Create or update the file with your editor
 $EDITOR ~/.config/cage/config.toml
 
-# Example streaming and backup settings
-cat <<EOF > ~/.config/cage/config.toml
-[streaming]
-strategy = "pipe"
-
-[backup]
-cleanup_on_success = true
-directory = "~/cage-backups"
-retention = "keep_last:5"
-EOF
-
 # Verify Cage is loading the config
-cage status . --verbose
+cage config show
 ```
 
 When the file is absent Cage falls back to its compiled defaults. Invalid entries surface as configuration errors with the failing path in the message.
