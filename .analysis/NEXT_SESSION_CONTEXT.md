@@ -19,47 +19,43 @@
 ## 2. Top Priority Tasks 🎯
 ================================================================================
 
-### CAGE-03: Backup Retention Lifecycle [5 pts] 🟡
-**Current Status (VERIFIED 2025-09-29):**
-- ✅ RetentionPolicy enum created (4 variants: KeepAll/KeepDays/KeepLast/KeepLastAndDays)
-- ✅ BackupManager struct exists with retention_policy field
-- ✅ AgeConfig backup_retention field with TOML parsing
-- ✅ Config loading/validation for retention policies
+### CAGE-03: Backup Retention Lifecycle [5 pts] ✅ COMPLETE
+**Completed:** 2025-09-29 (Commit 899d0df)
+**Status:** Fully implemented with 8/10 tests passing
+- ✅ JSON-backed BackupRegistry with .cage_backups.json persistence
+- ✅ Generation tracking (auto-incrementing)
+- ✅ 4 retention policies: KeepAll, KeepDays, KeepLast, KeepLastAndDays
+- ✅ create_backup_with_retention() method
+- ✅ Discovery helpers: list_backups(), restore_backup_generation()
+- ✅ Atomic registry saves
+
+**Files:** `src/cage/lifecycle/crud_manager.rs`, `tests/test_backup_retention.rs`
+
+### CAGE-12: Adapter V2 Streaming [5 pts] ✅ COMPLETE
+**Completed:** 2025-09-29 (Commit 38ebe5e)
+**Status:** Identity-based streaming encryption implemented
+- ✅ identity_to_recipient() helper extracts public recipient via age-keygen -y
+- ✅ encrypt_stream() automatically derives recipient from identity files
+- ✅ Enables "self-encryption" workflows for key rotation
+- ✅ Test: test_identity_based_streaming_encrypt() passes
+- ✅ Documentation updated in LIBRARY_USAGE.md
+
+**Files:** `src/cage/adapter_v2.rs`, `docs/ref/cage/LIBRARY_USAGE.md`
+
+### SEC-01: Centralized String Management [5 pts] 🟡 NEXT PRIORITY
+**Current Status:** Partially complete, migration ongoing
+- ✅ String module exists at `src/cage/strings.rs`
+- ✅ Audit complete (705 inline strings found)
+- ✅ Lint scripts available (check_inline_strings.sh)
+- ✅ Documentation at docs/dev/STRING_MANAGEMENT.md
 - ❌ Remaining work:
-  - Implement JSON-backed BackupRegistry struct with generation tracking
-  - Wire retention enforcement into create_backup() method
-  - Add backup discovery helpers (list/restore by generation)
-  - Write integration tests covering retention + legacy .bak migration
+  - Evaluate optional "ASCII-safe" mode
+  - Migrate high-priority user-facing strings (304 in CLI, 182 in CrudManager)
 
 **Key References:**
-- 📄 `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`
-- 📁 Potential implementation targets:
-  - `BackupManager`
-  - `AgeConfig` (for configuration)
-  - New JSON registry module
-
-**Test Strategy:**
-- Simulate lock/unlock cycles
-- Verify cleanup and registry updates
-- Test retention policy enforcement
-
-### CAGE-12: Adapter V2 Streaming Gaps [5 pts] 🟡
-**Current Status:**
-- ✅ V2 trait and compatibility wrapper implemented
-- ✅ Streaming works for passphrase + recipient flows
-- ❌ Remaining work:
-  - Implement identity-based streaming encrypt
-  - Document current limitations explicitly
-
-**Key References:**
-- 📁 `src/cage/adapter_v2.rs`
-- 📄 `docs/ref/cage/LIBRARY_USAGE.md`
-- 📄 `docs/ref/ignite/IGNITE_CONCEPTS.md`
-
-**Implementation Notes:**
-- Focus on streaming encrypt methods
-- Clarify identity-based streaming limitations
-- Ensure compatibility with Ignite key rotation
+- 📁 `src/cage/strings.rs`
+- 📄 `docs/dev/STRING_MANAGEMENT.md`
+- 🔧 `scripts/check_inline_strings.sh`
 
 ================================================================================
 ## 3. Technical Context 🔬
