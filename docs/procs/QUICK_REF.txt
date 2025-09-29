@@ -1,27 +1,27 @@
 🎯 CAGE QUICK REFERENCE (30-Second Context)
 ================================================================================
 
-**Current Focus**: Finish selective unlock & backup polish → prep recipient/identity features
+**Current Focus**: Ignite → Padlock readiness (multi-recipient, telemetry, backup registry)
 
 📊 **Project Status**:
 - 🔧 META_PROCESS v2 (low heat – docs mostly in place)
-- ✅ BUG-01/02/03/05 shipped; BUG-04 selective unlock outstanding
-- 🟡 Backup pipeline polish + config loader remain
-- ⬆️ Recipient/identity support and tests queued next
+- ✅ BUG-01/02/03/05 shipped; CLI stable
+- 🟡 Backup retention registry + string audit in progress
+- 🔺 Ignite/Padlock integration tasks (multi-recipient, telemetry, QA) now top priority
 
 🚨 **Critical Context**:
-- **Branch**: admin/meta-process (stay here until process complete)
-- **Version**: 0.3.1 (bump when ready to cut release)
-- **Priority**: Fix BUG-01…BUG-05 before any new features
-- **Tests**: Run `cargo test --all` + CLI smoke before commits
+- **Branch**: main (Ignite/Padlock prep)
+- **Version**: 0.5.0 (bump on next release)
+- **Priority**: Finish OBS-01, QA-02, CAGE-16, CAGE-03 before Phase 4
+- **Tests**: Run `cargo test --all` + `./bin/test.sh run smoke`
 
-📋 **Immediate Checklist** (details in docs/procs/TASKS.txt):
-1. BUG-04 follow-up: swap selective-mode logs to ASCII & make tests age-aware.
-2. CAGE-03 follow-up: retention/conflict strategy for backups.
-3. CAGE-06: Implement config file discovery/loading.
-4. CAGE-11/12: Finish docs + implement streaming adapter behaviour.
-5. CAGE-13/14/15/16: Streaming, SSH, derived keys, recipients planning.
-6. SEC-01: Start string constants inventory.
+📋 **Immediate Checklist** (see docs/procs/TASKS.txt):
+1. **OBS-01** – Structured telemetry (JSON logs, redaction) for Padlock ingest.
+2. **QA-02** – Restore CLI smoke + regression suite (BUG-01..05, PTY skips).
+3. **CAGE-16** – Multi-recipient lifecycle (recipient groups for Ignite rotations).
+4. **CAGE-03** – Backup registry + retention enforcement (Padlock restore UX).
+5. **SEC-01** – Migrate high-priority CLI strings, plan ASCII-safe mode.
+6. Phase 4 prep: AGE-01 adapter scaffolding (behind config flag).
 
 🏗️ **Architecture**:
 - **Language**: Rust
@@ -31,9 +31,9 @@
 - **Smoke Test**: `./bin/test.sh run smoke`
 
 ⚡ **Immediate Next Steps**:
-1. Read docs/procs/CONTINUE.md for latest session status
-2. Check docs/procs/TASKS.txt for detailed task breakdown
-3. Review .analysis/egg.1.rsb-cli-analysis.txt for RSB patterns
+1. Check docs/procs/CONTINUE.md for latest handoff + Ignite notes
+2. Open docs/procs/TASKS.txt (Phase 2/3 + AGE tasks) for implementation hints
+3. Review docs/ref/cage/AGE_LIBRARY_MIGRATION.md for future backend plan
 
 🚨 **Critical Rules**:
 - UPDATE docs/procs/CONTINUE.md at end of EVERY session
@@ -42,4 +42,4 @@
 - NO broken builds in commits
 
 ================================================================================
-Last Updated: 2025-09-27
+Last Updated: 2025-09-29

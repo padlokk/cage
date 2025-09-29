@@ -29,6 +29,9 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Ensure `health_check`/factory expose accurate streaming + identity support flags.
 - [ ] Implement identity-based streaming encrypt (currently passphrase-only) or mark limitation explicitly.
 - [x] Harden error surfaces (stderr parsing, partial write-reporting).
+**Implementation Notes:**
+- Ignite relies on identity-based streaming when rotating repo/ignition keys. Either add the library path or clearly document the limitation in `docs/ref/cage/LIBRARY_USAGE.md`.
+- Reference: `src/cage/adapter_v2.rs` TODO around `encrypt_stream_pipe_passphrase` plus Ignite rotation flows (`docs/ref/ignite/IGNITE_CONCEPTS.md`).
 
 ### QA-01: Documentation & Library Sync [3 pts] ✅
 **Status:** README and `docs/ref/cage/LIBRARY_USAGE.md` now include streaming strategy tables, config helper guidance, and usage samples aligned with CLI flags.
@@ -61,17 +64,23 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Regression tests with generated SSH keypairs.
 - [x] Documentation + security callouts.
 
-### CAGE-15: Deterministic Key Derivation [5 pts] 🔴
+### CAGE-15: Deterministic Key Derivation [5 pts] ⏸
 - [ ] Extend config/request structs with derive parameters (salt/context).
-- [ ] Invoke age binary with `--derive` and capture outputs.
+- [ ] Wire derive support once the `age` crate backend lands (AGE-01). CLI-only implementation is deferred.
 - [ ] Add tests verifying deterministic behaviour + error paths.
 - [ ] Document usage guidance and salting requirements.
+**Status:** Reprioritized to Phase 4 (native library backend). No current Padlock/Ignite dependency; keep spec handy in `docs/ref/cage/AGE_LIBRARY_MIGRATION.md`.
 
 ### CAGE-16: Multi-Recipient Lifecycle [8 pts] 🔴
 - [ ] Formalize recipient group model (struct/enums) for request API + config.
 - [ ] Update adapters/CrudManager to accept recipient vectors for all encrypt ops.
 - [ ] Provide lifecycle helpers (list/add/remove recipients, audit metadata).
 - [ ] Tests ensuring each recipient can decrypt; include rotation scenarios.
+**Priority:** 🔺 Required for Ignite → Padlock rotations (repo & distro keys).
+**Implementation Notes:**
+- Define recipient group manifests keyed by tier (X/M/R/I/D). See `docs/ref/ignite/IGNITE_CONCEPTS.md` §4 and `docs/ref/padlock/PADLOCK_CONCEPTS.md` §5.
+- Add config support for sets in `AgeConfig` + `cage.toml` (Padlock expects `.padlock` extension defaults).
+- Ensure `cage adapter info` reports group counts so Ignite can validate before rotations.
 
 ### CAGE-13: Streaming CLI Options [5 pts] ✅
 - [x] Expose streaming flags/config toggles (e.g., `--streaming-strategy`, already parsed) with doc coverage.
@@ -90,6 +99,10 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Document expectations in docs/dev/STRING_MANAGEMENT.md.
 - [ ] Evaluate optional "ASCII-safe" mode without forcing removal of branded glyphs.
 - [ ] Migrate high-priority user-facing strings from audit results.
+**Implementation Notes:**
+- Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/lifecycle/crud_manager.rs`).
+- Document ASCII-safe toggle behaviour; Padlock UI will eventually need plain-text mode for logs.
+- Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CrudManager).
 
 ### CAGE-03: Backup Retention Lifecycle [5 pts] 🟡
 **Reference:** `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`
@@ -100,12 +113,22 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Apply retention when creating backups; archive/delete expired entries safely.
 - [ ] Add backup discovery helpers (list/restore generations) for future CLI use.
 - [ ] Write integration tests covering retention + migration from legacy `.bak` files.
+**Implementation Notes:**
+- Ignite manifest audits expect Cage to expose prior generations; design registry structure in line with `docs/ref/cage/BACKUP_RETENTION_DESIGN.md` §3.
+- CLI UX: provide `cage backup list` (even if minimal) so Padlock can surface restore points.
+- Tests: simulate lock/unlock cycles with retention policies to verify cleanup + registry updates.
 
 ### OBS-01: Structured Audit & Telemetry [3 pts] 🔴
 - [ ] Capture streaming/identity/recipient events with structured metadata.
 - [ ] Ensure sensitive fields are redacted before logging.
 - [ ] Offer JSON/structured output toggle for downstream systems.
 - [ ] Update docs with telemetry configuration.
+**Priority:** 🔺 Padlock/Ignite need machine-readable audit trails.
+**Implementation Notes:**
+- Extend `AuditLogger` to emit JSON lines (include operation type, recipient group hash, Ignition tier where available).
+- Add config flag `telemetry.format = "text" | "json"` (default text).
+- Update README + `docs/ref/cage/LIBRARY_USAGE.md` with examples for log ingestion.
+- Reference Ignite authority docs for required fields: `docs/ref/ignite/AUTHORITY_PROTOCOL.md` (proof + manifest expectations).
 
 ### QA-02: End-to-End Test Coverage [3 pts] 🔴
 (Retires legacy TEST-01/02/03/04 entries; replans under single umbrella.)
@@ -113,6 +136,12 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Expand regression coverage for BUG-01..05 behaviours (extensions, recursion, globs, unlock options).
 - [ ] Add proxy PTY scenarios with skip gating when `age`/PTY missing.
 - [ ] Confirm age-dependent tests skip gracefully (selective unlock already uses `which::which`).
+**Priority:** 🔺 Needed before Padlock GA. Ignite automation depends on reliable CLI runs.
+**Implementation Notes:**
+- Bring back `bin/test.sh run smoke` coverage; ensure it writes artifacts under `target/tmp` to avoid repo pollution.
+- Capture fixtures covering `.padlock` extension so Padlock integration tests reuse them.
+- Ensure PTY-dependent tests print clear skip reasons (`Skipping: PTY unavailable (CI sandbox)`).
+- Reference `UAT_REPORT_SESSION3.md` for the current test inventory.
 
 ### DOC-03: Library Usage Accuracy [1 pt] ✅
 - [x] Mention request API and streaming basics.
@@ -161,6 +190,10 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Build a new adapter implementation that wraps `age::Encryptor` / `age::Decryptor` APIs for file and streaming workflows.
 - [ ] Preserve request/response semantics so CrudManager and request structs remain unchanged.
 - [ ] Keep the existing shell-based adapter available as a fallback strategy until feature parity is validated.
+**Implementation Notes:**
+- Start with passphrase + recipient flows; reuse streaming helpers from `ShellAdapterV2`.
+- Gate under config flag (`backend = "cli" | "library"`).
+- Tests should compare CLI vs library ciphertext for regressions.
 
 ### AGE-02: Passphrase & Identity Bridging [3 pts] 🔴
 - [ ] Reuse PassphraseManager/PTY automation to supply secrets directly to the age crate.

@@ -92,6 +92,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
   from passphrases + salt).
 - Extend request structs with derivation parameters (salt, recipients, reason).
 - Document security implications and add opt-in gating.
+*Status:* Deferred until Phase 4 (library adapter). No immediate Padlock/Ignite dependency; revisit when AGE-01 lands.
 
 ### Milestone 2.4 – Multi-Recipient Lifecycle
 *Strategy*
@@ -102,6 +103,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 - Update unlock flows to reason about recipient metadata (for auditing) and
   provide lifecycle helpers (add/remove recipients, inspect metadata).
 - Add tests ensuring all recipients can decrypt (fixtures with generated keys).
+*Ignite/Padlock Priority:* Required for repo/ignition/distro rotations. Align recipient group design with `docs/ref/ignite/IGNITE_CONCEPTS.md` and Padlock authority chain expectations.
 
 ## Phase 3 – Hardening & Tooling
 
