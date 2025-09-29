@@ -16,9 +16,8 @@
 //! # Quick Start
 //!
 //! ```rust,no_run
-//! use cage::{CrudManager, LockOptions, OutputFormat};
+//! use cage::prelude::*;
 //! use std::path::Path;
-//! # use cage::cage::error::AgeResult;
 //!
 //! # fn main() -> AgeResult<()> {
 //! // Create CRUD manager with defaults
@@ -36,6 +35,8 @@
 //! ```
 
 pub mod cage;
+pub mod deps;
+pub mod prelude;
 
 // Re-export core types for convenience
 pub use cage::{

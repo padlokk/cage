@@ -710,6 +710,30 @@ This will generate and open the full API documentation with all available method
 
 ---
 
+## 📋 Feature Status
+
+### ✅ Completed Features
+
+- **SSH Identity Support**: Full SSH key encryption/decryption support via CLI pass-through
+- **Streaming Strategies**: Configurable streaming (Pipe/TempFile) with environment overrides
+- **Request API**: Typed request builders for all operations (Lock/Unlock/Rotate)
+- **PTY Automation**: Hardened PTY wrapper with configurable timeouts
+- **Config Discovery**: Helper methods and CLI inspection commands
+- **Adapter Inspection**: `cage adapter info` command for capability reporting
+
+### 🚧 Roadmap Features
+
+- **Deterministic Key Derivation** (CAGE-15): Not yet implemented - will support `--derive` flag
+- **Multi-Recipient Lifecycle** (CAGE-16): Not yet implemented - will support multiple recipients per file
+- **Backup Retention Lifecycle** (CAGE-03): Partially implemented - registry and cleanup pending
+
+### ⚠️ Known Limitations
+
+- **Passphrase Streaming**: Due to age's TTY requirements, passphrase operations always use temp files regardless of streaming strategy
+- **SSH Key Conversion**: SSH keys are passed directly to age CLI (no rust-native conversion)
+
+---
+
 ## 🚀 Migration Guide
 
 ### From 0.1.x to 0.3.x
@@ -735,6 +759,6 @@ let safety_validator = SafetyValidator::new(false, false)?;  // In-place safety
 
 ---
 
-**Last Updated**: 2025-09-27
-**Cage Version**: 0.3.1
-**Documentation Version**: 1.0.0
+**Last Updated**: 2025-09-29
+**Cage Version**: 0.5.0
+**Documentation Version**: 1.1.0
