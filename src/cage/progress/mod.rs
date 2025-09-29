@@ -10,7 +10,7 @@
 //! - **Extractable**: Can be moved to RSB without modification
 //!
 //! # Usage
-//! ```rust,ignore
+//! ```ignore
 //! use cage::cage::progress::{ProgressManager, ProgressStyle};
 //!
 //! let mut progress = ProgressManager::new();
