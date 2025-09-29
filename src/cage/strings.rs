@@ -47,6 +47,10 @@ pub const ERR_RESTORE_FAILED: &str = "Restore operation failed";
 pub const ERR_ADAPTER_NOT_FOUND: &str = "Age adapter not found";
 pub const ERR_ADAPTER_NOT_IMPLEMENTED: &str = "Adapter not implemented";
 pub const ERR_AGE_NOT_INSTALLED: &str = "Age binary not installed or not in PATH";
+pub const ERR_STREAM_PIPE_REQUIRES_RECIPIENTS: &str =
+    "Pipe streaming requires at least one recipient";
+pub const ERR_STREAM_PIPE_REQUIRES_IDENTITY: &str =
+    "Pipe streaming requires an identity file or SSH key";
 
 // ============================================================================
 // WARNING MESSAGES
@@ -59,6 +63,7 @@ pub const WARN_WEAK_PASSPHRASE: &str = "Passphrase is weak";
 pub const WARN_NON_UTF8: &str = "File has non-UTF8 name";
 pub const WARN_WRONG_EXTENSION: &str = "File has unexpected extension";
 pub const WARN_DELETE_FAILED: &str = "Failed to delete encrypted file";
+pub const WARN_STREAM_PIPE_FALLBACK: &str = "Pipe streaming failed; retrying with temporary files";
 
 // ============================================================================
 // PROMPT MESSAGES

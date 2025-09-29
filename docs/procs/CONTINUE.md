@@ -1,5 +1,30 @@
 # Continue Log – Bug Slate Progress
 
+## HANDOFF-2025-09-28-2000 (Streaming Hardening)
+
+### Session Duration: ~90 minutes
+### Branch: main
+### Phase: Streaming hardening & documentation alignment
+
+### Completed:
+- [done] Hardened pipe streaming in `ShellAdapterV2` with concurrent stdin/stdout handling and ASCII fallback messaging.
+- [done] Added streaming capability metadata and updated CLI help to describe pipe prerequisites.
+- [done] Documented recipient/identity workflows, streaming strategy selection, and `cage.toml` editing guidance (README, docs/LIBRARY_USAGE.md).
+- [done] Added pipe streaming regression coverage and executed `cargo test --lib test_shell_adapter_v2_pipe_stream_round_trip`.
+
+### Findings:
+- [todo] Large-file benchmarking for pipe streaming still outstanding; only unit-level validation exists today.
+- [todo] CLI help output retains emoji-heavy headers; broader SEC-01 ASCII migration remains.
+- [todo] No built-in helper for editing `cage.toml` beyond documented manual steps (CAGE-06 follow-up).
+
+### Next Agent MUST:
+1. Validate pipe streaming under large-file load and capture performance notes (CAGE-12a follow-up).
+2. Continue SEC-01 cleanup on CLI surfaces by replacing remaining emoji/glyph output.
+3. Design or stub a helper command for viewing/editing `cage.toml` (CAGE-06 follow-up).
+
+### Context Hash: (pending commit)
+### Files Modified: 6 (`src/cage/adapter_v2.rs`, `src/cage/strings.rs`, `src/bin/cli_age.rs`, `README.md`, `docs/LIBRARY_USAGE.md`, `docs/procs/TASKS.txt`)
+
 ## HANDOFF-2025-09-27-1800
 
 ### Session Duration: ~45 minutes
@@ -38,15 +63,18 @@
 - ✅ TEST-04 gating: selective-unlock tests skip gracefully when `age` binary missing.
 - ✅ AdapterFactory now returns `AdapterV1Compat<ShellAdapterV2>` to expose the new trait surface.
 - ✅ ShellAdapterV2 supports passphrase streaming plus recipient-based encryption and identity-file decryption flows.
+- ✅ CLI lock/unlock accept identity & recipient flags, routing through new request APIs.
+- ✅ Optional streaming strategies exposed via `CAGE_STREAMING_STRATEGY` (temp vs pipe fallback).
+- ✅ Backup retention now enforced via AgeConfig (default + configurable directory).
+- ✅ AgeConfig loads from standard config paths (TOML) with backup/streaming settings.
 
 ### Partial:
-- 🟡 CAGE-11 doc update still pending (`docs/LIBRARY_USAGE.md`).
-- 🟡 CAGE-12: Streaming implemented for passphrase + basic recipients/identity files; SSH identities & advanced modes remain TODO.
+- 🟡 CAGE-12: Streaming implemented for passphrase + basic recipients/identity files; pipe strategy needs capability reporting & perf validation.
 
 ### Next Agent MUST:
-1. Update docs/LIBRARY_USAGE.md with request API usage (CAGE-11).
-2. Implement real streaming flows in `ShellAdapterV2` (CAGE-12/CAGE-13).
-3. Continue SEC-01 string migration in CLI + docs as modules are touched.
+1. Harden pipe-based streaming (capability reporting, perf validation) and document strategy selection (CAGE-12/12a).
+2. Document new CLI identity/recipient/streaming options (README/help) and expose config workflow (CAGE-06 follow-up).
+3. Continue SEC-01 string migration, replacing emoji/glyph output with ASCII-only strings.
 
 ### Context Hash: (pending commit)
 ### Files Modified: CODEX_START.txt, docs/procs/{TASKS,PROCESS,QUICK_REF}.txt, src/bin/cli_age.rs, src/cage/{adapter.rs,adapter_v2.rs,in_place.rs,mod.rs,progress/{core.rs,mod.rs},requests.rs,strings.rs}, tests/test_selective_unlock.rs

@@ -12,10 +12,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::cage::adapter::AgeAdapter;
-use crate::cage::config::{AgeConfig, OutputFormat};
+use crate::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+use crate::cage::config::{AgeConfig, OutputFormat, RetentionPolicyConfig};
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::operations::{OperationResult, RepositoryStatus};
-use crate::cage::requests::{Identity, LockRequest, UnlockRequest, VerifyRequest};
+use crate::cage::requests::{Identity, LockRequest, Recipient, UnlockRequest, VerifyRequest};
 use crate::cage::security::AuditLogger;
 use crate::cage::strings::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
@@ -30,6 +31,7 @@ pub struct LockOptions {
     pub format: OutputFormat,
     pub pattern_filter: Option<String>,
     pub backup_before_lock: bool,
+    pub backup_dir: Option<PathBuf>,
 }
 
 impl Default for LockOptions {
@@ -39,6 +41,7 @@ impl Default for LockOptions {
             format: OutputFormat::Binary,
             pattern_filter: None,
             backup_before_lock: false,
+            backup_dir: None,
         }
     }
 }
@@ -148,6 +151,22 @@ impl RetentionPolicy {
                         }
                     })
                     .collect()
+            }
+        }
+    }
+}
+
+impl RetentionPolicyConfig {
+    fn to_retention_policy(&self) -> RetentionPolicy {
+        match self {
+            RetentionPolicyConfig::KeepAll => RetentionPolicy::KeepAll,
+            RetentionPolicyConfig::KeepDays(days) => RetentionPolicy::KeepDays(*days),
+            RetentionPolicyConfig::KeepLast(last) => RetentionPolicy::KeepLast(*last),
+            RetentionPolicyConfig::KeepLastAndDays { last, days } => {
+                RetentionPolicy::KeepLastAndDays {
+                    last: *last,
+                    days: *days,
+                }
             }
         }
     }
@@ -273,6 +292,107 @@ impl BackupManager {
         Ok(())
     }
 
+    /// Enforce retention policy for the given source file
+    pub fn enforce_retention(&self, original_path: &Path) -> AgeResult<Vec<PathBuf>> {
+        let backups = self.collect_existing_backups(original_path)?;
+        if backups.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let to_delete = self.retention_policy.apply(&backups);
+        let mut deleted = Vec::new();
+
+        for idx in to_delete {
+            if let Some(info) = backups.get(idx) {
+                std::fs::remove_file(&info.backup_path).map_err(|e| {
+                    AgeError::file_error("remove_backup", info.backup_path.clone(), e)
+                })?;
+                deleted.push(info.backup_path.clone());
+            }
+        }
+
+        Ok(deleted)
+    }
+
+    fn collect_existing_backups(&self, original_path: &Path) -> AgeResult<Vec<BackupInfo>> {
+        let base_dir = if let Some(dir) = &self.backup_dir {
+            dir.clone()
+        } else {
+            original_path
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf()
+        };
+
+        if !base_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let file_name = original_path.file_name().ok_or_else(|| {
+            AgeError::file_error(
+                "get_filename",
+                original_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid filename"),
+            )
+        })?;
+
+        let backup_prefix = format!("{}{}", file_name.to_string_lossy(), self.backup_extension);
+
+        let mut backups = Vec::new();
+
+        let entries = match std::fs::read_dir(&base_dir) {
+            Ok(entries) => entries,
+            Err(e) => return Err(AgeError::file_error("read_backup_dir", base_dir.clone(), e)),
+        };
+
+        for entry in entries {
+            let entry =
+                entry.map_err(|e| AgeError::file_error("read_backup_dir", base_dir.clone(), e))?;
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            let name = match path.file_name().and_then(|s| s.to_str()) {
+                Some(name) => name,
+                None => continue,
+            };
+
+            if !name.starts_with(&backup_prefix) {
+                continue;
+            }
+
+            let metadata = entry
+                .metadata()
+                .map_err(|e| AgeError::file_error("read_metadata", path.clone(), e))?;
+
+            let created_at = metadata
+                .modified()
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+            backups.push(BackupInfo {
+                original_path: original_path.to_path_buf(),
+                backup_path: path,
+                created_at,
+                size_bytes: metadata.len(),
+            });
+        }
+
+        backups.sort_by(|a, b| {
+            match (
+                a.created_at.duration_since(std::time::UNIX_EPOCH),
+                b.created_at.duration_since(std::time::UNIX_EPOCH),
+            ) {
+                (Ok(a_dur), Ok(b_dur)) => b_dur.cmp(&a_dur),
+                (Ok(_), Err(_)) => std::cmp::Ordering::Less,
+                (Err(_), Ok(_)) => std::cmp::Ordering::Greater,
+                _ => std::cmp::Ordering::Equal,
+            }
+        });
+
+        Ok(backups)
+    }
+
     /// Generate backup path for a file
     fn generate_backup_path(&self, file_path: &Path) -> AgeResult<PathBuf> {
         let file_name = file_path.file_name().ok_or_else(|| {
@@ -379,10 +499,32 @@ pub struct OperationRecord {
 }
 
 impl CrudManager {
+    fn build_backup_manager(&self, options: &LockOptions) -> BackupManager {
+        let mut manager = if let Some(dir) = options
+            .backup_dir
+            .clone()
+            .or_else(|| self.config.backup_directory.as_ref().map(PathBuf::from))
+        {
+            BackupManager::with_backup_dir(dir)
+        } else {
+            BackupManager::new()
+        };
+
+        let retention = self.config.backup_retention.to_retention_policy();
+
+        manager = manager.with_retention(retention);
+        manager = manager.with_cleanup(self.config.backup_cleanup);
+        manager
+    }
+
     /// Create new CrudManager with specified adapter and configuration
     pub fn new(adapter: Box<dyn AgeAdapter>, config: AgeConfig) -> AgeResult<Self> {
         // Enable RSB glyphs for visual output
         glyph_enable();
+
+        if let Some(strategy) = &config.streaming_strategy {
+            std::env::set_var("CAGE_STREAMING_STRATEGY", strategy);
+        }
 
         let audit_logger = AuditLogger::new(config.audit_log_path.clone().map(PathBuf::from))?;
 
@@ -397,7 +539,7 @@ impl CrudManager {
     /// Create CrudManager with default configuration
     pub fn with_defaults() -> AgeResult<Self> {
         let adapter = super::super::adapter::AdapterFactory::create_default()?;
-        let config = AgeConfig::default();
+        let config = AgeConfig::load_default()?;
         Self::new(adapter, config)
     }
 
@@ -407,52 +549,43 @@ impl CrudManager {
 
     /// Lock operation using request struct (CAGE-11)
     pub fn lock_with_request(&mut self, request: &LockRequest) -> AgeResult<OperationResult> {
-        // Extract passphrase from identity
-        let passphrase = match &request.identity {
-            Identity::Passphrase(p) => p.clone(),
-            Identity::PromptPassphrase => {
-                // TODO: Implement interactive prompt
-                return Err(AgeError::PassphraseError {
-                    message: "Interactive prompt not yet implemented".to_string(),
-                });
-            }
-            _ => {
-                return Err(AgeError::PassphraseError {
-                    message: "Identity files not yet supported".to_string(),
-                });
-            }
-        };
-
         // Convert to legacy options
         let options = LockOptions {
             format: request.format,
             recursive: request.recursive,
             pattern_filter: request.pattern.clone(),
             backup_before_lock: request.backup,
+            backup_dir: request.backup_dir.clone(),
         };
 
-        self.lock(&request.target, &passphrase, options)
+        if let Some(recipients) = request
+            .recipients
+            .as_deref()
+            .filter(|list| !list.is_empty())
+        {
+            return self.lock_with_recipients(
+                &request.target,
+                &request.identity,
+                recipients,
+                options,
+            );
+        }
+
+        match &request.identity {
+            Identity::Passphrase(pass) => self.lock(&request.target, pass, options),
+            Identity::PromptPassphrase => Err(AgeError::PassphraseError {
+                message: "Interactive prompt not yet implemented".to_string(),
+            }),
+            Identity::IdentityFile(_) | Identity::SshKey(_) => Err(AgeError::InvalidOperation {
+                operation: "lock".to_string(),
+                reason: "Identity-based encryption requires recipients and is not supported yet"
+                    .to_string(),
+            }),
+        }
     }
 
     /// Unlock operation using request struct (CAGE-11)
     pub fn unlock_with_request(&mut self, request: &UnlockRequest) -> AgeResult<OperationResult> {
-        // Extract passphrase from identity
-        let passphrase = match &request.identity {
-            Identity::Passphrase(p) => p.clone(),
-            Identity::PromptPassphrase => {
-                // TODO: Implement interactive prompt
-                return Err(AgeError::PassphraseError {
-                    message: "Interactive prompt not yet implemented".to_string(),
-                });
-            }
-            _ => {
-                return Err(AgeError::PassphraseError {
-                    message: "Identity files not yet supported".to_string(),
-                });
-            }
-        };
-
-        // Convert to legacy options
         let options = UnlockOptions {
             selective: request.selective,
             verify_before_unlock: request.verify_first,
@@ -460,7 +593,15 @@ impl CrudManager {
             preserve_encrypted: request.preserve_encrypted,
         };
 
-        self.unlock(&request.target, &passphrase, options)
+        match &request.identity {
+            Identity::Passphrase(pass) => self.unlock(&request.target, pass, options),
+            Identity::IdentityFile(_) | Identity::SshKey(_) => {
+                self.unlock_with_identity(&request.target, &request.identity, options)
+            }
+            Identity::PromptPassphrase => Err(AgeError::PassphraseError {
+                message: "Interactive prompt not yet implemented".to_string(),
+            }),
+        }
     }
 
     /// Verify operation using request struct (CAGE-11)
@@ -873,6 +1014,118 @@ impl CrudManager {
         Ok(result)
     }
 
+    /// DELETE: Unlock (decrypt) files using identity/SSH keys
+    fn unlock_with_identity(
+        &mut self,
+        path: &Path,
+        identity: &Identity,
+        options: UnlockOptions,
+    ) -> AgeResult<OperationResult> {
+        let start_time = Instant::now();
+        self.audit_logger
+            .log_operation_start_single("unlock", path)?;
+
+        let mut result = OperationResult::new();
+
+        if !path.exists() {
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
+        }
+
+        if options.verify_before_unlock {
+            let status = self.status(path)?;
+            if status.encrypted_files == 0 {
+                return Err(AgeError::InvalidOperation {
+                    operation: "unlock".to_string(),
+                    reason: "No encrypted files found".to_string(),
+                });
+            }
+        }
+
+        let adapter = ShellAdapterV2::new()?;
+        let identity_clone = identity.clone();
+        let mut decrypt =
+            move |input: &Path, output: &Path| adapter.decrypt_file(input, output, &identity_clone);
+
+        if path.is_file() {
+            self.unlock_single_file_internal(path, &options, &mut result, &mut decrypt)?;
+        } else if path.is_dir() {
+            self.unlock_repository_internal(path, &options, &mut result, &mut decrypt)?;
+        }
+
+        self.record_operation("unlock", path, true, &result);
+        result.finalize(start_time);
+
+        self.audit_logger
+            .log_operation_complete("unlock", path, &result)?;
+        Ok(result)
+    }
+
+    /// CREATE: Lock files using recipient-based encryption flows
+    fn lock_with_recipients(
+        &mut self,
+        path: &Path,
+        identity: &Identity,
+        recipients: &[Recipient],
+        options: LockOptions,
+    ) -> AgeResult<OperationResult> {
+        let start_time = Instant::now();
+        self.audit_logger.log_operation_start_single("lock", path)?;
+
+        let mut result = OperationResult::new();
+
+        if !path.exists() {
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
+        }
+
+        if recipients.is_empty() {
+            return Err(AgeError::InvalidOperation {
+                operation: "lock".to_string(),
+                reason: "Recipient list cannot be empty".to_string(),
+            });
+        }
+
+        let adapter = ShellAdapterV2::new()?;
+        let identity_clone = identity.clone();
+        let recipients_vec: Vec<Recipient> = recipients.to_vec();
+        let mut encrypt = move |input: &Path, output: &Path, format: OutputFormat| {
+            adapter.encrypt_file(
+                input,
+                output,
+                &identity_clone,
+                Some(&recipients_vec),
+                format,
+            )
+        };
+
+        if path.is_file() {
+            self.lock_single_file_internal(path, &options, &mut result, &mut encrypt)?;
+        } else if path.is_dir() {
+            if options.recursive {
+                self.lock_repository_internal(path, &options, &mut result, &mut encrypt)?;
+            } else {
+                return Err(AgeError::InvalidOperation {
+                    operation: "lock".to_string(),
+                    reason: "Directory requires --recursive flag".to_string(),
+                });
+            }
+        }
+
+        self.record_operation("lock", path, true, &result);
+        result.finalize(start_time);
+        self.audit_logger
+            .log_operation_complete("lock", path, &result)?;
+
+        Ok(result)
+    }
+
     // ========================================================================================
     // AUTHORITY MANAGEMENT OPERATIONS - Bridge to Lucas's patterns
     // ========================================================================================
@@ -1136,14 +1389,17 @@ impl CrudManager {
         Ok(())
     }
 
-    /// Lock a single file
-    fn lock_single_file(
+    /// Lock a single file using provided encrypt strategy
+    fn lock_single_file_internal<F>(
         &self,
         file: &Path,
-        passphrase: &str,
         options: &LockOptions,
         result: &mut OperationResult,
-    ) -> AgeResult<()> {
+        encrypt_fn: &mut F,
+    ) -> AgeResult<()>
+    where
+        F: FnMut(&Path, &Path, OutputFormat) -> AgeResult<()>,
+    {
         let output_path = {
             let mut path = file.as_os_str().to_os_string();
             path.push(self.config.extension_with_dot());
@@ -1152,9 +1408,8 @@ impl CrudManager {
 
         let mut backup_info: Option<BackupInfo> = None;
 
-        // Create backup if requested
         if options.backup_before_lock {
-            let backup_manager = BackupManager::new();
+            let backup_manager = self.build_backup_manager(options);
             match backup_manager.create_backup(file) {
                 Ok(info) => {
                     backup_info = Some(info);
@@ -1163,6 +1418,24 @@ impl CrudManager {
                         file.display(),
                         backup_info.as_ref().unwrap().backup_path.display()
                     ))?;
+
+                    match backup_manager.enforce_retention(file) {
+                        Ok(paths) => {
+                            for deleted in paths {
+                                self.audit_logger.log_info(&format!(
+                                    "Removed expired backup: {}",
+                                    deleted.display()
+                                ))?;
+                            }
+                        }
+                        Err(e) => {
+                            self.audit_logger.log_warning(&format!(
+                                "Failed to enforce backup retention for {}: {}",
+                                file.display(),
+                                e
+                            ))?;
+                        }
+                    }
                 }
                 Err(e) => {
                     self.audit_logger.log_error(&format!(
@@ -1176,17 +1449,12 @@ impl CrudManager {
             }
         }
 
-        // Perform encryption
-        match self
-            .adapter
-            .encrypt(file, &output_path, passphrase, options.format)
-        {
+        match encrypt_fn(file, &output_path, options.format) {
             Ok(_) => {
                 result.add_success(file.display().to_string());
 
-                // Clean up backup on success if configured
                 if let Some(backup) = backup_info {
-                    let backup_manager = BackupManager::new();
+                    let backup_manager = self.build_backup_manager(options);
                     if backup_manager.cleanup_on_success {
                         if let Err(e) = backup_manager.cleanup_backup(&backup) {
                             self.audit_logger.log_warning(&format!(
@@ -1208,9 +1476,8 @@ impl CrudManager {
             Err(e) => {
                 result.add_failure(file.display().to_string());
 
-                // Restore from backup on failure
                 if let Some(backup) = backup_info {
-                    let backup_manager = BackupManager::new();
+                    let backup_manager = self.build_backup_manager(options);
                     if let Err(restore_err) = backup_manager.restore_backup(&backup) {
                         self.audit_logger.log_error(&format!(
                             "CRITICAL: Failed to restore backup {}: {}",
@@ -1230,20 +1497,36 @@ impl CrudManager {
         }
     }
 
-    /// Lock repository (directory)
-    fn lock_repository(
+    /// Lock a single file with passphrase credentials
+    fn lock_single_file(
         &self,
-        repository: &Path,
+        file: &Path,
         passphrase: &str,
         options: &LockOptions,
         result: &mut OperationResult,
     ) -> AgeResult<()> {
+        let mut encrypt = |input: &Path, output: &Path, format: OutputFormat| {
+            self.adapter.encrypt(input, output, passphrase, format)
+        };
+        self.lock_single_file_internal(file, options, result, &mut encrypt)
+    }
+
+    /// Lock repository (directory) using provided encrypt strategy
+    fn lock_repository_internal<F>(
+        &self,
+        repository: &Path,
+        options: &LockOptions,
+        result: &mut OperationResult,
+        encrypt_fn: &mut F,
+    ) -> AgeResult<()>
+    where
+        F: FnMut(&Path, &Path, OutputFormat) -> AgeResult<()>,
+    {
         let files =
             self.collect_files_with_pattern(repository, options.pattern_filter.as_deref())?;
 
         for file in files {
-            if let Err(e) = self.lock_single_file(&file, passphrase, options, result) {
-                // Continue processing other files even if one fails
+            if let Err(e) = self.lock_single_file_internal(&file, options, result, encrypt_fn) {
                 eprintln!(
                     "{}",
                     fmt_error(&format!("Failed to lock {}: {}", file.display(), e))
@@ -1254,14 +1537,31 @@ impl CrudManager {
         Ok(())
     }
 
-    /// Unlock a single file
-    fn unlock_single_file(
+    /// Lock repository (directory) with passphrase credentials
+    fn lock_repository(
         &self,
-        file: &Path,
+        repository: &Path,
         passphrase: &str,
-        options: &UnlockOptions,
+        options: &LockOptions,
         result: &mut OperationResult,
     ) -> AgeResult<()> {
+        let mut encrypt = |input: &Path, output: &Path, format: OutputFormat| {
+            self.adapter.encrypt(input, output, passphrase, format)
+        };
+        self.lock_repository_internal(repository, options, result, &mut encrypt)
+    }
+
+    /// Unlock a single file using provided decrypt strategy
+    fn unlock_single_file_internal<F>(
+        &self,
+        file: &Path,
+        options: &UnlockOptions,
+        result: &mut OperationResult,
+        decrypt_fn: &mut F,
+    ) -> AgeResult<()>
+    where
+        F: FnMut(&Path, &Path) -> AgeResult<()>,
+    {
         // Determine output path by stripping only the configured extension suffix
         let output_path = {
             let file_name_os = file.file_name().ok_or_else(|| {
@@ -1326,7 +1626,6 @@ impl CrudManager {
                             .error_message
                             .unwrap_or_else(|| "File failed integrity verification".to_string());
 
-                        // In selective mode, skip gracefully; otherwise, error out
                         if options.selective {
                             eprintln!(
                                 "{}",
@@ -1356,7 +1655,6 @@ impl CrudManager {
                 Err(e) => {
                     result.add_failure(file.display().to_string());
 
-                    // In selective mode, skip gracefully; otherwise, error out
                     if options.selective {
                         eprintln!(
                             "{}",
@@ -1385,13 +1683,11 @@ impl CrudManager {
             }
         }
 
-        match self.adapter.decrypt(file, &output_path, passphrase) {
+        match decrypt_fn(file, &output_path) {
             Ok(_) => {
                 result.add_success(file.display().to_string());
 
-                // Honor preserve_encrypted option
                 if !options.preserve_encrypted {
-                    // Delete the encrypted file after successful unlock
                     if let Err(e) = std::fs::remove_file(file) {
                         eprintln!(
                             "{}",
@@ -1401,7 +1697,6 @@ impl CrudManager {
                                 e
                             ))
                         );
-                        // Don't fail the operation if we can't delete the encrypted file
                     } else {
                         eprintln!("{}", fmt_deleted(&file.display().to_string()));
                     }
@@ -1418,19 +1713,35 @@ impl CrudManager {
         }
     }
 
-    /// Unlock repository (directory)
-    fn unlock_repository(
+    /// Unlock a single file using passphrase credentials
+    fn unlock_single_file(
         &self,
-        repository: &Path,
+        file: &Path,
         passphrase: &str,
         options: &UnlockOptions,
         result: &mut OperationResult,
     ) -> AgeResult<()> {
+        let mut decrypt =
+            |input: &Path, output: &Path| self.adapter.decrypt(input, output, passphrase);
+        self.unlock_single_file_internal(file, options, result, &mut decrypt)
+    }
+
+    /// Unlock repository (directory) using provided decrypt strategy
+    fn unlock_repository_internal<F>(
+        &self,
+        repository: &Path,
+        options: &UnlockOptions,
+        result: &mut OperationResult,
+        decrypt_fn: &mut F,
+    ) -> AgeResult<()>
+    where
+        F: FnMut(&Path, &Path) -> AgeResult<()>,
+    {
         let files = self
             .collect_encrypted_files_with_pattern(repository, options.pattern_filter.as_deref())?;
 
         for file in files {
-            if let Err(e) = self.unlock_single_file(&file, passphrase, options, result) {
+            if let Err(e) = self.unlock_single_file_internal(&file, options, result, decrypt_fn) {
                 eprintln!(
                     "{}",
                     fmt_error(&format!("Failed to unlock {}: {}", file.display(), e))
@@ -1439,6 +1750,19 @@ impl CrudManager {
         }
 
         Ok(())
+    }
+
+    /// Unlock repository (directory) using passphrase credentials
+    fn unlock_repository(
+        &self,
+        repository: &Path,
+        passphrase: &str,
+        options: &UnlockOptions,
+        result: &mut OperationResult,
+    ) -> AgeResult<()> {
+        let mut decrypt =
+            |input: &Path, output: &Path| self.adapter.decrypt(input, output, passphrase);
+        self.unlock_repository_internal(repository, options, result, &mut decrypt)
     }
 
     /// Get status for a single file

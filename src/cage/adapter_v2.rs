@@ -7,14 +7,37 @@ use super::config::OutputFormat;
 use super::error::{AgeError, AgeResult};
 use super::pty_wrap::PtyAgeAutomator;
 use super::requests::{Identity, Recipient};
+use super::strings;
 use age::ssh::Recipient as AgeSshRecipient;
+use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::thread;
 use tempfile::tempdir;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StreamingStrategy {
+    TempFile,
+    Pipe,
+    Auto,
+}
+
+fn streaming_strategy_from_env() -> StreamingStrategy {
+    match env::var("CAGE_STREAMING_STRATEGY")
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "pipe" | "pipes" => StreamingStrategy::Pipe,
+        "auto" => StreamingStrategy::Auto,
+        "temp" | "tempfile" => StreamingStrategy::TempFile,
+        _ => StreamingStrategy::TempFile,
+    }
+}
 
 // ============================================================================
 // CORE ADAPTER TRAITS
@@ -46,8 +69,8 @@ pub trait AgeAdapterV2: Send + Sync {
     /// Encrypt from reader to writer
     fn encrypt_stream(
         &self,
-        input: &mut dyn Read,
-        output: &mut dyn Write,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
         _identity: &Identity,
         recipients: Option<&[Recipient]>,
         format: OutputFormat,
@@ -56,8 +79,8 @@ pub trait AgeAdapterV2: Send + Sync {
     /// Decrypt from reader to writer
     fn decrypt_stream(
         &self,
-        input: &mut dyn Read,
-        output: &mut dyn Write,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
         _identity: &Identity,
     ) -> AgeResult<u64>; // Returns bytes processed
 
@@ -207,6 +230,9 @@ pub struct AdapterCapabilities {
     /// Supports streaming operations
     pub streaming: bool,
 
+    /// Streaming strategy metadata
+    pub streaming_strategies: StreamingStrategyInfo,
+
     /// Supports ASCII armor format
     pub ascii_armor: bool,
 
@@ -218,6 +244,42 @@ pub struct AdapterCapabilities {
 
     /// Maximum file size (None for unlimited)
     pub max_file_size: Option<u64>,
+}
+
+/// Describes available streaming strategies and constraints
+#[derive(Debug, Clone)]
+pub struct StreamingStrategyInfo {
+    /// Strategy selected when no configuration overrides are present
+    pub default: StreamingStrategyKind,
+
+    /// Strategy currently configured (env or config overrides applied)
+    pub configured: StreamingStrategyKind,
+
+    /// Environment override when present
+    pub env_override: Option<StreamingStrategyKind>,
+
+    /// Temp-file staging support available
+    pub supports_tempfile: bool,
+
+    /// Direct pipe streaming support available
+    pub supports_pipe: bool,
+
+    /// Auto mode negotiates between strategies
+    pub auto_fallback: bool,
+
+    /// Pipe encryption requires recipients (public-key mode)
+    pub pipe_requires_recipients: bool,
+
+    /// Pipe decryption requires identity files/SSH keys
+    pub pipe_requires_identity: bool,
+}
+
+/// Supported streaming strategy kinds for capability reporting
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StreamingStrategyKind {
+    TempFile,
+    Pipe,
+    Auto,
 }
 
 // ============================================================================
@@ -288,6 +350,16 @@ impl super::adapter::AgeAdapter for AdapterV1Compat {
 pub struct ShellAdapterV2;
 
 impl ShellAdapterV2 {
+    fn join_stream_thread<T>(
+        handle: thread::ScopedJoinHandle<'_, AgeResult<T>>,
+        context: &'static str,
+    ) -> AgeResult<T> {
+        handle.join().map_err(|_| AgeError::InvalidOperation {
+            operation: context.into(),
+            reason: "Streaming worker thread panicked".into(),
+        })?
+    }
+
     pub fn new() -> AgeResult<Self> {
         let automator = PtyAgeAutomator::new()?;
         automator.check_age_binary()?;
@@ -313,6 +385,12 @@ impl ShellAdapterV2 {
         format: OutputFormat,
     ) -> AgeResult<()> {
         let args = collect_recipient_args(recipients)?;
+        if args.is_empty() {
+            return Err(AgeError::InvalidOperation {
+                operation: "encrypt_stream_pipe".into(),
+                reason: "Recipient list cannot be empty".into(),
+            });
+        }
         if args.is_empty() {
             return Err(AgeError::InvalidOperation {
                 operation: "encrypt".into(),
@@ -427,128 +505,69 @@ impl AgeAdapterV2 for ShellAdapterV2 {
 
     fn encrypt_stream(
         &self,
-        input: &mut dyn Read,
-        output: &mut dyn Write,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
         identity: &Identity,
         recipients: Option<&[Recipient]>,
         format: OutputFormat,
     ) -> AgeResult<u64> {
-        let temp_dir = tempdir().map_err(|e| AgeError::TemporaryResourceError {
-            resource_type: "dir".into(),
-            operation: "create".into(),
-            reason: format!("{e:?}"),
-        })?;
+        let strategy = streaming_strategy_from_env();
+        let recipients_list = recipients.unwrap_or(&[]);
+        let can_use_pipe = !recipients_list.is_empty();
 
-        let input_path = temp_dir.path().join("stream_input");
-        let mut temp_in = File::create(&input_path)
-            .map_err(|e| AgeError::file_error("create", input_path.clone(), e))?;
-        let bytes_copied = std::io::copy(input, &mut temp_in).map_err(|e| AgeError::IoError {
-            operation: "stream_copy".into(),
-            context: "encrypt_stream".into(),
-            source: e,
-        })?;
-        temp_in.flush().map_err(|e| AgeError::IoError {
-            operation: "flush".into(),
-            context: "encrypt_stream".into(),
-            source: e,
-        })?;
-
-        let output_path = temp_dir.path().join("stream_output");
-
-        if let Some(recips) = recipients {
-            if !recips.is_empty() {
-                self.encrypt_with_recipients(&input_path, &output_path, recips, format)?;
-            } else {
-                let pass = match identity {
-                    Identity::Passphrase(p) => p.clone(),
-                    _ => {
-                        return Err(AgeError::AdapterNotImplemented(
-                            "Streaming requires passphrase or recipients".into(),
-                        ))
-                    }
-                };
-                self.encrypt_with_passphrase(&input_path, &output_path, &pass, format)?;
-            }
-        } else {
-            let pass = match identity {
-                Identity::Passphrase(p) => p.clone(),
-                _ => {
-                    return Err(AgeError::AdapterNotImplemented(
-                        "Streaming requires passphrase or recipients".into(),
-                    ))
-                }
-            };
-            self.encrypt_with_passphrase(&input_path, &output_path, &pass, format)?;
+        if !can_use_pipe && matches!(strategy, StreamingStrategy::Pipe) {
+            return Err(AgeError::InvalidOperation {
+                operation: "encrypt_stream".into(),
+                reason: strings::ERR_STREAM_PIPE_REQUIRES_RECIPIENTS.into(),
+            });
         }
 
-        let mut encrypted = File::open(&output_path)
-            .map_err(|e| AgeError::file_error("open", output_path.clone(), e))?;
-        std::io::copy(&mut encrypted, output).map_err(|e| AgeError::IoError {
-            operation: "stream_copy".into(),
-            context: "encrypt_stream".into(),
-            source: e,
-        })?;
+        if can_use_pipe && matches!(strategy, StreamingStrategy::Pipe | StreamingStrategy::Auto) {
+            match self.encrypt_stream_pipe(input, output, recipients_list, format) {
+                Ok(bytes) => return Ok(bytes),
+                Err(err) => {
+                    if strategy == StreamingStrategy::Pipe {
+                        return Err(err);
+                    } else {
+                        eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+                    }
+                }
+            }
+        }
 
-        Ok(bytes_copied)
+        self.encrypt_stream_temp(input, output, identity, recipients, format)
     }
 
     fn decrypt_stream(
         &self,
-        input: &mut dyn Read,
-        output: &mut dyn Write,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
         identity: &Identity,
     ) -> AgeResult<u64> {
-        let temp_dir = tempdir().map_err(|e| AgeError::TemporaryResourceError {
-            resource_type: "dir".into(),
-            operation: "create".into(),
-            reason: format!("{e:?}"),
-        })?;
+        let strategy = streaming_strategy_from_env();
+        let can_use_pipe = matches!(identity, Identity::IdentityFile(_) | Identity::SshKey(_));
 
-        let input_path = temp_dir.path().join("stream_input.cage");
-        let mut temp_in = File::create(&input_path)
-            .map_err(|e| AgeError::file_error("create", input_path.clone(), e))?;
-        let bytes_copied = std::io::copy(input, &mut temp_in).map_err(|e| AgeError::IoError {
-            operation: "stream_copy".into(),
-            context: "decrypt_stream".into(),
-            source: e,
-        })?;
-        temp_in.flush().map_err(|e| AgeError::IoError {
-            operation: "flush".into(),
-            context: "decrypt_stream".into(),
-            source: e,
-        })?;
+        if !can_use_pipe && matches!(strategy, StreamingStrategy::Pipe) {
+            return Err(AgeError::InvalidOperation {
+                operation: "decrypt_stream".into(),
+                reason: strings::ERR_STREAM_PIPE_REQUIRES_IDENTITY.into(),
+            });
+        }
 
-        let output_path = temp_dir.path().join("stream_output");
-
-        match identity {
-            Identity::Passphrase(pass) => {
-                let automator = PtyAgeAutomator::new()?;
-                automator.decrypt(&input_path, &output_path, pass)?;
-            }
-            Identity::IdentityFile(path) => {
-                self.decrypt_with_identity_file(&input_path, &output_path, path)?;
-            }
-            Identity::PromptPassphrase => {
-                return Err(AgeError::AdapterNotImplemented(
-                    "PromptPassphrase not supported in ShellAdapterV2".into(),
-                ));
-            }
-            Identity::SshKey(_) => {
-                return Err(AgeError::AdapterNotImplemented(
-                    "SSH identities not yet implemented".into(),
-                ));
+        if can_use_pipe && matches!(strategy, StreamingStrategy::Pipe | StreamingStrategy::Auto) {
+            match self.decrypt_stream_pipe(input, output, identity) {
+                Ok(bytes) => return Ok(bytes),
+                Err(err) => {
+                    if strategy == StreamingStrategy::Pipe {
+                        return Err(err);
+                    } else {
+                        eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+                    }
+                }
             }
         }
 
-        let mut decrypted = File::open(&output_path)
-            .map_err(|e| AgeError::file_error("open", output_path.clone(), e))?;
-        std::io::copy(&mut decrypted, output).map_err(|e| AgeError::IoError {
-            operation: "stream_copy".into(),
-            context: "decrypt_stream".into(),
-            source: e,
-        })?;
-
-        Ok(bytes_copied)
+        self.decrypt_stream_temp(input, output, identity)
     }
 
     fn validate_identity(&self, identity: &Identity) -> AgeResult<()> {
@@ -646,12 +665,35 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     }
 
     fn capabilities(&self) -> AdapterCapabilities {
+        let env_override = match env::var("CAGE_STREAMING_STRATEGY")
+            .ok()
+            .map(|v| v.to_lowercase())
+            .as_deref()
+        {
+            Some("pipe") | Some("pipes") => Some(StreamingStrategyKind::Pipe),
+            Some("auto") => Some(StreamingStrategyKind::Auto),
+            Some("temp") | Some("tempfile") => Some(StreamingStrategyKind::TempFile),
+            _ => None,
+        };
+
+        let configured = env_override.unwrap_or(StreamingStrategyKind::TempFile);
+
         AdapterCapabilities {
             passphrase: true,
             public_key: true,
             identity_files: true,
             ssh_recipients: false,
             streaming: true,
+            streaming_strategies: StreamingStrategyInfo {
+                default: StreamingStrategyKind::TempFile,
+                configured,
+                env_override,
+                supports_tempfile: true,
+                supports_pipe: true,
+                auto_fallback: true,
+                pipe_requires_recipients: true,
+                pipe_requires_identity: true,
+            },
             ascii_armor: true,
             hardware_keys: false,
             key_derivation: false,
@@ -669,6 +711,363 @@ impl AgeAdapterV2 for ShellAdapterV2 {
 
     fn clone_box(&self) -> Box<dyn AgeAdapterV2> {
         Box::new(Self)
+    }
+}
+
+impl ShellAdapterV2 {
+    fn encrypt_stream_temp(
+        &self,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
+        identity: &Identity,
+        recipients: Option<&[Recipient]>,
+        format: OutputFormat,
+    ) -> AgeResult<u64> {
+        let temp_dir = tempdir().map_err(|e| AgeError::TemporaryResourceError {
+            resource_type: "dir".into(),
+            operation: "create".into(),
+            reason: format!("{e:?}"),
+        })?;
+
+        let input_path = temp_dir.path().join("stream_input");
+        let mut temp_in = File::create(&input_path)
+            .map_err(|e| AgeError::file_error("create", input_path.clone(), e))?;
+        let bytes_copied = std::io::copy(input, &mut temp_in).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "encrypt_stream".into(),
+            source: e,
+        })?;
+        temp_in.flush().map_err(|e| AgeError::IoError {
+            operation: "flush".into(),
+            context: "encrypt_stream".into(),
+            source: e,
+        })?;
+
+        let output_path = temp_dir.path().join("stream_output");
+
+        if let Some(recips) = recipients {
+            if !recips.is_empty() {
+                self.encrypt_with_recipients(&input_path, &output_path, recips, format)?;
+            } else {
+                let pass = match identity {
+                    Identity::Passphrase(p) => p.clone(),
+                    _ => {
+                        return Err(AgeError::AdapterNotImplemented(
+                            "Streaming requires passphrase or recipients".into(),
+                        ))
+                    }
+                };
+                self.encrypt_with_passphrase(&input_path, &output_path, &pass, format)?;
+            }
+        } else {
+            let pass = match identity {
+                Identity::Passphrase(p) => p.clone(),
+                _ => {
+                    return Err(AgeError::AdapterNotImplemented(
+                        "Streaming requires passphrase or recipients".into(),
+                    ))
+                }
+            };
+            self.encrypt_with_passphrase(&input_path, &output_path, &pass, format)?;
+        }
+
+        let mut encrypted = File::open(&output_path)
+            .map_err(|e| AgeError::file_error("open", output_path.clone(), e))?;
+        std::io::copy(&mut encrypted, output).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "encrypt_stream".into(),
+            source: e,
+        })?;
+
+        Ok(bytes_copied)
+    }
+
+    fn encrypt_stream_pipe(
+        &self,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
+        recipients: &[Recipient],
+        format: OutputFormat,
+    ) -> AgeResult<u64> {
+        let args = collect_recipient_args(recipients)?;
+
+        let mut cmd = Command::new("age");
+        if matches!(format, OutputFormat::AsciiArmor) {
+            cmd.arg("-a");
+        }
+        cmd.args(&args);
+        cmd.stdin(Stdio::piped());
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| AgeError::ProcessExecutionFailed {
+            command: "age".into(),
+            exit_code: None,
+            stderr: e.to_string(),
+        })?;
+
+        let mut child_stdin =
+            child
+                .stdin
+                .take()
+                .ok_or_else(|| AgeError::ProcessExecutionFailed {
+                    command: "age".into(),
+                    exit_code: None,
+                    stderr: "Failed to open stdin for age".into(),
+                })?;
+        let child_stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| AgeError::ProcessExecutionFailed {
+                command: "age".into(),
+                exit_code: None,
+                stderr: "Failed to open stdout for age".into(),
+            })?;
+        let mut stderr_pipe = child.stderr.take();
+        let mut stderr_buffer = Vec::new();
+
+        let bytes_copied = thread::scope(|scope| -> AgeResult<u64> {
+            let output_writer: &mut (dyn Write + Send) = output;
+            let stdout_handle = scope.spawn(move || -> AgeResult<u64> {
+                let mut stdout_pipe = child_stdout;
+                std::io::copy(&mut stdout_pipe, output_writer).map_err(|e| AgeError::IoError {
+                    operation: "stream_copy".into(),
+                    context: "encrypt_stream_pipe:stdout".into(),
+                    source: e,
+                })
+            });
+
+            let stderr_handle = stderr_pipe.take().map(|mut pipe| {
+                let stderr_ref: &mut Vec<u8> = &mut stderr_buffer;
+                scope.spawn(move || -> AgeResult<()> {
+                    pipe.read_to_end(stderr_ref)
+                        .map_err(|e| AgeError::IoError {
+                            operation: "read".into(),
+                            context: "encrypt_stream_pipe:stderr".into(),
+                            source: e,
+                        })?;
+                    Ok(())
+                })
+            });
+
+            let bytes_written =
+                std::io::copy(input, &mut child_stdin).map_err(|e| AgeError::IoError {
+                    operation: "stream_copy".into(),
+                    context: "encrypt_stream_pipe:stdin".into(),
+                    source: e,
+                })?;
+
+            child_stdin.flush().map_err(|e| AgeError::IoError {
+                operation: "flush".into(),
+                context: "encrypt_stream_pipe:stdin".into(),
+                source: e,
+            })?;
+            drop(child_stdin);
+
+            let _ = Self::join_stream_thread(stdout_handle, "encrypt_stream_pipe:stdout")?;
+            if let Some(handle) = stderr_handle {
+                let _ = Self::join_stream_thread(handle, "encrypt_stream_pipe:stderr")?;
+            }
+
+            Ok(bytes_written)
+        })?;
+
+        let status = child.wait().map_err(|e| AgeError::ProcessExecutionFailed {
+            command: "age".into(),
+            exit_code: None,
+            stderr: e.to_string(),
+        })?;
+
+        if !status.success() {
+            let stderr_msg = if !stderr_buffer.is_empty() {
+                String::from_utf8_lossy(&stderr_buffer).to_string()
+            } else {
+                "age command failed without stderr output".to_string()
+            };
+            return Err(AgeError::ProcessExecutionFailed {
+                command: "age".into(),
+                exit_code: status.code(),
+                stderr: stderr_msg,
+            });
+        }
+
+        Ok(bytes_copied)
+    }
+
+    fn decrypt_stream_temp(
+        &self,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
+        identity: &Identity,
+    ) -> AgeResult<u64> {
+        let temp_dir = tempdir().map_err(|e| AgeError::TemporaryResourceError {
+            resource_type: "dir".into(),
+            operation: "create".into(),
+            reason: format!("{e:?}"),
+        })?;
+
+        let input_path = temp_dir.path().join("stream_input.cage");
+        let mut temp_in = File::create(&input_path)
+            .map_err(|e| AgeError::file_error("create", input_path.clone(), e))?;
+        let bytes_copied = std::io::copy(input, &mut temp_in).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "decrypt_stream".into(),
+            source: e,
+        })?;
+        temp_in.flush().map_err(|e| AgeError::IoError {
+            operation: "flush".into(),
+            context: "decrypt_stream".into(),
+            source: e,
+        })?;
+
+        let output_path = temp_dir.path().join("stream_output");
+
+        match identity {
+            Identity::Passphrase(pass) => {
+                let automator = PtyAgeAutomator::new()?;
+                automator.decrypt(&input_path, &output_path, pass)?;
+            }
+            Identity::IdentityFile(path) | Identity::SshKey(path) => {
+                self.decrypt_with_identity_file(&input_path, &output_path, path)?;
+            }
+            Identity::PromptPassphrase => {
+                return Err(AgeError::AdapterNotImplemented(
+                    "PromptPassphrase not supported in ShellAdapterV2".into(),
+                ));
+            }
+        }
+
+        let mut decrypted = File::open(&output_path)
+            .map_err(|e| AgeError::file_error("open", output_path.clone(), e))?;
+        std::io::copy(&mut decrypted, output).map_err(|e| AgeError::IoError {
+            operation: "stream_copy".into(),
+            context: "decrypt_stream".into(),
+            source: e,
+        })?;
+
+        Ok(bytes_copied)
+    }
+
+    fn decrypt_stream_pipe(
+        &self,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
+        identity: &Identity,
+    ) -> AgeResult<u64> {
+        let identity_path = match identity {
+            Identity::IdentityFile(path) | Identity::SshKey(path) => path,
+            Identity::PromptPassphrase => {
+                return Err(AgeError::AdapterNotImplemented(
+                    "PromptPassphrase not supported in ShellAdapterV2".into(),
+                ))
+            }
+            Identity::Passphrase(_) => {
+                return Err(AgeError::AdapterNotImplemented(
+                    "Passphrase-based streaming requires PTY; pipe strategy unavailable".into(),
+                ))
+            }
+        };
+
+        let mut cmd = Command::new("age");
+        cmd.arg("-d");
+        cmd.arg("-i");
+        cmd.arg(identity_path);
+        cmd.stdin(Stdio::piped());
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| AgeError::ProcessExecutionFailed {
+            command: "age".into(),
+            exit_code: None,
+            stderr: e.to_string(),
+        })?;
+
+        let mut child_stdin =
+            child
+                .stdin
+                .take()
+                .ok_or_else(|| AgeError::ProcessExecutionFailed {
+                    command: "age".into(),
+                    exit_code: None,
+                    stderr: "Failed to open stdin for age".into(),
+                })?;
+        let child_stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| AgeError::ProcessExecutionFailed {
+                command: "age".into(),
+                exit_code: None,
+                stderr: "Failed to open stdout for age".into(),
+            })?;
+        let mut stderr_pipe = child.stderr.take();
+        let mut stderr_buffer = Vec::new();
+
+        let bytes_copied = thread::scope(|scope| -> AgeResult<u64> {
+            let output_writer: &mut (dyn Write + Send) = output;
+            let stdout_handle = scope.spawn(move || -> AgeResult<u64> {
+                let mut stdout_pipe = child_stdout;
+                std::io::copy(&mut stdout_pipe, output_writer).map_err(|e| AgeError::IoError {
+                    operation: "stream_copy".into(),
+                    context: "decrypt_stream_pipe:stdout".into(),
+                    source: e,
+                })
+            });
+
+            let stderr_handle = stderr_pipe.take().map(|mut pipe| {
+                let stderr_ref: &mut Vec<u8> = &mut stderr_buffer;
+                scope.spawn(move || -> AgeResult<()> {
+                    pipe.read_to_end(stderr_ref)
+                        .map_err(|e| AgeError::IoError {
+                            operation: "read".into(),
+                            context: "decrypt_stream_pipe:stderr".into(),
+                            source: e,
+                        })?;
+                    Ok(())
+                })
+            });
+
+            let bytes_written =
+                std::io::copy(input, &mut child_stdin).map_err(|e| AgeError::IoError {
+                    operation: "stream_copy".into(),
+                    context: "decrypt_stream_pipe:stdin".into(),
+                    source: e,
+                })?;
+
+            child_stdin.flush().map_err(|e| AgeError::IoError {
+                operation: "flush".into(),
+                context: "decrypt_stream_pipe:stdin".into(),
+                source: e,
+            })?;
+            drop(child_stdin);
+
+            let _ = Self::join_stream_thread(stdout_handle, "decrypt_stream_pipe:stdout")?;
+            if let Some(handle) = stderr_handle {
+                let _ = Self::join_stream_thread(handle, "decrypt_stream_pipe:stderr")?;
+            }
+
+            Ok(bytes_written)
+        })?;
+
+        let status = child.wait().map_err(|e| AgeError::ProcessExecutionFailed {
+            command: "age".into(),
+            exit_code: None,
+            stderr: e.to_string(),
+        })?;
+
+        if !status.success() {
+            let stderr_msg = if !stderr_buffer.is_empty() {
+                String::from_utf8_lossy(&stderr_buffer).to_string()
+            } else {
+                "age command failed without stderr output".to_string()
+            };
+            return Err(AgeError::ProcessExecutionFailed {
+                command: "age".into(),
+                exit_code: status.code(),
+                stderr: stderr_msg,
+            });
+        }
+
+        Ok(bytes_copied)
     }
 }
 
@@ -770,6 +1169,37 @@ impl StreamBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use age::secrecy::ExposeSecret;
+    use age::x25519::Identity as X25519Identity;
+    use std::env;
+    use std::io::Write as IoWrite;
+    use tempfile::NamedTempFile;
+
+    struct EnvVarGuard {
+        key: String,
+        prev: Option<String>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &str, value: &str) -> Self {
+            let prev = env::var(key).ok();
+            env::set_var(key, value);
+            Self {
+                key: key.to_string(),
+                prev,
+            }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            if let Some(prev) = &self.prev {
+                env::set_var(&self.key, prev);
+            } else {
+                env::remove_var(&self.key);
+            }
+        }
+    }
 
     #[test]
     fn test_stream_buffer() {
@@ -792,6 +1222,14 @@ mod tests {
             identity_files: true,
             ssh_recipients: false,
             streaming: true,
+            streaming_strategies: StreamingStrategyInfo {
+                default: StreamingStrategyKind::Auto,
+                supports_tempfile: true,
+                supports_pipe: true,
+                auto_fallback: true,
+                pipe_requires_recipients: true,
+                pipe_requires_identity: true,
+            },
             ascii_armor: true,
             hardware_keys: false,
             key_derivation: false,
@@ -800,6 +1238,11 @@ mod tests {
 
         assert!(caps.passphrase);
         assert!(caps.streaming);
+        assert!(caps.streaming_strategies.supports_pipe);
+        assert_eq!(
+            caps.streaming_strategies.default,
+            StreamingStrategyKind::Auto
+        );
         assert_eq!(caps.max_file_size, Some(1_073_741_824));
     }
 
@@ -837,6 +1280,63 @@ mod tests {
             .expect("Streaming decrypt failed");
 
         assert_eq!(decrypted, b"streaming round trip");
+    }
+
+    #[test]
+    fn test_shell_adapter_v2_pipe_stream_round_trip() {
+        if which::which("age").is_err() {
+            println!("Pipe streaming test skipped: age binary not available");
+            return;
+        }
+
+        let adapter = ShellAdapterV2::new().expect("Failed to create ShellAdapterV2");
+
+        let identity = X25519Identity::generate();
+        let recipient = identity.to_public().to_string();
+
+        let mut identity_file = NamedTempFile::new().expect("create identity file");
+        let identity_string = identity.to_string();
+        identity_file
+            .write_all(identity_string.expose_secret().as_bytes())
+            .expect("write identity");
+        identity_file.flush().expect("flush identity file");
+
+        let mut data = vec![0_u8; 512 * 1024];
+        for (idx, byte) in data.iter_mut().enumerate() {
+            *byte = (idx % 251) as u8;
+        }
+
+        let _guard = EnvVarGuard::set("CAGE_STREAMING_STRATEGY", "pipe");
+
+        let recipients = vec![Recipient::PublicKey(recipient)];
+
+        let mut plaintext = std::io::Cursor::new(data.clone());
+        let mut encrypted = Vec::new();
+
+        adapter
+            .encrypt_stream(
+                &mut plaintext,
+                &mut encrypted,
+                &Identity::Passphrase("placeholder".to_string()),
+                Some(&recipients),
+                OutputFormat::Binary,
+            )
+            .expect("Pipe streaming encrypt failed");
+
+        assert!(!encrypted.is_empty());
+
+        let mut encrypted_cursor = std::io::Cursor::new(encrypted);
+        let mut decrypted = Vec::new();
+
+        adapter
+            .decrypt_stream(
+                &mut encrypted_cursor,
+                &mut decrypted,
+                &Identity::IdentityFile(identity_file.path().to_path_buf()),
+            )
+            .expect("Pipe streaming decrypt failed");
+
+        assert_eq!(decrypted, data);
     }
 
     #[test]

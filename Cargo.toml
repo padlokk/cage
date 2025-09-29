@@ -27,6 +27,7 @@ rpassword = "7.3"  # Secure terminal passphrase input
 which = "8.0"      # Find binaries in PATH - TODO make sure the version bump doesnt break anything
 globset = "0.4"    # Glob pattern matching for file filters
 age = { version = "0.11.1", default-features = false, features = ["armor", "ssh", "plugin"] }
+toml = "0.8"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"  # TTY detection on Unix systems
@@ -34,4 +35,3 @@ libc = "0.2"  # TTY detection on Unix systems
 # RSB ecosystem dependencies
 rsb = { git = "https://github.com/oodx/rsb", branch = "main" }
 hub = { git = "https://github.com/oodx/hub.git", features = ["terminal-ext"] }
-

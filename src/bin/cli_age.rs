@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 // Import cage library modules
 use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
-use cage::cage::requests::{Identity, LockRequest, UnlockRequest};
+use cage::cage::requests::{Identity, LockRequest, Recipient, UnlockRequest};
 use cage::{
     CrudManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode, UnlockOptions,
 };
@@ -82,6 +82,77 @@ fn main() {
     });
 }
 
+fn collect_lock_recipients_from_cli() -> Vec<Recipient> {
+    let mut recipients = Vec::new();
+
+    let single = get_var("opt_recipient");
+    if !single.is_empty() {
+        for entry in single
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            recipients.push(Recipient::PublicKey(entry.to_string()));
+        }
+    }
+
+    let multiple = get_var("opt_recipients");
+    if !multiple.is_empty() {
+        let keys: Vec<String> = multiple
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !keys.is_empty() {
+            if keys.len() == 1 {
+                recipients.push(Recipient::PublicKey(keys[0].clone()));
+            } else {
+                recipients.push(Recipient::MultipleKeys(keys));
+            }
+        }
+    }
+
+    let recipients_file = get_var("opt_recipients_file");
+    if !recipients_file.is_empty() {
+        recipients.push(Recipient::RecipientsFile(PathBuf::from(recipients_file)));
+    }
+
+    let ssh_recipients = get_var("opt_ssh_recipient");
+    if !ssh_recipients.is_empty() {
+        let keys: Vec<String> = ssh_recipients
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !keys.is_empty() {
+            recipients.push(Recipient::SshRecipients(keys));
+        }
+    }
+
+    recipients
+}
+
+fn parse_unlock_identity_from_cli() -> Option<Identity> {
+    let identity_path = get_var("opt_identity");
+    if !identity_path.is_empty() {
+        return Some(Identity::IdentityFile(PathBuf::from(identity_path)));
+    }
+
+    let ssh_identity_path = get_var("opt_ssh_identity");
+    if !ssh_identity_path.is_empty() {
+        return Some(Identity::SshKey(PathBuf::from(ssh_identity_path)));
+    }
+
+    None
+}
+
+fn apply_streaming_strategy_override() {
+    let strategy = get_var("opt_streaming_strategy");
+    if !strategy.is_empty() {
+        std::env::set_var("CAGE_STREAMING_STRATEGY", strategy);
+    }
+}
+
 // RSB Command Handler Functions
 
 /// Initialize cage configuration
@@ -120,53 +191,67 @@ fn cmd_lock(args: Args) -> i32 {
         return 1;
     }
 
-    // Check for insecure command-line passphrase usage
-    let cmd_args: Vec<String> = std::env::args().collect();
-    if let Some(_insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
-        stderr!("⚠️  WARNING: Passphrase detected on command line!");
-        stderr!("   This is insecure and visible in process list.");
-        if !is_true("opt_i_am_sure") {
-            stderr!("   Use interactive prompt instead, or add --i-am-sure to override");
-            return 1;
-        }
-    }
+    let recipients = collect_lock_recipients_from_cli();
+    let using_recipients = !recipients.is_empty();
 
-    // Get passphrase securely
-    let passphrase_manager = PassphraseManager::new();
-    let passphrase = if is_true("opt_stdin_passphrase") {
-        match passphrase_manager.get_passphrase_with_mode(
-            "Enter passphrase",
-            false,
-            PassphraseMode::Stdin,
-        ) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to read passphrase from stdin: {}", e);
-                return 1;
-            }
-        }
-    } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
-        env_pass
-    } else if let Some(insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
-        // Already checked for --i-am-sure above
-        insecure_pass
+    let cmd_args: Vec<String> = std::env::args().collect();
+
+    apply_streaming_strategy_override();
+
+    let passphrase_value = if using_recipients {
+        None
     } else {
-        // Interactive prompt (secure default)
-        match passphrase_manager.get_passphrase("Enter passphrase for encryption", false) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to get passphrase: {}", e);
+        if let Some(_insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+            stderr!("⚠️  WARNING: Passphrase detected on command line!");
+            stderr!("   This is insecure and visible in process list.");
+            if !is_true("opt_i_am_sure") {
+                stderr!("   Use interactive prompt instead, or add --i-am-sure to override");
                 return 1;
             }
         }
+
+        let passphrase_manager = PassphraseManager::new();
+        let passphrase = if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter passphrase",
+                false,
+                PassphraseMode::Stdin,
+            ) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                    return 1;
+                }
+            }
+        } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
+            env_pass
+        } else if let Some(insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+            insecure_pass
+        } else {
+            match passphrase_manager.get_passphrase("Enter passphrase for encryption", false) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get passphrase: {}", e);
+                    return 1;
+                }
+            }
+        };
+
+        Some(passphrase)
+    };
+
+    let identity = if let Some(ref pass) = passphrase_value {
+        Identity::Passphrase(pass.clone())
+    } else {
+        Identity::Passphrase(String::new())
     };
 
     let recursive = is_true("opt_recursive");
-    let pattern = get_var("opt_pattern");
-    let pattern = if pattern.is_empty() {
+    let pattern_val = get_var("opt_pattern");
+    let pattern = if pattern_val.is_empty() {
         None
     } else {
-        Some(pattern)
+        Some(pattern_val)
     };
     let backup = is_true("opt_backup");
     let verbose = is_true("opt_verbose");
@@ -191,14 +276,22 @@ fn cmd_lock(args: Args) -> i32 {
 
     // Handle in-place operations with safety checks
     if in_place {
+        if using_recipients {
+            stderr!(
+                "❌ In-place mode currently requires a passphrase. Remove recipient flags to continue."
+            );
+            return 1;
+        }
         match execute_in_place_lock_operation(
             paths,
-            &passphrase,
+            passphrase_value
+                .as_ref()
+                .expect("passphrase expected for in-place operations"),
             recursive,
-            pattern,
+            pattern.clone(),
             backup,
             format,
-            audit_log,
+            audit_log.clone(),
             verbose,
             danger_mode,
             i_am_sure,
@@ -218,9 +311,10 @@ fn cmd_lock(args: Args) -> i32 {
     } else {
         match execute_lock_operation(
             paths,
-            &passphrase,
+            &identity,
+            &recipients,
             recursive,
-            pattern,
+            pattern.clone(),
             backup,
             format,
             audit_log,
@@ -256,31 +350,38 @@ fn cmd_unlock(args: Args) -> i32 {
         return 1;
     }
 
-    // Get passphrase securely (same pattern as lock)
-    let passphrase_manager = PassphraseManager::new();
-    let passphrase = if is_true("opt_stdin_passphrase") {
-        match passphrase_manager.get_passphrase_with_mode(
-            "Enter passphrase",
-            false,
-            PassphraseMode::Stdin,
-        ) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to read passphrase from stdin: {}", e);
-                return 1;
-            }
-        }
-    } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
-        env_pass
+    let identity_override = parse_unlock_identity_from_cli();
+    apply_streaming_strategy_override();
+
+    let identity = if let Some(identity) = identity_override {
+        identity
     } else {
-        // Interactive prompt (secure default)
-        match passphrase_manager.get_passphrase("Enter passphrase for decryption", false) {
-            Ok(pass) => pass,
-            Err(e) => {
-                stderr!("❌ Failed to get passphrase: {}", e);
-                return 1;
+        let passphrase_manager = PassphraseManager::new();
+        let passphrase = if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter passphrase",
+                false,
+                PassphraseMode::Stdin,
+            ) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                    return 1;
+                }
             }
-        }
+        } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
+            env_pass
+        } else {
+            match passphrase_manager.get_passphrase("Enter passphrase for decryption", false) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get passphrase: {}", e);
+                    return 1;
+                }
+            }
+        };
+
+        Identity::Passphrase(passphrase)
     };
 
     let selective = is_true("opt_selective");
@@ -302,7 +403,7 @@ fn cmd_unlock(args: Args) -> i32 {
 
     match execute_unlock_operation(
         paths,
-        &passphrase,
+        &identity,
         selective,
         pattern,
         preserve,
@@ -605,7 +706,8 @@ This demonstration showcases Age encryption operations:
 /// Execute lock operation with RSB integration
 fn execute_lock_operation(
     paths: Vec<PathBuf>,
-    passphrase: &str,
+    identity: &Identity,
+    recipients: &[Recipient],
     recursive: bool,
     pattern: Option<String>,
     backup: bool,
@@ -623,8 +725,10 @@ fn execute_lock_operation(
         return Err("No paths provided for lock operation".into());
     }
 
-    if passphrase.len() < 8 {
-        stderr!("⚠️  Warning: Passphrase is less than 8 characters. Consider using a stronger passphrase.");
+    if let Identity::Passphrase(pass) = identity {
+        if pass.len() < 8 {
+            stderr!("⚠️  Warning: Passphrase is less than 8 characters. Consider using a stronger passphrase.");
+        }
     }
 
     let options = LockOptions {
@@ -632,6 +736,7 @@ fn execute_lock_operation(
         format,
         pattern_filter: pattern,
         backup_before_lock: backup,
+        backup_dir: None,
     };
 
     let mut crud_manager = CrudManager::with_defaults()?;
@@ -675,15 +780,19 @@ fn execute_lock_operation(
         }
 
         // Use the new request API (CAGE-11)
-        let lock_request =
-            LockRequest::new(path.clone(), Identity::Passphrase(passphrase.to_string()))
-                .with_format(options.format)
-                .recursive(options.recursive);
+        let mut lock_request = LockRequest::new(path.clone(), identity.clone())
+            .with_format(options.format)
+            .recursive(options.recursive);
 
-        let lock_request = match options.pattern_filter.clone() {
-            Some(pattern_val) => lock_request.with_pattern(pattern_val),
-            None => lock_request,
-        };
+        if let Some(pattern_val) = options.pattern_filter.clone() {
+            lock_request = lock_request.with_pattern(pattern_val);
+        }
+
+        if !recipients.is_empty() {
+            lock_request = lock_request.with_recipients(recipients.to_vec());
+        }
+
+        lock_request.backup = backup;
 
         let result = match crud_manager.lock_with_request(&lock_request) {
             Ok(result) => {
@@ -758,6 +867,7 @@ fn execute_in_place_lock_operation(
         format,
         pattern_filter: pattern,
         backup_before_lock: backup,
+        backup_dir: None,
     };
 
     let mut crud_manager = CrudManager::with_defaults()?;
@@ -926,7 +1036,7 @@ fn execute_in_place_lock_operation(
 /// Execute unlock operation with RSB integration
 fn execute_unlock_operation(
     paths: Vec<PathBuf>,
-    passphrase: &str,
+    identity: &Identity,
     selective: bool,
     pattern: Option<String>,
     preserve: bool,
@@ -943,8 +1053,10 @@ fn execute_unlock_operation(
         return Err("No paths provided for unlock operation".into());
     }
 
-    if passphrase.is_empty() {
-        return Err("Passphrase cannot be empty for unlock operation".into());
+    if let Identity::Passphrase(pass) = identity {
+        if pass.is_empty() {
+            return Err("Passphrase cannot be empty for unlock operation".into());
+        }
     }
 
     let options = UnlockOptions {
@@ -995,15 +1107,13 @@ fn execute_unlock_operation(
         }
 
         // Use the new request API (CAGE-11)
-        let unlock_request =
-            UnlockRequest::new(path.clone(), Identity::Passphrase(passphrase.to_string()))
-                .selective(options.selective)
-                .preserve_encrypted(options.preserve_encrypted);
+        let mut unlock_request = UnlockRequest::new(path.clone(), identity.clone())
+            .selective(options.selective)
+            .preserve_encrypted(options.preserve_encrypted);
 
-        let unlock_request = match options.pattern_filter.clone() {
-            Some(pattern_val) => unlock_request.with_pattern(pattern_val),
-            None => unlock_request,
-        };
+        if let Some(pattern_val) = options.pattern_filter.clone() {
+            unlock_request = unlock_request.with_pattern(pattern_val);
+        }
 
         let result = match crud_manager.unlock_with_request(&unlock_request) {
             Ok(result) => {
@@ -1340,11 +1450,22 @@ fn show_help() {
     println!("  --progress             Display professional progress indicators");
     println!("  --format <FORMAT>      Encryption format: binary (default) or ascii");
     println!("  --audit-log <PATH>     Write audit log for security compliance");
+    println!(
+        "  --streaming-strategy <temp|pipe|auto>  Select streaming mode (pipe needs recipients + identity file)"
+    );
     println!();
     println!("IN-PLACE OPERATION OPTIONS:");
     println!("  --in-place             Encrypt/decrypt files in-place (overwrites original)");
     println!("  --danger-mode          Skip recovery file creation (requires DANGER_MODE=1)");
     println!("  --i-am-sure            Automation override for scripted operations");
+    println!();
+    println!("RECIPIENT & IDENTITY OPTIONS:");
+    println!("  --recipient <AGE>          Add public-key recipient (repeat or comma list)");
+    println!("  --recipients <LIST>        Comma-separated recipients");
+    println!("  --recipients-file <PATH>   Use age recipients file");
+    println!("  --ssh-recipient <KEYS>     Convert SSH public keys to recipients");
+    println!("  --identity <PATH>          Decrypt with age identity file");
+    println!("  --ssh-identity <PATH>      Decrypt with SSH private key");
     println!();
     println!("EXAMPLES:");
     println!("  cage lock secret.txt --progress");

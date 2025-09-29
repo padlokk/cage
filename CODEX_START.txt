@@ -4,7 +4,8 @@
 
 Role: Primary UAT/verification agent for Cage.
 
-Use this file to rehydrate context quickly. For live status, always consult:
+Use this file to rehydrate context quickly. For live status (including the new
+config/streaming toggles), always consult:
 - `docs/procs/PROCESS.txt`
 - `docs/procs/CONTINUE.md`
 - `docs/procs/TASKS.txt`
@@ -17,6 +18,8 @@ Those documents track current workstreams, handoffs, and priorities.
 - **Product**: Cage – Age encryption automation tool (Rust)
 - **Surfaces**: CLI binary (`cage`) + library API (`cage::cage::*`)
 - **Frameworks**: RSB for CLI orchestrations; PTY automation via `hub::portable_pty`
+- **Config**: `AgeConfig` now loads from XDG/config paths (`cage.toml`) with
+  backup/streaming settings.
 - **Testing**: `cargo test --all` + targeted integration/UAT suites
 
 --------------------------------------------------------------------------------
@@ -28,7 +31,8 @@ Those documents track current workstreams, handoffs, and priorities.
    (e.g. `CageConfig`) to manage passphrases, recipients, identities, streaming
    options, and other knobs centrally.
 3. **Streaming Support**: Provide streaming encrypt/decrypt (Readers/Writers)
-   for large-file workflows, avoiding temporary files.
+   for large-file workflows, avoiding temporary files. (Pipe strategy available
+   via `CAGE_STREAMING_STRATEGY`, temp-file path remains default.)
 4. **SSH Key Support**: Accept SSH identities for encrypt/decrypt operations
    across both file and streaming flows.
 5. **ASCII Armor**: Continue supporting ASCII-armor output (already present).
@@ -67,9 +71,13 @@ Those documents track current workstreams, handoffs, and priorities.
  Useful References
 --------------------------------------------------------------------------------
 - `docs/LIBRARY_USAGE.md` – Library integration examples (request API & streaming).
+- `docs/procs/BACKUP_RETENTION_DESIGN.md` – Design notes for backup registry & retention.
 - `docs/procs/PROCESS.txt` – Workflow rules & priority context.
 - `docs/ref/ROADMAP.md` – Long-term roadmap & milestones.
 - `src/cage/` – Core library modules (adapter, lifecycle, config, etc.).
 - `tests/` – Unit, integration, PTY, and regression suites.
++ Quick toggles: `CAGE_STREAMING_STRATEGY=temp|pipe|auto` (or `--streaming-strategy`) and
+  backup settings via `cage.toml` (`backup.cleanup_on_success`, `backup.directory`,
+  `backup.retention`).
 
 ================================================================================

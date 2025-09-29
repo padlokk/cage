@@ -24,10 +24,10 @@
 **Status:** Complete – `globset` matcher is used for lock/unlock/status/verify (`src/cage/lifecycle/crud_manager.rs:1203`).
 
 ### BUG-04: Unlock Options Ignored [3 pts] 🟡
-**Status:** Implementation merged (selective unlock + regression suite), but follow-ups remain before closing out.
+**Status:** Implementation merged (selective unlock + regression suite); tests now skip cleanly when `age` is unavailable. ASCII-only logging still outstanding.
 **Next Actions:**
-- [ ] Replace non-ASCII log output in selective mode with ASCII-only messaging (`src/cage/lifecycle/crud_manager.rs:989`).
-- [ ] Ensure selective unlock tests skip gracefully when the `age` binary is unavailable.
+- [ ] Replace non-ASCII log output in selective mode with ASCII-only messaging (`src/cage/lifecycle/crud_manager.rs:1319`).
+- [x] Ensure selective unlock tests skip gracefully when the `age` binary is unavailable.
 
 ### BUG-05: Proxy Command Still Uses Expect Script [5 pts] ✅
 **Status:** Complete – Proxy command now routes through `PtyAgeAutomator` (`src/bin/cli_age.rs:993`). Follow-up tests still pending (see TEST-03).
@@ -45,7 +45,12 @@
 **Deliverables:** Header/format validation, optional decrypt probe, structured reporting, and corruption handling.
 
 ### CAGE-03: Backup & Recovery Pipeline [5 pts] 🟡
-**Status:** Partial – `backup_before_lock` covers single-file backups with restore-on-failure (`src/cage/lifecycle/crud_manager.rs:864`), but retention policies, user-configurable dirs, and multi-run conflict handling remain.
+**Status:** Retention policy wiring now runs after each backup and honors config defaults. Conflict generation/registry work remains.
+**Tasks:**
+- [x] Implement retention policies with customizable retention settings.
+- [x] Add configurable backup directories with safe defaults.
+- [ ] Provide conflict-resolution strategies for existing backups.
+- [x] Wire `RetentionPolicy` evaluation into backup cleanup on lock/unlock operations.
 
 ### CAGE-04: In-Place Operation Safety Layers [5 pts]
 **Location:** `src/bin/cli_age.rs:569-760`, `src/cage/in_place.rs`.
@@ -55,8 +60,8 @@
 **Location:** Progress manager utilities.
 **Scope:** Integrate spinner/bar styles with CRUD operations, respect verbosity flags, and expose hooks for long jobs.
 
-### CAGE-06: Configuration File Support [5 pts]
-**Status:** Pending – `AgeConfig` only offers programmatic defaults; no on-disk config loader or CLI wiring exists.
+### CAGE-06: Configuration File Support [5 pts] 🟡
+**Status:** `AgeConfig` now loads from standard config paths (TOML) with settings for backups/streaming; CLI surface for editing/inspection still pending.
 
 ### CAGE-07: RageAdapter Implementation [8 pts]
 **Status:** Deferred backlog – Rage adapter remains a stub returning `AdapterNotImplemented` (`src/cage/adapter.rs:128`).
@@ -90,23 +95,26 @@
 ### CAGE-11: CageConfig & Operation Request API [5 pts] ✅
 **Location:** `src/cage/config.rs`, `src/cage/lifecycle/`
 **Scope:** Introduce `CageConfig` and typed request structs (LockRequest, UnlockRequest, RotateRequest) to unify CLI and library entry points.
-**Status:** Request structs in place, CRUD/CLI wiring complete, documentation updated.
+**Status:** Request API + CLI now cover passphrase, identity, and recipient flows; follow-on enhancements live under CAGE-11a/12.
 **Tasks:**
 - [x] Design request structs covering existing CLI flags.
 - [x] Refactor `CrudManager` methods to accept request structs.
 - [x] Provide builder/compatibility helpers for CLI usage.
 - [x] Update docs/examples in `docs/LIBRARY_USAGE.md`.
+- [x] Allow request handling for identity files and SSH keys.
+- [x] Propagate recipient sets from requests into adapter calls.
 
 ### CAGE-12: Adapter Interface Refresh [5 pts] 🟡
 **Location:** `src/cage/adapter.rs`, `src/cage/age_engine.rs`
 **Scope:** Extend `AgeAdapter` to support file + streaming operations with a unified trait.
-**Status:** V2 trait and compatibility wrapper landed; passphrase-based streaming implemented via temp staging, remaining work for identity/recipient support.
+**Status:** V2 trait + compatibility wrapper landed; identity-based encryption/SSH flows return `AdapterNotImplemented`, streaming depends on temp-file staging.
 **Tasks:**
 - [x] Add stream-based methods (Reader/Writer) to the trait.
 - [x] Wrap existing Shell adapter with V2 compatibility.
 - [x] Implement basic streaming encrypt/decrypt in ShellAdapterV2 (passphrase flows).
-- [x] Extend streaming to support identity files / recipients.
-- [x] Ensure health checks & factory expose new capabilities.
+- [ ] Extend streaming to support identity files / recipients end-to-end.
+- [ ] Ensure health checks & factory expose accurate capability flags.
+- [ ] Replace temp-file staging with true streaming.
 
 ### CAGE-13: Streaming Encryption & Decryption [8 pts]
 **Location:** Adapter + CRUD pipeline + CLI
@@ -143,6 +151,22 @@
 - [ ] Update adapters to accept recipient lists for encryption.
 - [ ] Provide audit/reporting hooks for recipient metadata.
 - [ ] Add tests ensuring each recipient can decrypt and lifecycle operations succeed.
+
+### CAGE-11a: Identity & Recipient Parity [3 pts]
+**Location:** `src/bin/cli_age.rs`, `src/cage/lifecycle/crud_manager.rs`
+**Scope:** Ensure request API + CLI accept identity files, SSH keys, and recipient sets end-to-end.
+**Tasks:**
+- [x] Parse identity/recipient options in CLI flags and request builders.
+- [x] Pass identity/recipient data through CrudManager into adapters.
+- [x] Add regression tests covering identity-file decrypt and multi-recipient encrypt flows.
+
+### CAGE-12a: True Streaming Implementation [5 pts]
+**Location:** `src/cage/adapter_v2.rs`
+**Scope:** Replace temp-file staging with stream piping to satisfy large-file workflows.
+**Tasks:**
+- [x] Implement pipe/buffer streaming for encrypt/decrypt across identities/recipients.
+- [ ] Validate performance/memory on large fixtures; add regression coverage. (Partial: added pipe round-trip unit test; large fixture benchmark still pending.)
+- [x] Update adapter capability reporting and user docs to reflect real streaming support.
 
 ---
 
@@ -192,6 +216,7 @@
 - [ ] Migrate existing inline strings (CLI messages, errors, prompts) to the module.
 - [ ] Add lint/check script to detect new inline strings in critical paths.
 - [ ] Document guidelines in CONTRIBUTING/PROCESS.
+- [ ] Replace emoji/glyph usage in CLI/log output with ASCII-safe strings.
 
 ### OBS-01: Structured Audit & Telemetry [3 pts]
 **Location:** `src/cage/security.rs`, logging pathways
@@ -201,6 +226,14 @@
 - [ ] Ensure sensitive fields are scrubbed/redacted.
 - [ ] Offer optional JSON logging for downstream ingestion.
 - [ ] Update docs with observability configuration.
+
+### DOC-03: Library Usage Accuracy [1 pt]
+**Location:** `docs/LIBRARY_USAGE.md`
+**Issue:** Documentation claims SSH identity/recipient streaming parity that is not yet implemented.
+**Tasks:**
+- [ ] Update streaming and SSH sections to reflect current limitations and roadmap.
+- [ ] Link to CAGE-11a/CAGE-12a for planned parity work.
+- [ ] Add callouts for test prerequisites (age binary availability).
 
 ---
 

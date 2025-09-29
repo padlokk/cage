@@ -100,45 +100,52 @@ let result = crud_manager.lock(&std::path::Path::new("legacy.txt"), "pass", lega
 
 ### 2. Streaming Encryption/Decryption
 
-`ShellAdapterV2` backs both file and stream operations. Streaming currently
-supports:
+`ShellAdapterV2` now supports both staged (temp-file) and pipe-based streaming. The adapter selects a strategy at runtime using `CAGE_STREAMING_STRATEGY`, the CLI `--streaming-strategy` flag, or the `[streaming]` section in `cage.toml`.
 
-- Passphrase-based encrypt/decrypt (`Identity::Passphrase`).
-- Identity-file decrypt (`Identity::IdentityFile` or `Identity::SshKey`).
-- Public-key encryption via recipient lists (`Recipient::PublicKey`,
-  `Recipient::MultipleKeys`, `Recipient::RecipientsFile`, `Recipient::SshRecipients`).
+- Passphrase-only encryption and decryption continue to use the temp-file path (the Age CLI still requires an interactive passphrase).
+- Recipient-based encryption (`Recipient::PublicKey`, `Recipient::MultipleKeys`, `Recipient::RecipientsFile`, `Recipient::SshRecipients`) streams directly through the Age CLI when the strategy is `pipe` or `auto`.
+- Identity-driven decryption (`Identity::IdentityFile` or `Identity::SshKey`) streams via pipes under the same strategy.
+
+`ShellAdapterV2::capabilities()` exposes detailed metadata through `AdapterCapabilities::streaming_strategies`, allowing callers to confirm the default strategy, pipe availability, and prerequisites before opting in.
 
 ```rust
 use cage::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
-use cage::cage::requests::{Identity, Recipient};
 use cage::cage::config::OutputFormat;
+use cage::cage::requests::{Identity, Recipient};
 
 let adapter = ShellAdapterV2::new()?;
 
-// Stream encrypt to recipients
+// Opt into pipe streaming for recipient flows
+std::env::set_var("CAGE_STREAMING_STRATEGY", "pipe");
+
+let recipients = vec![Recipient::PublicKey("age1exampleKey".into())];
 let mut plaintext = std::io::Cursor::new(b"stream me".to_vec());
 let mut ciphertext = Vec::new();
 adapter.encrypt_stream(
     &mut plaintext,
     &mut ciphertext,
-    &Identity::Passphrase("unused".into()),
-    Some(&[Recipient::PublicKey("age1...".into())]),
+    &Identity::Passphrase("topsecret".into()),
+    Some(&recipients),
     OutputFormat::Binary,
 )?;
 
-// Stream decrypt with identity file
+let identity_path = std::path::PathBuf::from("/tmp/identity.txt"); // update with your identity file
 let mut cipher_cursor = std::io::Cursor::new(ciphertext);
 let mut recovered = Vec::new();
 adapter.decrypt_stream(
     &mut cipher_cursor,
     &mut recovered,
-    &Identity::IdentityFile(std::path::PathBuf::from("~/.config/age/keys.txt")),
+    &Identity::IdentityFile(identity_path),
 )?;
+println!("Recovered: {}", String::from_utf8_lossy(&recovered));
 ```
 
-> **Note:** SSH identity/recipient support now works for passphrase and stream
-> flows where compatible. Remaining roadmap items cover self-recipient and
-> derived-key scenarios.
+> **Fallback behaviour:** Even in `auto`, the adapter falls back to temp files when prerequisites are missing (no recipients or identity) or when the Age CLI returns an error.
+
+> **Configuration shortcut:** Set `[streaming]
+strategy = "pipe"` in `~/.config/cage/config.toml` (or the path referenced by `CAGE_CONFIG`) to make pipe streaming the default.
+
+> **Requirements:** Streaming helpers expect the `age` binary to be installed and visible on `PATH`. Test suites skip automatically when the binary is absent.
 
 ### 2. Progress Framework
 

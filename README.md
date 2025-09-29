@@ -73,6 +73,72 @@ cage inspect        # List all available functions
 cage test --progress-demo  # Demo progress indicators
 ```
 
+### Recipients and Identities
+
+Cage accepts multiple recipient and identity inputs on the CLI and applies them to file and streaming workflows.
+
+- `--recipient <AGE>` adds an Age public key (repeat flag to add more).
+- `--recipients <age1,age2>` accepts a comma list of Age recipients.
+- `--recipients-file <PATH>` loads keys from an Age recipients file.
+- `--ssh-recipient <ssh-ed25519...>` converts SSH public keys on the fly.
+- `--identity <PATH>` supplies an Age identity file for unlock/verify.
+- `--ssh-identity <PATH>` uses an SSH private key as the identity source.
+
+Example recipient workflow with streaming encryption and decryption:
+
+```bash
+# Encrypt with explicit recipients (pipe streaming requires at least one)
+cage lock report.txt --recipient age1exampleKey --streaming-strategy pipe
+
+# Decrypt with the matching identity file
+cage unlock report.txt.cage --identity ~/.config/age/keys.txt --streaming-strategy pipe
+```
+
+### Streaming Modes
+
+The adapter exposes selectable streaming strategies:
+
+- `temp` – always stage content through temporary files (default, most stable).
+- `pipe` – send data directly through pipes (requires recipients for lock and an identity file or SSH key for unlock).
+- `auto` – try pipe mode first when prerequisites are satisfied and fall back to temp files when the Age CLI returns an error.
+
+Choose a strategy per command with `--streaming-strategy` or set the environment variable `CAGE_STREAMING_STRATEGY=temp|pipe|auto`. The adapter reports its supported strategies via `ShellAdapterV2::capabilities()` for library callers.
+
+### Configuration (`cage.toml`)
+
+Runtime defaults load from the first existing path in the list below:
+
+1. `CAGE_CONFIG` (explicit override)
+2. `$XDG_CONFIG_HOME/cage/config.toml`
+3. `$HOME/.config/cage/config.toml`
+4. `./cage.toml`
+
+Quick workflow for editing the config:
+
+```bash
+# Ensure the config directory exists
+mkdir -p ~/.config/cage
+
+# Create or update the file with your editor
+$EDITOR ~/.config/cage/config.toml
+
+# Example streaming and backup settings
+cat <<EOF > ~/.config/cage/config.toml
+[streaming]
+strategy = "pipe"
+
+[backup]
+cleanup_on_success = true
+directory = "~/cage-backups"
+retention = "keep_last:5"
+EOF
+
+# Verify Cage is loading the config
+cage status . --verbose
+```
+
+When the file is absent Cage falls back to its compiled defaults. Invalid entries surface as configuration errors with the failing path in the message.
+
 ## 🔧 RSB Framework Integration
 
 Cage now uses the **RSB (Rust Shell Bridge) framework** for enhanced CLI architecture:

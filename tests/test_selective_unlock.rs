@@ -49,6 +49,7 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
         recursive: false,
         pattern_filter: None,
         backup_before_lock: false,
+        backup_dir: None,
     };
     let passphrase = "test_password_123";
     let lock_result = manager.lock(&test_file, passphrase, lock_options)?;
@@ -121,6 +122,7 @@ fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::err
         recursive: false,
         pattern_filter: None,
         backup_before_lock: false,
+        backup_dir: None,
     };
     let passphrase = "test_password_123";
     let lock_result = manager.lock(&test_file, passphrase, lock_options)?;
@@ -168,6 +170,7 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
         recursive: false,
         pattern_filter: None,
         backup_before_lock: false,
+        backup_dir: None,
     };
     let passphrase = "secure_pass_456";
     let lock_result = manager.lock(&test_file, passphrase, lock_options)?;
@@ -223,6 +226,7 @@ fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std:
         recursive: false,
         pattern_filter: None,
         backup_before_lock: false,
+        backup_dir: None,
     };
     let passphrase = "test_pass_789";
     manager.lock(&valid1, passphrase, lock_options.clone())?;

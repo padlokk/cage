@@ -6,6 +6,10 @@
 //! Security Guardian: Edgar - Production-ready configuration management
 
 use super::error::{AgeError, AgeResult};
+use serde::Deserialize;
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Output format for Age encryption
@@ -117,6 +121,20 @@ impl Default for SecurityLevel {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum RetentionPolicyConfig {
+    KeepAll,
+    KeepDays(u32),
+    KeepLast(usize),
+    KeepLastAndDays { last: usize, days: u32 },
+}
+
+impl Default for RetentionPolicyConfig {
+    fn default() -> Self {
+        RetentionPolicyConfig::KeepLast(3)
+    }
+}
+
 /// Age automation configuration
 #[derive(Debug, Clone)]
 pub struct AgeConfig {
@@ -170,6 +188,18 @@ pub struct AgeConfig {
 
     /// File extension for encrypted files (default: "cage")
     pub encrypted_file_extension: String,
+
+    /// Delete backups after successful operations
+    pub backup_cleanup: bool,
+
+    /// Optional default backup directory
+    pub backup_directory: Option<String>,
+
+    /// Retention policy applied to backups
+    pub backup_retention: RetentionPolicyConfig,
+
+    /// Default streaming strategy (temp, pipe, auto)
+    pub streaming_strategy: Option<String>,
 }
 
 impl AgeConfig {
@@ -263,6 +293,19 @@ impl AgeConfig {
             });
         }
 
+        if let Some(strategy) = &self.streaming_strategy {
+            match strategy.as_str() {
+                "temp" | "pipe" | "auto" => {}
+                other => {
+                    return Err(AgeError::ConfigurationError {
+                        parameter: "streaming_strategy".to_string(),
+                        value: other.to_string(),
+                        reason: "Valid values: temp, pipe, auto".to_string(),
+                    });
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -344,6 +387,54 @@ impl AgeConfig {
         }
         false
     }
+
+    pub fn load_default() -> AgeResult<Self> {
+        for path in default_config_paths() {
+            if path.exists() {
+                return Self::load_from_path(&path);
+            }
+        }
+
+        Ok(AgeConfig::default())
+    }
+
+    fn load_from_path(path: &Path) -> AgeResult<Self> {
+        let contents = fs::read_to_string(path).map_err(|e| AgeError::ConfigurationError {
+            parameter: "config_file".to_string(),
+            value: path.display().to_string(),
+            reason: e.to_string(),
+        })?;
+
+        let file: AgeConfigFile =
+            toml::from_str(&contents).map_err(|e| AgeError::ConfigurationError {
+                parameter: "config_file".to_string(),
+                value: path.display().to_string(),
+                reason: e.to_string(),
+            })?;
+
+        let mut config = AgeConfig::default();
+
+        if let Some(backup_cfg) = file.backup {
+            if let Some(cleanup) = backup_cfg.cleanup_on_success {
+                config.backup_cleanup = cleanup;
+            }
+            if let Some(dir) = backup_cfg.directory {
+                config.backup_directory = Some(dir);
+            }
+            if let Some(retention) = backup_cfg.retention {
+                config.backup_retention = parse_retention_policy(&retention)?;
+            }
+        }
+
+        if let Some(streaming_cfg) = file.streaming {
+            if let Some(strategy) = streaming_cfg.strategy {
+                config.streaming_strategy = Some(strategy);
+            }
+        }
+
+        config.validate()?;
+        Ok(config)
+    }
 }
 
 impl Default for AgeConfig {
@@ -366,14 +457,128 @@ impl Default for AgeConfig {
             secure_deletion: true,
             temp_dir_override: None,
             encrypted_file_extension: "cage".to_string(),
+            backup_cleanup: true,
+            backup_directory: None,
+            backup_retention: RetentionPolicyConfig::default(),
+            streaming_strategy: None,
         }
     }
+}
+
+#[derive(Default, Deserialize)]
+struct AgeConfigFile {
+    backup: Option<BackupConfigSection>,
+    streaming: Option<StreamingConfigSection>,
+}
+
+#[derive(Default, Deserialize)]
+struct BackupConfigSection {
+    cleanup_on_success: Option<bool>,
+    directory: Option<String>,
+    retention: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct StreamingConfigSection {
+    strategy: Option<String>,
+}
+
+fn default_config_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    if let Ok(custom) = env::var("CAGE_CONFIG") {
+        if !custom.is_empty() {
+            paths.push(PathBuf::from(custom));
+        }
+    }
+
+    if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
+        let mut path = PathBuf::from(xdg);
+        path.push("cage/config.toml");
+        paths.push(path);
+    } else if let Ok(home) = env::var("HOME") {
+        let mut path = PathBuf::from(home);
+        path.push(".config/cage/config.toml");
+        paths.push(path);
+    }
+
+    paths.push(PathBuf::from("cage.toml"));
+
+    paths
+}
+
+fn parse_retention_policy(value: &str) -> AgeResult<RetentionPolicyConfig> {
+    let trimmed = value.trim();
+    let lower = trimmed.to_lowercase();
+
+    if lower == "keep_all" {
+        return Ok(RetentionPolicyConfig::KeepAll);
+    }
+
+    if let Some(rest) = lower.strip_prefix("keep_days:") {
+        let days: u32 = rest
+            .trim()
+            .parse()
+            .map_err(|_| AgeError::ConfigurationError {
+                parameter: "backup.retention".to_string(),
+                value: trimmed.to_string(),
+                reason: "Expected keep_days:<u32>".to_string(),
+            })?;
+        return Ok(RetentionPolicyConfig::KeepDays(days));
+    }
+
+    if let Some(rest) = lower.strip_prefix("keep_last:") {
+        let count: usize = rest
+            .trim()
+            .parse()
+            .map_err(|_| AgeError::ConfigurationError {
+                parameter: "backup.retention".to_string(),
+                value: trimmed.to_string(),
+                reason: "Expected keep_last:<usize>".to_string(),
+            })?;
+        return Ok(RetentionPolicyConfig::KeepLast(count));
+    }
+
+    if let Some(rest) = lower.strip_prefix("keep_last_and_days:") {
+        let parts: Vec<&str> = rest.split(',').collect();
+        if parts.len() != 2 {
+            return Err(AgeError::ConfigurationError {
+                parameter: "backup.retention".to_string(),
+                value: trimmed.to_string(),
+                reason: "Expected keep_last_and_days:<usize>,<u32>".to_string(),
+            });
+        }
+        let last: usize = parts[0]
+            .trim()
+            .parse()
+            .map_err(|_| AgeError::ConfigurationError {
+                parameter: "backup.retention".to_string(),
+                value: trimmed.to_string(),
+                reason: "Invalid last parameter".to_string(),
+            })?;
+        let days: u32 = parts[1]
+            .trim()
+            .parse()
+            .map_err(|_| AgeError::ConfigurationError {
+                parameter: "backup.retention".to_string(),
+                value: trimmed.to_string(),
+                reason: "Invalid days parameter".to_string(),
+            })?;
+        return Ok(RetentionPolicyConfig::KeepLastAndDays { last, days });
+    }
+
+    Err(AgeError::ConfigurationError {
+        parameter: "backup.retention".to_string(),
+        value: trimmed.to_string(),
+        reason: "Valid values: keep_all, keep_days:<u32>, keep_last:<usize>, keep_last_and_days:<usize>,<u32>".to_string(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;
+    use tempfile::TempDir;
 
     #[test]
     fn test_output_format() {
@@ -445,5 +650,47 @@ mod tests {
         let test = AgeConfig::testing();
         assert_eq!(test.max_retries, 0);
         assert_eq!(test.security_level, SecurityLevel::Paranoid);
+    }
+
+    #[test]
+    fn test_parse_retention_policy_strings() {
+        assert!(matches!(
+            parse_retention_policy("keep_all").unwrap(),
+            RetentionPolicyConfig::KeepAll
+        ));
+        assert!(matches!(
+            parse_retention_policy("keep_days:7").unwrap(),
+            RetentionPolicyConfig::KeepDays(7)
+        ));
+        assert!(matches!(
+            parse_retention_policy("keep_last:5").unwrap(),
+            RetentionPolicyConfig::KeepLast(5)
+        ));
+        assert!(matches!(
+            parse_retention_policy("keep_last_and_days:2,30").unwrap(),
+            RetentionPolicyConfig::KeepLastAndDays { last: 2, days: 30 }
+        ));
+
+        assert!(parse_retention_policy("invalid").is_err());
+    }
+
+    #[test]
+    fn test_load_config_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[backup]\ncleanup_on_success=false\ndirectory='backups'\nretention='keep_days:5'\n\n[streaming]\nstrategy='pipe'\n",
+        )
+        .unwrap();
+
+        let config = AgeConfig::load_from_path(&config_path).unwrap();
+        assert!(!config.backup_cleanup);
+        assert_eq!(config.backup_directory.as_deref(), Some("backups"));
+        assert!(matches!(
+            config.backup_retention,
+            RetentionPolicyConfig::KeepDays(5)
+        ));
+        assert_eq!(config.streaming_strategy.as_deref(), Some("pipe"));
     }
 }
