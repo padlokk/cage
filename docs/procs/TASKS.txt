@@ -33,10 +33,10 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 ### QA-01: Documentation & Library Sync [3 pts] ✅
 **Status:** README and `docs/ref/cage/LIBRARY_USAGE.md` now include streaming strategy tables, config helper guidance, and usage samples aligned with CLI flags.
 
-### QA-03: Age CLI Output Sanity [1 pt] 🔴
-- [ ] Add a lightweight sanity test that captures `age --version` / `age --help` output and verifies expected strings (`age v`, `Usage: age`, `--encrypt`, `--decrypt`).
-- [ ] Document the reference snippet in QA notes so deviations are easy to spot during upgrades.
-- [ ] Gate the test to skip when the `age` binary is unavailable (consistent with other CLI-dependent checks).
+### QA-03: Age CLI Output Sanity [1 pt] ✅
+- [x] Add a lightweight sanity test that captures `age --version` / `age --help` output and verifies expected strings.
+- [x] Document the reference snippet in QA notes (docs/qa/AGE_CLI_REFERENCE.md) so deviations are easy to spot during upgrades.
+- [x] Gate the test to skip when the `age` binary is unavailable (consistent with other CLI-dependent checks).
 
 ---
 
