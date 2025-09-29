@@ -6,20 +6,21 @@
 //! - Comparison between temp-file and pipe strategies
 
 use std::fs::{self, File};
-use std::io::{self, Write, Read};
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Instant;
 use tempfile::TempDir;
 
 use cage::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
-use cage::cage::requests::{Identity, Recipient};
 use cage::cage::config::OutputFormat;
+use cage::cage::requests::{Identity, Recipient};
 
 /// Generate a test file of specified size with repeating pattern
 fn create_test_file(path: &Path, size_mb: usize) -> io::Result<()> {
     let mut file = File::create(path)?;
     let chunk_size = 1024 * 1024; // 1MB chunks
-    let pattern = b"The quick brown fox jumps over the lazy dog. 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ! ";
+    let pattern =
+        b"The quick brown fox jumps over the lazy dog. 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ! ";
     let mut buffer = Vec::with_capacity(chunk_size);
 
     // Fill buffer with pattern
@@ -97,11 +98,18 @@ fn benchmark_streaming_1gb() -> Result<(), Box<dyn std::error::Error>> {
     let passphrase = Identity::Passphrase("benchmark_test_pass_2024".to_string());
 
     let start = Instant::now();
-    adapter.encrypt_file(&test_file, &encrypted_file, &passphrase, None, OutputFormat::Binary)?;
+    adapter.encrypt_file(
+        &test_file,
+        &encrypted_file,
+        &passphrase,
+        None,
+        OutputFormat::Binary,
+    )?;
     let encrypt_duration = start.elapsed();
 
     let encrypted_size = get_file_size(&encrypted_file)?;
-    let encrypt_throughput = (file_size as f64 / encrypt_duration.as_secs_f64()) / (1024.0 * 1024.0);
+    let encrypt_throughput =
+        (file_size as f64 / encrypt_duration.as_secs_f64()) / (1024.0 * 1024.0);
 
     println!("Encryption completed:");
     println!("  Duration: {:.2}s", encrypt_duration.as_secs_f64());
@@ -115,7 +123,8 @@ fn benchmark_streaming_1gb() -> Result<(), Box<dyn std::error::Error>> {
     let decrypt_duration = start.elapsed();
 
     let decrypted_size = get_file_size(&decrypted_file)?;
-    let decrypt_throughput = (encrypted_size as f64 / decrypt_duration.as_secs_f64()) / (1024.0 * 1024.0);
+    let decrypt_throughput =
+        (encrypted_size as f64 / decrypt_duration.as_secs_f64()) / (1024.0 * 1024.0);
 
     println!("Decryption completed:");
     println!("  Duration: {:.2}s", decrypt_duration.as_secs_f64());
@@ -148,7 +157,13 @@ fn benchmark_streaming_1gb() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = Vec::new();
 
     let start = Instant::now();
-    adapter.encrypt_stream(&mut input, &mut output, &passphrase, None, OutputFormat::Binary)?;
+    adapter.encrypt_stream(
+        &mut input,
+        &mut output,
+        &passphrase,
+        None,
+        OutputFormat::Binary,
+    )?;
     let stream_duration = start.elapsed();
 
     let stream_throughput = (file_size as f64 / stream_duration.as_secs_f64()) / (1024.0 * 1024.0);
@@ -222,7 +237,13 @@ fn test_streaming_small_file() -> Result<(), Box<dyn std::error::Error>> {
     let decrypted_file = temp_dir.path().join("small_test_decrypted.txt");
 
     // Test round trip
-    adapter.encrypt_file(&test_file, &encrypted_file, &passphrase, None, OutputFormat::Binary)?;
+    adapter.encrypt_file(
+        &test_file,
+        &encrypted_file,
+        &passphrase,
+        None,
+        OutputFormat::Binary,
+    )?;
     adapter.decrypt_file(&encrypted_file, &decrypted_file, &passphrase)?;
 
     // Verify

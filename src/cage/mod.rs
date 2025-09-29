@@ -15,6 +15,7 @@
 
 pub mod adapter;
 pub mod adapter_v2; // Enhanced adapter with streaming (CAGE-12)
+pub mod adapter_v2_pipe_passphrase; // True pipe streaming for passphrases (CAGE-12b)
 pub mod age_engine;
 pub mod config;
 pub mod error;

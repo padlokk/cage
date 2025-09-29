@@ -74,6 +74,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
   `Path`).
 - Provide fallbacks for environments where streaming is unsupported.
 - Add regression tests using in-memory buffers and large test files.
+- Document passphrase streaming limitations: age requires PTY for passphrases, so pipe streaming is only available for recipient/identity flows (see `.analysis/CAGE-12b_investigation.md`).
 
 ### Milestone 2.2 – SSH Identity Support
 *Strategy*

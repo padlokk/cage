@@ -1,5 +1,5 @@
 //! PTY Automation Tests for Cage
-//! Based on the working driver.rs implementation
+//! Based on the working examples/pty_demo.rs implementation
 
 use hub::portable_pty::*;
 use std::io::{Read, Write};
@@ -26,9 +26,7 @@ fn test_pty_creation() {
             drop(pair);
         }
         Err(err) => {
-            println!(
-                "⚠️  PTY creation skipped: environment does not allow PTY access ({err})"
-            );
+            println!("⚠️  PTY creation skipped: environment does not allow PTY access ({err})");
         }
     }
 }

@@ -105,9 +105,7 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during selective unlock ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during selective unlock ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -138,9 +136,7 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable while validating invalid file ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable while validating invalid file ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -222,9 +218,7 @@ fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::err
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during non-selective unlock ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during non-selective unlock ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -280,9 +274,7 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during selective lock with verify ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during selective lock with verify ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -310,9 +302,7 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during selective unlock with verify ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during selective unlock with verify ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -374,9 +364,7 @@ fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std:
     if let Err(err) = manager.lock(&valid1, passphrase, lock_options.clone()) {
         let msg = err.to_string();
         if msg.contains("PTY") {
-            println!(
-                "SKIPPED: PTY unavailable during directory setup (valid1) ({msg})"
-            );
+            println!("SKIPPED: PTY unavailable during directory setup (valid1) ({msg})");
             return Ok(());
         }
         return Err(err.into());
@@ -384,9 +372,7 @@ fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std:
     if let Err(err) = manager.lock(&valid2, passphrase, lock_options) {
         let msg = err.to_string();
         if msg.contains("PTY") {
-            println!(
-                "SKIPPED: PTY unavailable during directory setup (valid2) ({msg})"
-            );
+            println!("SKIPPED: PTY unavailable during directory setup (valid2) ({msg})");
             return Ok(());
         }
         return Err(err.into());
@@ -411,9 +397,7 @@ fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std:
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during directory selective unlock ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during directory selective unlock ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -466,9 +450,7 @@ fn test_preserve_encrypted_with_selective() -> Result<(), Box<dyn std::error::Er
     if let Err(err) = manager.lock(&test_file, passphrase, lock_options) {
         let msg = err.to_string();
         if msg.contains("PTY") {
-            println!(
-                "SKIPPED: PTY unavailable during preserve_encrypted lock ({msg})"
-            );
+            println!("SKIPPED: PTY unavailable during preserve_encrypted lock ({msg})");
             return Ok(());
         }
         return Err(err.into());
@@ -489,9 +471,7 @@ fn test_preserve_encrypted_with_selective() -> Result<(), Box<dyn std::error::Er
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during preserve_encrypted unlock ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during preserve_encrypted unlock ({msg})");
                 return Ok(());
             }
             return Err(err.into());

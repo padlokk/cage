@@ -20,9 +20,7 @@ fn setup_test_manager(temp_dir: &TempDir) -> Option<CrudManager> {
     let adapter = match ShellAdapter::new() {
         Ok(adapter) => Box::new(adapter),
         Err(err) => {
-            println!(
-                "SKIPPED: ShellAdapter unavailable (PTY or age missing): {err}"
-            );
+            println!("SKIPPED: ShellAdapter unavailable (PTY or age missing): {err}");
             return None;
         }
     };
@@ -33,9 +31,7 @@ fn setup_test_manager(temp_dir: &TempDir) -> Option<CrudManager> {
     match CrudManager::new(adapter, config) {
         Ok(manager) => Some(manager),
         Err(err) => {
-            println!(
-                "SKIPPED: CrudManager unavailable (environment restrictions): {err}"
-            );
+            println!("SKIPPED: CrudManager unavailable (environment restrictions): {err}");
             None
         }
     }
@@ -74,9 +70,7 @@ fn test_lock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable for lock_with_request_api ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable for lock_with_request_api ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -90,7 +84,11 @@ fn test_lock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    assert_eq!(lock_result.processed_files.len(), 1, "Should process one file");
+    assert_eq!(
+        lock_result.processed_files.len(),
+        1,
+        "Should process one file"
+    );
 
     // Verify encrypted file exists
     let encrypted_file = test_file.with_extension("txt.cage");
@@ -129,9 +127,7 @@ fn test_unlock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
     if let Err(err) = manager.lock_with_request(&lock_request) {
         let msg = err.to_string();
         if msg.contains("PTY") {
-            println!(
-                "SKIPPED: PTY unavailable while preparing unlock request test ({msg})"
-            );
+            println!("SKIPPED: PTY unavailable while preparing unlock request test ({msg})");
             return Ok(());
         }
         return Err(err.into());
@@ -151,9 +147,7 @@ fn test_unlock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable for unlock_with_request_api ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable for unlock_with_request_api ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -167,7 +161,11 @@ fn test_unlock_with_request_api() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    assert_eq!(unlock_result.processed_files.len(), 1, "Should unlock one file");
+    assert_eq!(
+        unlock_result.processed_files.len(),
+        1,
+        "Should unlock one file"
+    );
 
     // Verify content
     let unlocked_content = fs::read_to_string(&test_file)?;
@@ -217,9 +215,7 @@ fn test_request_api_with_pattern_filter() -> Result<(), Box<dyn std::error::Erro
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable for pattern filter test ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable for pattern filter test ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -235,7 +231,11 @@ fn test_request_api_with_pattern_filter() -> Result<(), Box<dyn std::error::Erro
         return Ok(());
     }
 
-    assert_eq!(lock_result.processed_files.len(), 2, "Should lock only .txt files");
+    assert_eq!(
+        lock_result.processed_files.len(),
+        2,
+        "Should lock only .txt files"
+    );
 
     // Verify .txt files are encrypted
     assert!(temp_dir.path().join("file1.txt.cage").exists());
@@ -308,9 +308,7 @@ fn test_unlock_with_identity_file_request() -> Result<(), Box<dyn std::error::Er
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable for identity unlock test ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable for identity unlock test ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -327,9 +325,7 @@ fn test_unlock_with_identity_file_request() -> Result<(), Box<dyn std::error::Er
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during identity unlock ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during identity unlock ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -399,9 +395,7 @@ fn test_lock_with_recipients_request() -> Result<(), Box<dyn std::error::Error>>
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable for recipient lock test ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable for recipient lock test ({msg})");
                 return Ok(());
             }
             return Err(err.into());
@@ -415,9 +409,7 @@ fn test_lock_with_recipients_request() -> Result<(), Box<dyn std::error::Error>>
         Err(err) => {
             let msg = err.to_string();
             if msg.contains("PTY") {
-                println!(
-                    "SKIPPED: PTY unavailable during recipient lock ({msg})"
-                );
+                println!("SKIPPED: PTY unavailable during recipient lock ({msg})");
                 return Ok(());
             }
             return Err(err.into());

@@ -1047,7 +1047,7 @@ impl CrudManager {
             }
         }
 
-        let adapter = ShellAdapterV2::new()?;
+        let adapter = ShellAdapterV2::with_config(self.config.clone())?;
         let identity_clone = identity.clone();
         let mut decrypt =
             move |input: &Path, output: &Path| adapter.decrypt_file(input, output, &identity_clone);
@@ -1094,7 +1094,7 @@ impl CrudManager {
             });
         }
 
-        let adapter = ShellAdapterV2::new()?;
+        let adapter = ShellAdapterV2::with_config(self.config.clone())?;
         let identity_clone = identity.clone();
         let recipients_vec: Vec<Recipient> = recipients.to_vec();
         let mut encrypt = move |input: &Path, output: &Path, format: OutputFormat| {

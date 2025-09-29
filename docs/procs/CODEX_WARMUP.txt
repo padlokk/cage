@@ -71,8 +71,9 @@ Those documents track current workstreams, handoffs, and priorities.
 3. Confirm any new deliverable against stakeholder expectations above.
 4. Validate security constraints (string centralization, no secret leakage in
    logs/tests).
-5. Run or request appropriate test suites; ensure age availability assumptions
-   are documented.
+5. Run or request appropriate test suites; when PTY/age are unavailable note the
+   auto-skip behaviour and capture a full run (e.g. `full_test_results.log`) from a
+   PTY-capable environment.
 6. Record findings in UAT reports or handoffs as required.
 
 --------------------------------------------------------------------------------
@@ -87,5 +88,8 @@ Those documents track current workstreams, handoffs, and priorities.
 - Quick toggles: `CAGE_STREAMING_STRATEGY=temp|pipe|auto` (or `--streaming-strategy`) and
   backup settings via `cage.toml` (`backup.cleanup_on_success`, `backup.directory`,
   `backup.retention`).
+- New CLI helpers: `cage config show|path|paths`, `cage adapter info`, `cage adapter health`.
+- Streaming guidance: README and `docs/ref/cage/LIBRARY_USAGE.md` include performance tables
+  comparing passphrase vs recipient streaming (CAGE-12a/12b).
 
 ================================================================================

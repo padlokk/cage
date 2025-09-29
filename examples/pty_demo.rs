@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use std::thread;
 use std::time::Duration;
-use hub::terminal_ext::portable_pty::*;
+use hub::portable_pty::*;
 
 fn main() {
     println!("🧪 Simple PTY + age driver test");
@@ -144,7 +144,7 @@ fn test_age_pty() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 fn test_decrypt(encrypted_file: &std::path::Path) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use portable_pty::*;
+    use hub::portable_pty::*;
 
     let pty_system = native_pty_system();
     let pty_size = PtySize {

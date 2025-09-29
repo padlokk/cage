@@ -19,20 +19,27 @@ use tempfile::TempDir;
 pub struct PtyAgeAutomator {
     temp_dir: TempDir,
     timeout: Duration,
+    capture_stderr: bool,
 }
 
 impl PtyAgeAutomator {
     /// Create new PTY Age automator
     pub fn new() -> AgeResult<Self> {
+        Self::with_config(&super::config::AgeConfig::load_default().unwrap_or_default())
+    }
+
+    /// Create PTY automator with custom config
+    pub fn with_config(config: &super::config::AgeConfig) -> AgeResult<Self> {
         let temp_dir = tempfile::tempdir().map_err(|e| AgeError::TemporaryResourceError {
             resource_type: "directory".to_string(),
             operation: "create".to_string(),
-            reason: e.to_string(),
+            reason: format!("Failed to create temporary directory for PTY operations: {}", e),
         })?;
 
         Ok(Self {
             temp_dir,
-            timeout: Duration::from_secs(30),
+            timeout: config.operation_timeout,
+            capture_stderr: true,
         })
     }
 
@@ -44,6 +51,8 @@ impl PtyAgeAutomator {
         passphrase: &str,
         format: OutputFormat,
     ) -> AgeResult<()> {
+        let mut captured_stderr = String::new();
+
         // Validate inputs
         if !input.exists() {
             return Err(AgeError::file_error(
@@ -125,9 +134,11 @@ impl PtyAgeAutomator {
         // Handle age interaction with timeout and proper process monitoring
         let passphrase_clone = passphrase.to_string();
         let timeout_duration = self.timeout;
-        let automation_thread = thread::spawn(move || -> AgeResult<()> {
+        let capture_stderr = self.capture_stderr;
+        let automation_thread = thread::spawn(move || -> AgeResult<String> {
             let mut buffer = [0u8; 1024];
             let mut output_buffer = String::new();
+            let mut stderr_buffer = String::new();
             let start_time = std::time::Instant::now();
 
             // Set reader to non-blocking mode would be ideal, but portable-pty doesn't expose that
@@ -154,23 +165,34 @@ impl PtyAgeAutomator {
                         let text = String::from_utf8_lossy(&buffer[..n]);
                         output_buffer.push_str(&text);
 
-                        // Check for passphrase prompts
-                        if output_buffer.contains("Enter passphrase")
-                            || output_buffer.contains("passphrase:")
-                        {
+                        // Capture stderr if enabled
+                        if capture_stderr {
+                            stderr_buffer.push_str(&text);
+                        }
+
+                        // Check for passphrase prompts (case-insensitive)
+                        let output_lower = output_buffer.to_lowercase();
+
+                        // More robust prompt detection
+                        let is_passphrase_prompt = output_lower.contains("enter passphrase")
+                            || output_lower.contains("passphrase:")
+                            || output_lower.contains("password:")
+                            || output_lower.contains("enter password");
+
+                        if is_passphrase_prompt && !output_lower.contains("confirm") {
                             // Send passphrase
                             writer.write_all(passphrase_clone.as_bytes()).map_err(|e| {
                                 AgeError::ProcessExecutionFailed {
-                                    command: "pty_write_passphrase".to_string(),
+                                    command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write passphrase: {}", e),
+                                    stderr: format!("Failed to write passphrase to PTY: {}. Prompt was: '{}'", e, output_buffer.trim()),
                                 }
                             })?;
                             writer.write_all(b"\n").map_err(|e| {
                                 AgeError::ProcessExecutionFailed {
-                                    command: "pty_write_newline".to_string(),
+                                    command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write newline: {}", e),
+                                    stderr: format!("Failed to send newline after passphrase: {}", e),
                                 }
                             })?;
 
@@ -178,22 +200,26 @@ impl PtyAgeAutomator {
                             output_buffer.clear();
                         }
 
-                        if output_buffer.contains("Confirm passphrase")
-                            || output_buffer.contains("confirm:")
-                        {
+                        // Check for confirmation prompts
+                        let is_confirm_prompt = output_lower.contains("confirm passphrase")
+                            || output_lower.contains("confirm:")
+                            || output_lower.contains("re-enter")
+                            || output_lower.contains("verify");
+
+                        if is_confirm_prompt {
                             // Send confirmation
                             writer.write_all(passphrase_clone.as_bytes()).map_err(|e| {
                                 AgeError::ProcessExecutionFailed {
-                                    command: "pty_write_confirm".to_string(),
+                                    command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write confirmation: {}", e),
+                                    stderr: format!("Failed to write passphrase confirmation: {}. Prompt was: '{}'", e, output_buffer.trim()),
                                 }
                             })?;
                             writer.write_all(b"\n").map_err(|e| {
                                 AgeError::ProcessExecutionFailed {
-                                    command: "pty_write_confirm_newline".to_string(),
+                                    command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write confirmation newline: {}", e),
+                                    stderr: format!("Failed to send newline after confirmation: {}", e),
                                 }
                             })?;
 
@@ -220,12 +246,16 @@ impl PtyAgeAutomator {
                 // Small delay to prevent busy waiting
                 thread::sleep(Duration::from_millis(10));
             }
-            Ok(())
+            Ok(stderr_buffer)
         });
 
         // Wait for automation thread with timeout
         let automation_result = match automation_thread.join() {
-            Ok(result) => result,
+            Ok(Ok(stderr)) => {
+                captured_stderr = stderr;
+                Ok(())
+            }
+            Ok(Err(e)) => Err(e),
             Err(_) => Err(AgeError::ProcessExecutionFailed {
                 command: "automation_thread".to_string(),
                 exit_code: None,
@@ -247,16 +277,23 @@ impl PtyAgeAutomator {
         if exit_status.success() && output.exists() {
             Ok(())
         } else {
+            let reason = if !captured_stderr.is_empty() {
+                format!("Age encryption failed with exit status: {:?}. Stderr: {}", exit_status, captured_stderr.trim())
+            } else {
+                format!("Age encryption failed with exit status: {:?}", exit_status)
+            };
             Err(AgeError::EncryptionFailed {
                 input: input.to_path_buf(),
                 output: output.to_path_buf(),
-                reason: format!("Age encryption failed with exit status: {:?}", exit_status),
+                reason,
             })
         }
     }
 
     /// Decrypt file using PTY automation
     pub fn decrypt(&self, input: &Path, output: &Path, passphrase: &str) -> AgeResult<()> {
+        let mut captured_stderr = String::new();
+
         // Validate inputs
         if !input.exists() {
             return Err(AgeError::file_error(
@@ -334,9 +371,11 @@ impl PtyAgeAutomator {
         // Handle decryption interaction with timeout
         let passphrase_clone = passphrase.to_string();
         let timeout_duration = self.timeout;
-        let automation_thread = thread::spawn(move || -> AgeResult<()> {
+        let capture_stderr = self.capture_stderr;
+        let automation_thread = thread::spawn(move || -> AgeResult<String> {
             let mut buffer = [0u8; 1024];
             let mut output_buffer = String::new();
+            let mut stderr_buffer = String::new();
             let start_time = std::time::Instant::now();
 
             loop {
@@ -355,15 +394,24 @@ impl PtyAgeAutomator {
                         let text = String::from_utf8_lossy(&buffer[..n]);
                         output_buffer.push_str(&text);
 
-                        // Look for passphrase prompt
-                        if output_buffer.contains("Enter passphrase")
-                            || output_buffer.contains("passphrase:")
-                        {
+                        // Capture stderr if enabled
+                        if capture_stderr {
+                            stderr_buffer.push_str(&text);
+                        }
+
+                        // Look for passphrase prompt (case-insensitive)
+                        let output_lower = output_buffer.to_lowercase();
+                        let is_passphrase_prompt = output_lower.contains("enter passphrase")
+                            || output_lower.contains("passphrase:")
+                            || output_lower.contains("password:")
+                            || output_lower.contains("enter password");
+
+                        if is_passphrase_prompt && !output_lower.contains("confirm") {
                             writer.write_all(passphrase_clone.as_bytes()).map_err(|e| {
                                 AgeError::ProcessExecutionFailed {
                                     command: "pty_write_passphrase".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write passphrase: {}", e),
+                                    stderr: format!("Failed to write passphrase: {}. Prompt was: '{}'", e, output_buffer.trim()),
                                 }
                             })?;
                             writer.write_all(b"\n").map_err(|e| {
@@ -397,18 +445,22 @@ impl PtyAgeAutomator {
                 // Small delay to prevent busy waiting
                 thread::sleep(Duration::from_millis(10));
             }
-            Ok(())
+            Ok(stderr_buffer)
         });
 
         // Wait for automation and process
-        let automation_result =
-            automation_thread
-                .join()
-                .map_err(|_| AgeError::ProcessExecutionFailed {
-                    command: "automation_thread".to_string(),
-                    exit_code: None,
-                    stderr: "Automation thread panicked".to_string(),
-                })?;
+        let automation_result = match automation_thread.join() {
+            Ok(Ok(stderr)) => {
+                captured_stderr = stderr;
+                Ok(())
+            }
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(AgeError::ProcessExecutionFailed {
+                command: "automation_thread".to_string(),
+                exit_code: None,
+                stderr: "Automation thread panicked".to_string(),
+            }),
+        };
 
         let mut child = child;
         let exit_status = child.wait().map_err(|e| AgeError::ProcessExecutionFailed {
@@ -422,10 +474,15 @@ impl PtyAgeAutomator {
         if exit_status.success() && output.exists() {
             Ok(())
         } else {
+            let reason = if !captured_stderr.is_empty() {
+                format!("Age decryption failed with exit status: {:?}. Stderr: {}", exit_status, captured_stderr.trim())
+            } else {
+                format!("Age decryption failed with exit status: {:?}", exit_status)
+            };
             Err(AgeError::DecryptionFailed {
                 input: input.to_path_buf(),
                 output: output.to_path_buf(),
-                reason: format!("Age decryption failed with exit status: {:?}", exit_status),
+                reason,
             })
         }
     }

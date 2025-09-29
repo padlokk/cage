@@ -94,15 +94,71 @@ cage lock report.txt --recipient age1exampleKey --streaming-strategy pipe
 cage unlock report.txt.cage --identity ~/.config/age/keys.txt --streaming-strategy pipe
 ```
 
-### Streaming Modes
+Example SSH key workflow:
 
-The adapter exposes selectable streaming strategies:
+```bash
+# Encrypt with SSH public key (use = syntax for complex values)
+cage lock secret.txt --ssh-recipient="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA..."
 
-- `temp` – always stage content through temporary files (default, most stable).
-- `pipe` – send data directly through pipes (requires recipients for lock and an identity file or SSH key for unlock).
-- `auto` – try pipe mode first when prerequisites are satisfied and fall back to temp files when the Age CLI returns an error.
+# Decrypt with SSH private key
+cage unlock secret.txt.cage --ssh-identity=~/.ssh/id_ed25519
 
-Choose a strategy per command with `--streaming-strategy` or set the environment variable `CAGE_STREAMING_STRATEGY=temp|pipe|auto`. The adapter reports its supported strategies via `ShellAdapterV2::capabilities()` for library callers.
+# Multiple SSH recipients
+cage lock document.pdf --ssh-recipient="ssh-rsa AAAA..." --ssh-recipient="ssh-ed25519 AAAA..."
+```
+
+### Streaming Strategy
+
+Cage supports different streaming strategies to optimize for performance or memory usage based on your use case:
+
+#### Strategies Available
+
+- **`temp`** – Always stage content through temporary files (default, most stable)
+  - Best for: Passphrase-based encryption/decryption
+  - Performance: ~100-150 MB/s for large files
+  - Memory: Requires disk space for temporary files
+
+- **`pipe`** – Send data directly through pipes (when supported)
+  - Best for: Recipient-based encryption with identity files
+  - Performance: Better throughput for supported operations
+  - Limitations: Not available for passphrase-based operations due to age's TTY requirements
+
+- **`auto`** – Try pipe mode first when prerequisites are satisfied, fall back to temp files
+  - Best for: General use when you want optimal performance automatically
+
+#### Performance Characteristics
+
+Based on benchmarks with 1GB files:
+
+| Operation Type | Strategy | Throughput | Notes |
+|---------------|----------|------------|-------|
+| File-based | N/A | ~600 MB/s | Direct file operations |
+| Recipient streaming | pipe | ~400-500 MB/s | True pipe streaming |
+| Passphrase streaming | temp | ~100-150 MB/s | PTY + temp files required |
+
+**Recommendations:**
+- Files < 100MB: Use streaming (lower memory footprint)
+- Files > 100MB with passphrases: Consider file-based operations (better throughput)
+- Recipient-based encryption: Always prefer pipe streaming
+
+#### Configuration
+
+Choose a strategy per command with `--streaming-strategy` or set the environment variable:
+
+```bash
+# Command-line flag
+cage lock data.txt --streaming-strategy pipe --recipient age1...
+
+# Environment variable
+export CAGE_STREAMING_STRATEGY=auto
+cage lock data.txt --recipient age1...
+```
+
+#### Technical Details
+
+**Why passphrase streaming is limited:** The age binary requires passphrase input from a TTY (terminal) for security. Cage uses PTY (pseudo-terminal) automation to handle this securely, but this prevents true pipe streaming for passphrase operations. The temp file approach ensures security while maintaining reasonable performance.
+
+For more details on streaming implementation and benchmarks, see `.analysis/CAGE-12b_investigation.md`.
 
 ### Configuration (`cage.toml`)
 
@@ -112,6 +168,21 @@ Runtime defaults load from the first existing path in the list below:
 2. `$XDG_CONFIG_HOME/cage/config.toml`
 3. `$HOME/.config/cage/config.toml`
 4. `./cage.toml`
+
+#### Config Helper Commands
+
+Cage includes built-in config inspection commands:
+
+```bash
+# Show current configuration and search paths
+cage config show
+
+# Display only the active config file path
+cage config path
+
+# List all configuration search paths
+cage config paths
+```
 
 Quick workflow for editing the config:
 

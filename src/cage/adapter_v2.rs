@@ -20,7 +20,7 @@ use std::thread;
 use tempfile::tempdir;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StreamingStrategy {
+pub enum StreamingStrategy {
     TempFile,
     Pipe,
     Auto,
@@ -346,11 +346,19 @@ impl super::adapter::AgeAdapter for AdapterV1Compat {
 // SHELL ADAPTER V2 IMPLEMENTATION
 // ============================================================================
 
-#[derive(Clone, Default)]
-pub struct ShellAdapterV2;
+#[derive(Clone)]
+pub struct ShellAdapterV2 {
+    config: Option<super::config::AgeConfig>,
+}
+
+impl Default for ShellAdapterV2 {
+    fn default() -> Self {
+        Self { config: None }
+    }
+}
 
 impl ShellAdapterV2 {
-    fn join_stream_thread<T>(
+    pub(crate) fn join_stream_thread<T>(
         handle: thread::ScopedJoinHandle<'_, AgeResult<T>>,
         context: &'static str,
     ) -> AgeResult<T> {
@@ -363,7 +371,25 @@ impl ShellAdapterV2 {
     pub fn new() -> AgeResult<Self> {
         let automator = PtyAgeAutomator::new()?;
         automator.check_age_binary()?;
-        Ok(Self)
+        Ok(Self { config: None })
+    }
+
+    pub fn with_config(config: super::config::AgeConfig) -> AgeResult<Self> {
+        let automator = if let Ok(automator) = PtyAgeAutomator::with_config(&config) {
+            automator
+        } else {
+            PtyAgeAutomator::new()?
+        };
+        automator.check_age_binary()?;
+        Ok(Self { config: Some(config) })
+    }
+
+    fn get_automator(&self) -> AgeResult<PtyAgeAutomator> {
+        if let Some(ref config) = self.config {
+            PtyAgeAutomator::with_config(config)
+        } else {
+            PtyAgeAutomator::new()
+        }
     }
 
     fn encrypt_with_passphrase(
@@ -373,7 +399,7 @@ impl ShellAdapterV2 {
         passphrase: &str,
         format: OutputFormat,
     ) -> AgeResult<()> {
-        let automator = PtyAgeAutomator::new()?;
+        let automator = self.get_automator()?;
         automator.encrypt(input, output, passphrase, format)
     }
 
@@ -491,7 +517,7 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     fn decrypt_file(&self, input: &Path, output: &Path, identity: &Identity) -> AgeResult<()> {
         match identity {
             Identity::Passphrase(pass) => {
-                let automator = PtyAgeAutomator::new()?;
+                let automator = self.get_automator()?;
                 automator.decrypt(input, output, pass)
             }
             Identity::IdentityFile(path) | Identity::SshKey(path) => {
@@ -513,28 +539,55 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     ) -> AgeResult<u64> {
         let strategy = streaming_strategy_from_env();
         let recipients_list = recipients.unwrap_or(&[]);
-        let can_use_pipe = !recipients_list.is_empty();
 
-        if !can_use_pipe && matches!(strategy, StreamingStrategy::Pipe) {
+        // Check if we can use pipe streaming
+        let can_use_pipe_recipients = !recipients_list.is_empty();
+        let can_use_pipe_passphrase = matches!(identity, Identity::Passphrase(_))
+            && std::env::var("CAGE_PASSPHRASE_PIPE").unwrap_or_default() == "1";
+        let can_use_pipe = can_use_pipe_recipients || can_use_pipe_passphrase;
+
+        if matches!(strategy, StreamingStrategy::Pipe) && !can_use_pipe {
             return Err(AgeError::InvalidOperation {
                 operation: "encrypt_stream".into(),
-                reason: strings::ERR_STREAM_PIPE_REQUIRES_RECIPIENTS.into(),
+                reason:
+                    "Pipe streaming requires recipients or CAGE_PASSPHRASE_PIPE=1 for passphrases"
+                        .into(),
             });
         }
 
-        if can_use_pipe && matches!(strategy, StreamingStrategy::Pipe | StreamingStrategy::Auto) {
-            match self.encrypt_stream_pipe(input, output, recipients_list, format) {
-                Ok(bytes) => return Ok(bytes),
-                Err(err) => {
-                    if strategy == StreamingStrategy::Pipe {
-                        return Err(err);
-                    } else {
-                        eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+        // Try pipe streaming if strategy allows
+        if matches!(strategy, StreamingStrategy::Pipe | StreamingStrategy::Auto) {
+            // Recipients-based pipe streaming
+            if can_use_pipe_recipients {
+                match self.encrypt_stream_pipe(input, output, recipients_list, format) {
+                    Ok(bytes) => return Ok(bytes),
+                    Err(err) => {
+                        if strategy == StreamingStrategy::Pipe {
+                            return Err(err);
+                        } else {
+                            eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+                        }
+                    }
+                }
+            }
+            // Passphrase-based pipe streaming (CAGE-12b)
+            else if can_use_pipe_passphrase {
+                if let Identity::Passphrase(pass) = identity {
+                    match self.encrypt_stream_pipe_passphrase(input, output, pass, format) {
+                        Ok(bytes) => return Ok(bytes),
+                        Err(err) => {
+                            if strategy == StreamingStrategy::Pipe {
+                                return Err(err);
+                            } else {
+                                eprintln!("[cage] Passphrase pipe failed, falling back to temp file ({err})");
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // Fall back to temp file strategy
         self.encrypt_stream_temp(input, output, identity, recipients, format)
     }
 
@@ -545,28 +598,54 @@ impl AgeAdapterV2 for ShellAdapterV2 {
         identity: &Identity,
     ) -> AgeResult<u64> {
         let strategy = streaming_strategy_from_env();
-        let can_use_pipe = matches!(identity, Identity::IdentityFile(_) | Identity::SshKey(_));
+
+        // Check if we can use pipe streaming
+        let can_use_pipe_identity =
+            matches!(identity, Identity::IdentityFile(_) | Identity::SshKey(_));
+        let can_use_pipe_passphrase = matches!(identity, Identity::Passphrase(_))
+            && std::env::var("CAGE_PASSPHRASE_PIPE").unwrap_or_default() == "1";
+        let can_use_pipe = can_use_pipe_identity || can_use_pipe_passphrase;
 
         if !can_use_pipe && matches!(strategy, StreamingStrategy::Pipe) {
             return Err(AgeError::InvalidOperation {
                 operation: "decrypt_stream".into(),
-                reason: strings::ERR_STREAM_PIPE_REQUIRES_IDENTITY.into(),
+                reason: "Pipe streaming requires identity file or CAGE_PASSPHRASE_PIPE=1 for passphrases".into(),
             });
         }
 
-        if can_use_pipe && matches!(strategy, StreamingStrategy::Pipe | StreamingStrategy::Auto) {
-            match self.decrypt_stream_pipe(input, output, identity) {
-                Ok(bytes) => return Ok(bytes),
-                Err(err) => {
-                    if strategy == StreamingStrategy::Pipe {
-                        return Err(err);
-                    } else {
-                        eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+        // Try pipe streaming if strategy allows
+        if matches!(strategy, StreamingStrategy::Pipe | StreamingStrategy::Auto) {
+            // Identity-based pipe streaming
+            if can_use_pipe_identity {
+                match self.decrypt_stream_pipe(input, output, identity) {
+                    Ok(bytes) => return Ok(bytes),
+                    Err(err) => {
+                        if strategy == StreamingStrategy::Pipe {
+                            return Err(err);
+                        } else {
+                            eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+                        }
+                    }
+                }
+            }
+            // Passphrase-based pipe streaming (CAGE-12b)
+            else if can_use_pipe_passphrase {
+                if let Identity::Passphrase(pass) = identity {
+                    match self.decrypt_stream_pipe_passphrase(input, output, pass) {
+                        Ok(bytes) => return Ok(bytes),
+                        Err(err) => {
+                            if strategy == StreamingStrategy::Pipe {
+                                return Err(err);
+                            } else {
+                                eprintln!("[cage] Passphrase pipe failed, falling back to temp file ({err})");
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // Fall back to temp file strategy
         self.decrypt_stream_temp(input, output, identity)
     }
 
@@ -619,12 +698,18 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     }
 
     fn ssh_to_recipient(&self, ssh_pubkey: &str) -> AgeResult<String> {
-        AgeSshRecipient::from_str(ssh_pubkey)
-            .map(|r| r.to_string())
-            .map_err(|e| AgeError::InvalidOperation {
+        // For CLI usage, age accepts SSH keys directly
+        // Just validate it looks like an SSH key and return as-is
+        if ssh_pubkey.starts_with("ssh-rsa ") ||
+           ssh_pubkey.starts_with("ssh-ed25519 ") ||
+           ssh_pubkey.starts_with("ssh-ecdsa ") {
+            Ok(ssh_pubkey.to_string())
+        } else {
+            Err(AgeError::InvalidOperation {
                 operation: "ssh_to_recipient".into(),
-                reason: format!("{e:?}"),
+                reason: format!("Invalid SSH key format: must start with ssh-rsa, ssh-ed25519, or ssh-ecdsa"),
             })
+        }
     }
 
     fn verify_file(
@@ -648,23 +733,62 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     }
 
     fn health_check(&self) -> AgeResult<HealthStatus> {
-        let age_available = PtyAgeAutomator::new()?.check_age_binary().is_ok();
+        let mut errors = Vec::new();
+        let mut age_available = false;
+        let mut age_version = None;
+
+        // Check age binary availability and version
+        match Command::new("age").arg("--version").output() {
+            Ok(output) => {
+                age_available = true;
+                if output.status.success() {
+                    let version_str = String::from_utf8_lossy(&output.stdout);
+                    // Parse version from output like "age 1.1.1"
+                    if let Some(version) = version_str.trim().strip_prefix("age ") {
+                        age_version = Some(version.to_string());
+                    } else if !version_str.is_empty() {
+                        age_version = Some(version_str.trim().to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                errors.push(format!("Age binary not found: {}", e));
+            }
+        }
+
+        // Check PTY availability for passphrase operations
+        // Must actually try to open a PTY and check age binary to verify PTY support
+        let pty_available = PtyAgeAutomator::new()
+            .and_then(|automator| automator.check_age_binary())
+            .is_ok();
+        if !pty_available {
+            errors.push("PTY automation unavailable (required for passphrase operations)".into());
+        }
+
+        // Check streaming requirements
+        let streaming_available = age_available;
+        let can_encrypt = age_available && pty_available;
+        let can_decrypt = age_available && pty_available;
+
         Ok(HealthStatus {
-            healthy: age_available,
+            healthy: age_available && pty_available && errors.is_empty(),
             age_binary: age_available,
-            age_version: None,
-            can_encrypt: age_available,
-            can_decrypt: age_available,
-            streaming_available: age_available,
-            errors: if age_available {
-                vec![]
-            } else {
-                vec!["Age binary not available".into()]
-            },
+            age_version,
+            can_encrypt,
+            can_decrypt,
+            streaming_available,
+            errors,
         })
     }
 
     fn capabilities(&self) -> AdapterCapabilities {
+        // Check actual binary availability for accurate capability reporting
+        let age_available = Command::new("age").arg("--version").output().is_ok();
+        // Must actually try to open a PTY and check age binary to verify PTY support
+        let pty_available = PtyAgeAutomator::new()
+            .and_then(|automator| automator.check_age_binary())
+            .is_ok();
+
         let env_override = match env::var("CAGE_STREAMING_STRATEGY")
             .ok()
             .map(|v| v.to_lowercase())
@@ -676,28 +800,43 @@ impl AgeAdapterV2 for ShellAdapterV2 {
             _ => None,
         };
 
-        let configured = env_override.unwrap_or(StreamingStrategyKind::TempFile);
+        // Check config for default strategy
+        let default_strategy = if let Ok(config) = super::config::AgeConfig::load_default() {
+            if let Some(strategy) = config.streaming_strategy {
+                match strategy.as_str() {
+                    "pipe" => StreamingStrategyKind::Pipe,
+                    "auto" => StreamingStrategyKind::Auto,
+                    _ => StreamingStrategyKind::TempFile,
+                }
+            } else {
+                StreamingStrategyKind::TempFile
+            }
+        } else {
+            StreamingStrategyKind::TempFile
+        };
+
+        let configured = env_override.unwrap_or(default_strategy);
 
         AdapterCapabilities {
-            passphrase: true,
-            public_key: true,
-            identity_files: true,
-            ssh_recipients: false,
-            streaming: true,
+            passphrase: age_available && pty_available,
+            public_key: age_available,
+            identity_files: age_available,
+            ssh_recipients: age_available, // SSH recipients supported via direct CLI pass-through
+            streaming: age_available,
             streaming_strategies: StreamingStrategyInfo {
-                default: StreamingStrategyKind::TempFile,
+                default: default_strategy,
                 configured,
                 env_override,
-                supports_tempfile: true,
-                supports_pipe: true,
+                supports_tempfile: age_available && pty_available,
+                supports_pipe: age_available,
                 auto_fallback: true,
                 pipe_requires_recipients: true,
                 pipe_requires_identity: true,
             },
-            ascii_armor: true,
-            hardware_keys: false,
-            key_derivation: false,
-            max_file_size: None,
+            ascii_armor: age_available,
+            hardware_keys: false, // Not yet implemented
+            key_derivation: false, // Not yet implemented (CAGE-15)
+            max_file_size: None, // No hard limit
         }
     }
 
@@ -710,7 +849,7 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     }
 
     fn clone_box(&self) -> Box<dyn AgeAdapterV2> {
-        Box::new(Self)
+        Box::new(self.clone())
     }
 }
 
@@ -924,7 +1063,7 @@ impl ShellAdapterV2 {
 
         match identity {
             Identity::Passphrase(pass) => {
-                let automator = PtyAgeAutomator::new()?;
+                let automator = self.get_automator()?;
                 automator.decrypt(&input_path, &output_path, pass)?;
             }
             Identity::IdentityFile(path) | Identity::SshKey(path) => {
@@ -1111,13 +1250,10 @@ fn collect_recipient_args(recipients: &[Recipient]) -> AgeResult<Vec<String>> {
             }
             Recipient::SshRecipients(keys) => {
                 for key in keys {
-                    let converted =
-                        AgeSshRecipient::from_str(key).map_err(|e| AgeError::InvalidOperation {
-                            operation: "ssh_to_recipient".into(),
-                            reason: format!("{e:?}"),
-                        })?;
+                    // The age CLI accepts SSH keys directly with -r flag
+                    // No conversion needed
                     args.push("-r".to_string());
-                    args.push(converted.to_string());
+                    args.push(key.to_string());
                 }
             }
             Recipient::SelfRecipient => {
@@ -1220,7 +1356,7 @@ mod tests {
             passphrase: true,
             public_key: true,
             identity_files: true,
-            ssh_recipients: false,
+            ssh_recipients: true,
             streaming: true,
             streaming_strategies: StreamingStrategyInfo {
                 default: StreamingStrategyKind::Auto,
@@ -1258,9 +1394,7 @@ mod tests {
         let adapter = match ShellAdapterV2::new() {
             Ok(a) => a,
             Err(e) => {
-                println!(
-                    "Streaming test skipped: PTY unavailable or age binary missing ({e})"
-                );
+                println!("Streaming test skipped: PTY unavailable or age binary missing ({e})");
                 return;
             }
         };
@@ -1358,14 +1492,34 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "SSH recipient conversion not fully implemented (CAGE-09/CAGE-14)"]
-    fn test_ssh_recipient_conversion() {
+    fn test_ssh_recipient_validation() {
         let adapter = ShellAdapterV2::new().expect("Failed to create adapter");
-        let ssh_key =
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICowKIiMzZLpy0X58F3RrgPf63HgFUsVTN4egkwh28yk";
-        let converted = adapter
-            .ssh_to_recipient(ssh_key)
-            .expect("Conversion failed");
-        assert!(converted.starts_with("age1"));
+
+        // Valid SSH keys should be accepted as-is
+        let valid_keys = vec![
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICowKIiMzZLpy0X58F3RrgPf63HgFUsVTN4egkwh28yk",
+            "ssh-rsa AAAAB3NzaC1yc2E...",
+            "ssh-ecdsa AAAAE2VjZHNh...",
+        ];
+
+        for key in valid_keys {
+            let result = adapter.ssh_to_recipient(key).expect("Validation failed");
+            assert_eq!(result, key, "SSH key should be returned as-is");
+        }
+
+        // Invalid formats should be rejected
+        let invalid_keys = vec![
+            "not-an-ssh-key",
+            "age1abc123", // Age key, not SSH
+            "",
+        ];
+
+        for key in invalid_keys {
+            assert!(
+                adapter.ssh_to_recipient(key).is_err(),
+                "Invalid key '{}' should be rejected",
+                key
+            );
+        }
     }
 }

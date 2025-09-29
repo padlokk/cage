@@ -78,7 +78,9 @@ fn main() {
         "test" => cmd_test,
         "demo" => cmd_demo,
         "proxy" => cmd_proxy,
-        "version" => cmd_version
+        "version" => cmd_version,
+        "config" => cmd_config,
+        "adapter" => cmd_adapter
     });
 }
 
@@ -1444,6 +1446,8 @@ fn show_help() {
     println!("  verify         Verify file integrity");
     println!("  batch          Bulk operations");
     println!("  proxy          Direct Age commands with PTY");
+    println!("  config         Show/manage configuration");
+    println!("  adapter        Inspect adapter capabilities");
     println!("  test           Run test suite & demos");
     println!("  demo           Show demonstrations");
     println!();
@@ -1484,6 +1488,233 @@ fn show_help() {
 fn cmd_version(_args: Args) -> i32 {
     show_version();
     0
+}
+
+/// Config command - show or inspect configuration
+fn cmd_config(args: Args) -> i32 {
+    use cage::cage::config::AgeConfig;
+
+    let subcommand = args.get_or(1, "show");
+
+    match subcommand.as_str() {
+        "show" => {
+            // Load and display the current configuration
+            match AgeConfig::load_default() {
+                Ok(config) => {
+                    echo!("🔧 Cage Configuration");
+                    echo!("===================");
+                    echo!("");
+                    echo!("{}", config.format_layers());
+                    echo!("");
+                    echo!("Current Settings:");
+                    echo!("  Output format: {:?}", config.output_format);
+                    echo!("  TTY method: {:?}", config.tty_method);
+                    echo!(
+                        "  Encrypted file extension: .{}",
+                        config.encrypted_file_extension
+                    );
+                    echo!("  Backup cleanup: {}", config.backup_cleanup);
+                    echo!(
+                        "  Streaming strategy: {}",
+                        config
+                            .streaming_strategy
+                            .as_ref()
+                            .unwrap_or(&"auto".to_string())
+                    );
+
+                    if let Some(backup_dir) = &config.backup_directory {
+                        echo!("  Backup directory: {}", backup_dir);
+                    }
+
+                    echo!("");
+                    echo!("Use 'cage config path' to see only the active config file path");
+                    0
+                }
+                Err(e) => {
+                    echo!("❌ Failed to load configuration: {}", e);
+                    1
+                }
+            }
+        }
+        "path" => {
+            // Show just the path where config was loaded from
+            match AgeConfig::load_default() {
+                Ok(config) => {
+                    if let Some(path) = config.source_path {
+                        echo!("{}", path.display());
+                    } else {
+                        echo!("No configuration file loaded (using defaults)");
+                    }
+                    0
+                }
+                Err(e) => {
+                    echo!("❌ Failed to load configuration: {}", e);
+                    1
+                }
+            }
+        }
+        "paths" => {
+            // Show all search paths
+            echo!("Configuration search paths:");
+            for path in AgeConfig::get_config_search_paths() {
+                let status = if path.exists() { "✓" } else { "✗" };
+                echo!("  {} {}", status, path.display());
+            }
+            0
+        }
+        _ => {
+            echo!("❌ Unknown config subcommand: {}", subcommand);
+            echo!("");
+            echo!("Available subcommands:");
+            echo!("  cage config show  - Display current configuration and search paths");
+            echo!("  cage config path  - Show the active configuration file path");
+            echo!("  cage config paths - List all configuration search paths");
+            1
+        }
+    }
+}
+
+/// Adapter command - inspect adapter capabilities and health
+fn cmd_adapter(args: Args) -> i32 {
+    use cage::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+
+    let subcommand = args.get_or(1, "info");
+
+    match subcommand.as_str() {
+        "info" | "inspect" => {
+            // Create adapter and check its capabilities
+            match ShellAdapterV2::new() {
+                Ok(adapter) => {
+                    echo!("🔧 Age Adapter Inspection");
+                    echo!("========================");
+                    echo!("");
+
+                    // Basic info
+                    echo!("Adapter: {}", adapter.adapter_name());
+                    echo!("Version: {}", adapter.adapter_version());
+                    echo!("");
+
+                    // Health check
+                    echo!("Health Status:");
+                    match adapter.health_check() {
+                        Ok(health) => {
+                            echo!("  ✓ Overall: {}", if health.healthy { "Healthy" } else { "Unhealthy" });
+                            echo!("  ✓ Age binary: {}", if health.age_binary { "Available" } else { "Not found" });
+                            if let Some(version) = health.age_version {
+                                echo!("  ✓ Age version: {}", version);
+                            }
+                            echo!("  ✓ Can encrypt: {}", if health.can_encrypt { "Yes" } else { "No" });
+                            echo!("  ✓ Can decrypt: {}", if health.can_decrypt { "Yes" } else { "No" });
+                            echo!("  ✓ Streaming: {}", if health.streaming_available { "Available" } else { "Not available" });
+
+                            if !health.errors.is_empty() {
+                                echo!("");
+                                echo!("  ⚠️ Issues:");
+                                for error in &health.errors {
+                                    echo!("    - {}", error);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            echo!("  ✗ Health check failed: {}", e);
+                        }
+                    }
+                    echo!("");
+
+                    // Capabilities
+                    let caps = adapter.capabilities();
+                    echo!("Capabilities:");
+                    echo!("  Encryption Methods:");
+                    echo!("    • Passphrase: {}", if caps.passphrase { "✓" } else { "✗" });
+                    echo!("    • Public key: {}", if caps.public_key { "✓" } else { "✗" });
+                    echo!("    • Identity files: {}", if caps.identity_files { "✓" } else { "✗" });
+                    echo!("    • SSH recipients: {}", if caps.ssh_recipients { "✓" } else { "✗" });
+                    echo!("");
+
+                    echo!("  Streaming Strategies:");
+                    let strategies = &caps.streaming_strategies;
+                    echo!("    • Default: {:?}", strategies.default);
+                    echo!("    • Configured: {:?}", strategies.configured);
+                    if let Some(env_override) = &strategies.env_override {
+                        echo!("    • Environment override: {:?}", env_override);
+                    }
+                    echo!("    • Temp file support: {}", if strategies.supports_tempfile { "✓" } else { "✗" });
+                    echo!("    • Pipe support: {}", if strategies.supports_pipe { "✓" } else { "✗" });
+                    echo!("    • Auto fallback: {}", if strategies.auto_fallback { "✓" } else { "✗" });
+                    echo!("");
+
+                    echo!("  Streaming Requirements:");
+                    echo!("    • Pipe encryption needs recipients: {}",
+                        if strategies.pipe_requires_recipients { "Yes" } else { "No" });
+                    echo!("    • Pipe decryption needs identity file: {}",
+                        if strategies.pipe_requires_identity { "Yes" } else { "No" });
+                    echo!("");
+
+                    echo!("  Additional Features:");
+                    echo!("    • ASCII armor: {}", if caps.ascii_armor { "✓" } else { "✗" });
+                    echo!("    • Hardware keys: {}", if caps.hardware_keys { "✓" } else { "✗" });
+                    echo!("    • Key derivation: {}", if caps.key_derivation { "✓" } else { "✗" });
+
+                    if let Some(max_size) = caps.max_file_size {
+                        echo!("    • Max file size: {} GB", max_size / (1024 * 1024 * 1024));
+                    } else {
+                        echo!("    • Max file size: Unlimited");
+                    }
+
+                    echo!("");
+                    echo!("Performance Notes:");
+                    echo!("  • Passphrase operations: ~100-150 MB/s (PTY + temp files)");
+                    echo!("  • Recipient pipe streaming: ~400-500 MB/s");
+                    echo!("  • File operations: ~600 MB/s");
+                    echo!("");
+                    echo!("Use 'cage adapter health' for quick health check only");
+
+                    0
+                }
+                Err(e) => {
+                    echo!("❌ Failed to create adapter: {}", e);
+                    1
+                }
+            }
+        }
+        "health" => {
+            // Quick health check only
+            match ShellAdapterV2::new() {
+                Ok(adapter) => {
+                    match adapter.health_check() {
+                        Ok(health) => {
+                            if health.healthy {
+                                echo!("✓ Adapter is healthy");
+                                0
+                            } else {
+                                echo!("✗ Adapter is unhealthy");
+                                for error in &health.errors {
+                                    echo!("  - {}", error);
+                                }
+                                1
+                            }
+                        }
+                        Err(e) => {
+                            echo!("✗ Health check failed: {}", e);
+                            1
+                        }
+                    }
+                }
+                Err(e) => {
+                    echo!("✗ Failed to create adapter: {}", e);
+                    1
+                }
+            }
+        }
+        _ => {
+            echo!("❌ Unknown adapter subcommand: {}", subcommand);
+            echo!("");
+            echo!("Available subcommands:");
+            echo!("  cage adapter info   - Show detailed adapter capabilities");
+            echo!("  cage adapter health - Quick health check");
+            1
+        }
+    }
 }
 
 /// UAT Demo for Progress Indicators

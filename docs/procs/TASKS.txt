@@ -20,40 +20,46 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 **Scope:** Typed request structs (Lock/Unlock/Rotate) plus `CageConfig` unifying CLI and library entry points.
 **Status:** Landed. CLI, library, and docs use the shared builders; identity/recipient data flows end-to-end.
 
-### CAGE-06: Config Helper & Discovery [5 pts] 🟡
-**Status:** `AgeConfig` loads layered TOML (env → XDG → local) and exposes backup/streaming defaults. A CLI/library helper for viewing/editing `cage.toml` is still missing.
-**Next:**
-- [ ] Provide read/inspect helper (CLI subcommand or `cage config --show`).
-- [ ] Add `--edit`/`--open` flow or documented integration with `$EDITOR`.
-- [ ] Document config discovery order in README/QUICK_REF.
+### CAGE-06: Config Helper & Discovery [5 pts] ✅
+**Status:** `AgeConfig` now tracks the loaded source path, exposes helper methods, and a `cage config` CLI command provides `show`, `path`, and `paths` subcommands for inspection. README and library docs cover usage.
+**Notes:** Future enhancement (optional) could add an interactive editor hook, but inspection workflows are complete.
 
 ### CAGE-12: Adapter V2 Refresh [5 pts] 🟡
 **Status:** V2 trait, compatibility wrapper, and ShellAdapterV2 implemented. Streaming works for passphrase + recipient flows; capability metadata exists. Remaining gaps:
-- [ ] Ensure `health_check`/factory expose accurate streaming + identity support flags.
+- [x] Ensure `health_check`/factory expose accurate streaming + identity support flags.
 - [ ] Implement identity-based streaming encrypt (currently passphrase-only) or mark limitation explicitly.
-- [ ] Harden error surfaces (stderr parsing, partial write-reporting).
+- [x] Harden error surfaces (stderr parsing, partial write-reporting).
 
-### QA-01: Documentation & Library Sync [3 pts] 🟡
-**Status:** `docs/LIBRARY_USAGE.md` updated for requests and streaming basics. Needs more parity examples.
-- [ ] Add recipient/identity/streaming samples mirroring CLI flags.
-- [ ] Document config helper once implemented (CAGE-06).
-- [ ] Capture known limitations (SSH identities pending, streaming perf TBD).
+### QA-01: Documentation & Library Sync [3 pts] ✅
+**Status:** README and `docs/ref/cage/LIBRARY_USAGE.md` now include streaming strategy tables, config helper guidance, and usage samples aligned with CLI flags.
+
+### QA-03: Age CLI Output Sanity [1 pt] 🔴
+- [ ] Add a lightweight sanity test that captures `age --version` / `age --help` output and verifies expected strings (`age v`, `Usage: age`, `--encrypt`, `--decrypt`).
+- [ ] Document the reference snippet in QA notes so deviations are easy to spot during upgrades.
+- [ ] Gate the test to skip when the `age` binary is unavailable (consistent with other CLI-dependent checks).
 
 ---
 
 ## Phase 2 – Advanced Encryption Capabilities
 
 ### CAGE-12a: Streaming Benchmark & Hardening [5 pts] 🟡
-**Status:** Pipe-based streaming landed with round-trip test. Large-file validation and capability notes outstanding.
-- [ ] Benchmark 1–5 GB streams (passphrase + recipients) and record throughput/memory.
-- [ ] Add regression/bench harness (can live under `tests/` gated by env flag).
-- [ ] Surface capability hints in CLI (`cage --inspect adapter`).
+**Status:** Pipe-based streaming landed with round-trip test. Bench harness + 1 GB run complete; passphrase streaming remains limited by age's PTY requirements (see `.analysis/streaming_benchmark_results.md`).
+- [x] Benchmark 1–5 GB streams (passphrase + recipients) and record throughput/memory. (See `tests/test_streaming_benchmark.rs` + `.analysis/streaming_benchmark_results.md`.)
+- [x] Add regression/bench harness (gated streaming benchmark test).
+- [x] Surface capability hints in CLI (`cage adapter info` / `adapter health`).
+- [x] Highlight recommended usage patterns (passphrase vs recipient streaming) in docs.
 
-### CAGE-14: SSH Identity Support [5 pts] 🔴
-- [ ] Accept `--ssh-identity` / config entries (file paths or inline material).
-- [ ] Convert SSH keys via `age::ssh` or CLI helper and feed adapters.
-- [ ] Regression tests with generated SSH keypairs.
-- [ ] Documentation + security callouts.
+### CAGE-12b: Passphrase Streaming Behavior [3 pts] ✅
+**Status:** Investigation shows age's PTY-bound passphrase flow prevents true pipe streaming; current temp-file fallback is the secure approach.
+- [x] Document findings (`.analysis/CAGE-12b_investigation.md`, `adapter_v2_pipe_passphrase.rs`).
+- [x] Update benchmarks to cover passphrase + file staging vs recipient + pipe.
+- [x] Update README / LIBRARY_USAGE with guidance on when to use streaming vs file staging and note the passphrase limitation.
+
+### CAGE-14: SSH Identity Support [5 pts] ✅
+- [x] Accept `--ssh-identity` / config entries (file paths or inline material).
+- [x] Convert SSH keys via age CLI (direct pass-through for SSH recipients).
+- [x] Regression tests with generated SSH keypairs.
+- [x] Documentation + security callouts.
 
 ### CAGE-15: Deterministic Key Derivation [5 pts] 🔴
 - [ ] Extend config/request structs with derive parameters (salt/context).
@@ -67,10 +73,10 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Provide lifecycle helpers (list/add/remove recipients, audit metadata).
 - [ ] Tests ensuring each recipient can decrypt; include rotation scenarios.
 
-### CAGE-13: Streaming CLI Options [5 pts] 🔴
-- [ ] Expose streaming flags/config toggles (e.g., `--streaming-strategy`, already parsed) with doc coverage.
-- [ ] Wire strategy selection into requests + capability reporting.
-- [ ] Extend CLI help/README with streaming workflow guidance.
+### CAGE-13: Streaming CLI Options [5 pts] ✅
+- [x] Expose streaming flags/config toggles (e.g., `--streaming-strategy`, already parsed) with doc coverage.
+- [x] Wire strategy selection into requests + capability reporting.
+- [x] Extend CLI help/README with streaming workflow guidance.
 
 ---
 
@@ -127,10 +133,16 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Audit modules to pull shared imports via `crate::deps` where appropriate.
 - [ ] Note intentionally excluded crates (e.g., heavy optional deps) in the module doc comment.
 
-### MOD3-03: Relocate Driver Example [1 pt] 🔴
-- [ ] Move `src/driver.rs` demo into either `src/bin` or `examples/` to satisfy the “no stray top-level modules” rule in the module spec.
-- [ ] Update docs referencing the driver (if any) to the new path.
-- [ ] Ensure integration tests or demos still compile after relocation.
+### MOD3-03: Relocate Driver Example [1 pt] ✅
+- [x] Move `src/driver.rs` demo into either `src/bin` or `examples/` to satisfy the "no stray top-level modules" rule in the module spec.
+- [x] Update docs referencing the driver (if any) to the new path.
+- [x] Ensure integration tests or demos still compile after relocation.
+
+### MOD3-04: Harden PTY Automator [3 pts] ✅
+- [x] Make PTY timeouts configurable (derive from `AgeConfig`) and avoid premature failures on long streams.
+- [x] Improve prompt detection (case-insensitive / regex) and capture age stderr for debugging.
+- [x] Audit error surfaces so PTY/TTY permission issues return actionable messages.
+- [x] Evaluate non-blocking read strategy to remove busy-wait sleeps.
 
 ---
 

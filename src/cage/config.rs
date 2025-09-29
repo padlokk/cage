@@ -138,6 +138,9 @@ impl Default for RetentionPolicyConfig {
 /// Age automation configuration
 #[derive(Debug, Clone)]
 pub struct AgeConfig {
+    /// Path where the configuration was loaded from (if any)
+    pub source_path: Option<PathBuf>,
+
     /// Preferred output format
     pub output_format: OutputFormat,
 
@@ -398,6 +401,56 @@ impl AgeConfig {
         Ok(AgeConfig::default())
     }
 
+    /// Get the paths that will be checked for configuration files
+    pub fn get_config_search_paths() -> Vec<PathBuf> {
+        default_config_paths()
+    }
+
+    /// Get a formatted string showing the configuration layers
+    pub fn format_layers(&self) -> String {
+        let paths = Self::get_config_search_paths();
+        let mut layers = String::new();
+
+        layers.push_str("Configuration search order (highest priority first):\n");
+        for (i, path) in paths.iter().enumerate() {
+            let status = if path.exists() {
+                if self.source_path.as_ref() == Some(path) {
+                    " [LOADED]"
+                } else {
+                    " [exists]"
+                }
+            } else {
+                " [not found]"
+            };
+
+            let source = if i == 0 && std::env::var("CAGE_CONFIG").is_ok() {
+                "env:CAGE_CONFIG"
+            } else if path.to_string_lossy().contains("XDG_CONFIG_HOME")
+                || path.to_string_lossy().contains(".config")
+            {
+                "XDG"
+            } else if path.to_string_lossy().contains("cage.toml") {
+                "local"
+            } else {
+                "unknown"
+            };
+
+            layers.push_str(&format!(
+                "  {}. {} -> {}{}\n",
+                i + 1,
+                source,
+                path.display(),
+                status
+            ));
+        }
+
+        if self.source_path.is_none() {
+            layers.push_str("\nUsing default configuration (no config file found)");
+        }
+
+        layers
+    }
+
     fn load_from_path(path: &Path) -> AgeResult<Self> {
         let contents = fs::read_to_string(path).map_err(|e| AgeError::ConfigurationError {
             parameter: "config_file".to_string(),
@@ -413,6 +466,7 @@ impl AgeConfig {
             })?;
 
         let mut config = AgeConfig::default();
+        config.source_path = Some(path.to_path_buf());
 
         if let Some(backup_cfg) = file.backup {
             if let Some(cleanup) = backup_cfg.cleanup_on_success {
@@ -440,6 +494,7 @@ impl AgeConfig {
 impl Default for AgeConfig {
     fn default() -> Self {
         Self {
+            source_path: None,
             output_format: OutputFormat::default(),
             tty_method: TtyMethod::default(),
             security_level: SecurityLevel::default(),
