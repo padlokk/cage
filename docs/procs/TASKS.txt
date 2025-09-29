@@ -84,6 +84,16 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Document expectations in CONTRIBUTING/PROCESS.
 - [ ] Evaluate optional “ASCII-safe” mode without forcing removal of branded glyphs.
 
+### CAGE-03: Backup Retention Lifecycle [5 pts] 🟡
+**Reference:** `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`
+**Status:** RetentionPolicy enum + basic enforcement wired into `BackupManager`; registry, conflict strategy, and CLI ergonomics remain.
+- [x] Add retention enum + enforcement hooks in `BackupManager`.
+- [x] Support configurable backup directories and cleanup defaults via `AgeConfig`.
+- [ ] Implement JSON-backed `BackupRegistry` with generation tracking.
+- [ ] Apply retention when creating backups; archive/delete expired entries safely.
+- [ ] Add backup discovery helpers (list/restore generations) for future CLI use.
+- [ ] Write integration tests covering retention + migration from legacy `.bak` files.
+
 ### OBS-01: Structured Audit & Telemetry [3 pts] 🔴
 - [ ] Capture streaming/identity/recipient events with structured metadata.
 - [ ] Ensure sensitive fields are redacted before logging.
@@ -104,9 +114,28 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ---
 
+## Module Spec Alignment (MOD3 Series)
+
+### MOD3-01: Establish Project Prelude [2 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md`
+- [ ] Create `src/prelude.rs` that curates the public Surface (CrudManager, requests, adapter traits, macros).
+- [ ] Update `lib.rs` to re-export via `pub mod prelude` and document usage in README.
+- [ ] Add sanity tests ensuring prelude compilations stay minimal.
+
+### MOD3-02: Dependency Re-export Surface [2 pts] 🔴
+- [ ] Introduce `src/deps.rs` (standard RSB pattern) re-exporting external crates we expect downstream users to consume (`age`, `rsb`, `hub`).
+- [ ] Audit modules to pull shared imports via `crate::deps` where appropriate.
+- [ ] Note intentionally excluded crates (e.g., heavy optional deps) in the module doc comment.
+
+### MOD3-03: Relocate Driver Example [1 pt] 🔴
+- [ ] Move `src/driver.rs` demo into either `src/bin` or `examples/` to satisfy the “no stray top-level modules” rule in the module spec.
+- [ ] Update docs referencing the driver (if any) to the new path.
+- [ ] Ensure integration tests or demos still compile after relocation.
+
+---
+
 ## Completed / Archived (for reference)
 - BUG-01..05 – Critical CLI regressions resolved mid-2025.
 - CAGE-11a – Identity/recipient request parity.
 - INFRA-01 – RSB terminal-ext integration.
 - TEST-04 – Age availability gating incorporated into selective unlock tests.
-

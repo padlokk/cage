@@ -121,6 +121,13 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 - Update documentation (`README`, `LIBRARY_USAGE`, new “MVP Feature Matrix”).
 - Prepare migration guide for downstream consumers (Padlock, Ignite, etc.).
 
+### Milestone 3.4 – Backup Retention & Recovery (CAGE-03)
+*Strategy*
+- Implement the retention architecture captured in `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`.
+- Wire `BackupManager` to config-driven retention policies (keep-last / keep-days / hybrid).
+- Introduce the optional JSON registry for listing and pruning prior backups.
+- Defer CLI helpers (`cage backup list|restore|cleanup`) until Phase 4 unless explicitly prioritized.
+
 ## Milestone Summary & Dependencies
 
 | Phase | Milestone | Depends On | Outcomes |
@@ -154,4 +161,3 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 - All user-facing strings sourced from dedicated constants module.
 - End-to-end tests covering every stakeholder requirement pass on CI with
   age installed; degraded mode skips gracefully when absent.
-
