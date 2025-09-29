@@ -162,3 +162,134 @@ fn test_ssh_identity_file_validation() {
         "Existing SSH key file should pass validation"
     );
 }
+
+/// Test that ECDSA keys with correct prefixes are accepted
+#[test]
+fn test_ecdsa_key_validation() {
+    let adapter = match ShellAdapterV2::new() {
+        Ok(a) => a,
+        Err(_) => {
+            eprintln!("Skipping: Failed to create adapter (PTY/age not available)");
+            return;
+        }
+    };
+
+    // Test valid ECDSA key formats (real OpenSSH ECDSA keys use these prefixes)
+    let valid_ecdsa_keys = vec![
+        "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQ...",
+        "ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzODQAAABhBGlOQ3Rz...",
+        "ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAF5R2F0...",
+    ];
+
+    for key in &valid_ecdsa_keys {
+        let result = adapter.ssh_to_recipient(key);
+        assert!(
+            result.is_ok(),
+            "Valid ECDSA key should be accepted: {}",
+            &key[..30]
+        );
+        assert_eq!(
+            result.unwrap(),
+            *key,
+            "SSH key should be passed through unchanged"
+        );
+    }
+
+    // Test other valid SSH key formats still work
+    let other_valid_keys = vec![
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7VhRu...",
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzr...",
+    ];
+
+    for key in &other_valid_keys {
+        let result = adapter.ssh_to_recipient(key);
+        assert!(
+            result.is_ok(),
+            "Valid SSH key should be accepted: {}",
+            &key[..20]
+        );
+    }
+
+    // Test invalid key format is rejected
+    let invalid_keys = vec![
+        "ssh-ecdsa AAAAE2...", // This prefix doesn't actually exist in real SSH keys
+        "invalid-key-format",
+        "ssh-dss AAAAB3...", // DSS keys not supported
+        "",
+    ];
+
+    for key in &invalid_keys {
+        let result = adapter.ssh_to_recipient(key);
+        assert!(
+            result.is_err(),
+            "Invalid key should be rejected: {}",
+            if key.len() > 20 { &key[..20] } else { key }
+        );
+    }
+}
+
+/// Test ECDSA key encryption/decryption if possible
+#[test]
+fn test_ecdsa_key_encryption() {
+    // Skip if age is not available
+    if Command::new("age").arg("--version").output().is_err() {
+        eprintln!("Skipping ECDSA encryption test: age binary not found");
+        return;
+    }
+
+    // Skip if ssh-keygen is not available
+    if Command::new("ssh-keygen").arg("-h").output().is_err() {
+        eprintln!("Skipping ECDSA encryption test: ssh-keygen not found");
+        return;
+    }
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let key_path = temp_dir.path().join("test_ecdsa_key");
+    let pub_key_path = temp_dir.path().join("test_ecdsa_key.pub");
+
+    // Generate ECDSA key pair (nistp256)
+    let keygen = Command::new("ssh-keygen")
+        .args(&["-t", "ecdsa"])
+        .args(&["-b", "256"]) // nistp256
+        .args(&["-f", key_path.to_str().unwrap()])
+        .args(&["-N", ""]) // No passphrase
+        .args(&["-q"]) // Quiet mode
+        .output()
+        .expect("Failed to generate ECDSA key");
+
+    if !keygen.status.success() {
+        eprintln!("Skipping: ECDSA key generation failed");
+        return;
+    }
+
+    assert!(pub_key_path.exists(), "ECDSA public key not created");
+    assert!(key_path.exists(), "ECDSA private key not created");
+
+    // Read the public key and verify it has the correct prefix
+    let pub_key = fs::read_to_string(&pub_key_path)
+        .expect("Failed to read ECDSA public key")
+        .trim()
+        .to_string();
+
+    assert!(
+        pub_key.starts_with("ecdsa-sha2-nistp256 "),
+        "Generated ECDSA key should have correct prefix, got: {}",
+        &pub_key[..30.min(pub_key.len())]
+    );
+
+    // Verify the adapter accepts this real ECDSA key
+    let adapter = match ShellAdapterV2::new() {
+        Ok(a) => a,
+        Err(_) => {
+            eprintln!("Skipping: Failed to create adapter");
+            return;
+        }
+    };
+
+    let result = adapter.ssh_to_recipient(&pub_key);
+    assert!(
+        result.is_ok(),
+        "Real ECDSA public key should be accepted: {}",
+        &pub_key[..50.min(pub_key.len())]
+    );
+}

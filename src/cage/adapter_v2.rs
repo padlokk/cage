@@ -698,14 +698,17 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     fn ssh_to_recipient(&self, ssh_pubkey: &str) -> AgeResult<String> {
         // For CLI usage, age accepts SSH keys directly
         // Just validate it looks like an SSH key and return as-is
+        // Note: Real ECDSA keys use ecdsa-sha2-nistp256/384/521 prefixes
         if ssh_pubkey.starts_with("ssh-rsa ") ||
            ssh_pubkey.starts_with("ssh-ed25519 ") ||
-           ssh_pubkey.starts_with("ssh-ecdsa ") {
+           ssh_pubkey.starts_with("ecdsa-sha2-nistp256 ") ||
+           ssh_pubkey.starts_with("ecdsa-sha2-nistp384 ") ||
+           ssh_pubkey.starts_with("ecdsa-sha2-nistp521 ") {
             Ok(ssh_pubkey.to_string())
         } else {
             Err(AgeError::InvalidOperation {
                 operation: "ssh_to_recipient".into(),
-                reason: format!("Invalid SSH key format: must start with ssh-rsa, ssh-ed25519, or ssh-ecdsa"),
+                reason: format!("Invalid SSH key format: must start with ssh-rsa, ssh-ed25519, or ecdsa-sha2-nistp256/384/521"),
             })
         }
     }
@@ -1497,7 +1500,9 @@ mod tests {
         let valid_keys = vec![
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICowKIiMzZLpy0X58F3RrgPf63HgFUsVTN4egkwh28yk",
             "ssh-rsa AAAAB3NzaC1yc2E...",
-            "ssh-ecdsa AAAAE2VjZHNh...",
+            "ecdsa-sha2-nistp256 AAAAE2VjZHNh...",
+            "ecdsa-sha2-nistp384 AAAAE2VjZHNh...",
+            "ecdsa-sha2-nistp521 AAAAE2VjZHNh...",
         ];
 
         for key in valid_keys {
