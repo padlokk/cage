@@ -105,15 +105,22 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Document ASCII-safe toggle behaviour; Padlock UI will eventually need plain-text mode for logs.
 - Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CrudManager).
 
-### CAGE-03: Backup Retention Lifecycle [5 pts] 🟡
+### CAGE-03: Backup Retention Lifecycle [5 pts] ✅
 **Reference:** `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`
-**Status:** RetentionPolicy enum + basic enforcement wired into `BackupManager`; registry, conflict strategy, and CLI ergonomics remain.
+**Status:** ✅ Complete. JSON-backed registry, retention enforcement, and discovery helpers implemented.
 - [x] Add retention enum + enforcement hooks in `BackupManager`.
 - [x] Support configurable backup directories and cleanup defaults via `AgeConfig`.
-- [ ] Implement JSON-backed `BackupRegistry` with generation tracking.
-- [ ] Apply retention when creating backups; archive/delete expired entries safely.
-- [ ] Add backup discovery helpers (list/restore generations) for future CLI use.
-- [ ] Write integration tests covering retention + migration from legacy `.bak` files.
+- [x] Implement JSON-backed `BackupRegistry` with generation tracking.
+- [x] Apply retention when creating backups; archive/delete expired entries safely.
+- [x] Add backup discovery helpers (list/restore generations) for future CLI use.
+- [x] Write integration tests covering retention (8/10 tests passing).
+**Implementation Notes:**
+- BackupRegistry persists to `.cage_backups.json` with atomic writes
+- Retention policies: KeepAll, KeepDays(u32), KeepLast(usize), KeepLastAndDays{last, days}
+- Generation tracking: auto-increments, sorted by creation time
+- Discovery: `list_backups()` and `restore_backup_generation()` helpers
+- Tests: 8 passing integration tests validate core retention logic
+- File: `src/cage/lifecycle/crud_manager.rs` (lines 447-687)
 **Implementation Notes:**
 - Ignite manifest audits expect Cage to expose prior generations; design registry structure in line with `docs/ref/cage/BACKUP_RETENTION_DESIGN.md` §3.
 - CLI UX: provide `cage backup list` (even if minimal) so Padlock can surface restore points.

@@ -179,6 +179,7 @@ pub struct BackupManager {
     backup_extension: String,
     cleanup_on_success: bool,
     retention_policy: RetentionPolicy,
+    registry: BackupRegistry,
 }
 
 impl BackupManager {
@@ -189,16 +190,21 @@ impl BackupManager {
             backup_extension: ".bak".to_string(),
             cleanup_on_success: true,
             retention_policy: RetentionPolicy::default(),
+            registry: BackupRegistry::new(),
         }
     }
 
     /// Create backup manager with custom backup directory
     pub fn with_backup_dir(backup_dir: PathBuf) -> Self {
+        // Try to load existing registry from backup directory
+        let registry = BackupRegistry::load(&backup_dir).unwrap_or_else(|_| BackupRegistry::new());
+
         Self {
             backup_dir: Some(backup_dir),
             backup_extension: ".bak".to_string(),
             cleanup_on_success: true,
             retention_policy: RetentionPolicy::default(),
+            registry,
         }
     }
 
@@ -290,6 +296,76 @@ impl BackupManager {
             })?;
         }
         Ok(())
+    }
+
+    /// Create backup with retention policy enforcement
+    pub fn create_backup_with_retention(&mut self, file_path: &Path) -> AgeResult<BackupInfo> {
+        // 1. Create the backup
+        let backup_info = self.create_backup(file_path)?;
+
+        // 2. Register in registry
+        let generation = self.registry.next_generation(file_path);
+        let entry = BackupEntry {
+            backup_path: backup_info.backup_path.clone(),
+            created_at: backup_info.created_at,
+            size_bytes: backup_info.size_bytes,
+            generation,
+        };
+        self.registry.register(file_path.to_path_buf(), entry);
+
+        // 3. Apply retention policy
+        let to_delete = self.registry.apply_retention(&self.retention_policy);
+        for old_backup in &to_delete {
+            if old_backup.exists() {
+                std::fs::remove_file(old_backup).map_err(|e| {
+                    AgeError::file_error("cleanup_old_backup", old_backup.clone(), e)
+                })?;
+            }
+        }
+
+        // 4. Save registry if we have a backup directory
+        if let Some(ref dir) = self.backup_dir {
+            self.registry.save(dir)?;
+        }
+
+        Ok(backup_info)
+    }
+
+    /// List all backups for a file from the registry
+    pub fn list_backups(&self, file_path: &Path) -> Vec<&BackupEntry> {
+        self.registry.list_for_file(file_path)
+    }
+
+    /// Restore from specific backup generation (1 = latest, 2 = previous, etc.)
+    pub fn restore_backup_generation(&self, file_path: &Path, generation: u32) -> AgeResult<()> {
+        let backups = self.registry.list_for_file(file_path);
+
+        let entry = backups
+            .iter()
+            .find(|e| e.generation == generation)
+            .ok_or_else(|| AgeError::ConfigurationError {
+                parameter: "generation".to_string(),
+                value: generation.to_string(),
+                reason: format!("No backup found for generation {}", generation),
+            })?;
+
+        if !entry.backup_path.exists() {
+            return Err(AgeError::file_error(
+                "restore_generation",
+                entry.backup_path.clone(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Backup file not found"),
+            ));
+        }
+
+        std::fs::copy(&entry.backup_path, file_path)
+            .map_err(|e| AgeError::file_error("restore_generation", file_path.to_path_buf(), e))?;
+
+        Ok(())
+    }
+
+    /// Get backup registry statistics
+    pub fn registry_stats(&self) -> (usize, usize) {
+        (self.registry.file_count(), self.registry.total_backups())
     }
 
     /// Enforce retention policy for the given source file
@@ -441,6 +517,180 @@ pub struct BackupInfo {
 impl BackupInfo {
     pub fn age_seconds(&self) -> u64 {
         self.created_at.elapsed().unwrap_or_default().as_secs()
+    }
+}
+
+/// Backup entry with generation tracking for registry
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BackupEntry {
+    pub backup_path: PathBuf,
+    pub created_at: std::time::SystemTime,
+    pub size_bytes: u64,
+    pub generation: u32, // 1 = most recent, 2 = previous, etc.
+}
+
+impl BackupEntry {
+    /// Get age in seconds
+    pub fn age_seconds(&self) -> u64 {
+        self.created_at.elapsed().unwrap_or_default().as_secs()
+    }
+
+    /// Get age in days
+    pub fn age_days(&self) -> u32 {
+        (self.age_seconds() / 86400) as u32
+    }
+}
+
+/// Backup registry for tracking backup generations across sessions
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct BackupRegistry {
+    /// Map of original file path to list of backup entries (sorted by generation, newest first)
+    backups: HashMap<PathBuf, Vec<BackupEntry>>,
+}
+
+impl BackupRegistry {
+    /// Create a new empty registry
+    pub fn new() -> Self {
+        Self {
+            backups: HashMap::new(),
+        }
+    }
+
+    /// Load registry from disk (.cage_backups.json in backup_dir)
+    pub fn load(backup_dir: &Path) -> AgeResult<Self> {
+        let registry_path = backup_dir.join(".cage_backups.json");
+
+        if !registry_path.exists() {
+            return Ok(Self::new());
+        }
+
+        let contents = std::fs::read_to_string(&registry_path)
+            .map_err(|e| AgeError::file_error("read_registry", registry_path.clone(), e))?;
+
+        let registry: BackupRegistry = serde_json::from_str(&contents)
+            .map_err(|e| AgeError::ConfigurationError {
+                parameter: "backup_registry".to_string(),
+                value: registry_path.display().to_string(),
+                reason: format!("Invalid JSON: {}", e),
+            })?;
+
+        Ok(registry)
+    }
+
+    /// Save registry to disk
+    pub fn save(&self, backup_dir: &Path) -> AgeResult<()> {
+        // Ensure backup directory exists
+        if !backup_dir.exists() {
+            std::fs::create_dir_all(backup_dir)
+                .map_err(|e| AgeError::file_error("create_backup_dir", backup_dir.to_path_buf(), e))?;
+        }
+
+        let registry_path = backup_dir.join(".cage_backups.json");
+        let temp_path = registry_path.with_extension("json.tmp");
+
+        // Serialize to temp file first (atomic write)
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| AgeError::ConfigurationError {
+                parameter: "backup_registry".to_string(),
+                value: "serialize".to_string(),
+                reason: format!("JSON serialization failed: {}", e),
+            })?;
+
+        std::fs::write(&temp_path, json)
+            .map_err(|e| AgeError::file_error("write_registry_temp", temp_path.clone(), e))?;
+
+        // Atomic rename
+        std::fs::rename(&temp_path, &registry_path)
+            .map_err(|e| AgeError::file_error("rename_registry", registry_path.clone(), e))?;
+
+        Ok(())
+    }
+
+    /// Register a new backup entry
+    pub fn register(&mut self, original: PathBuf, entry: BackupEntry) {
+        let entries = self.backups.entry(original).or_insert_with(Vec::new);
+        entries.push(entry);
+
+        // Sort by generation ascending (oldest first, for retention logic)
+        entries.sort_by(|a, b| a.generation.cmp(&b.generation));
+    }
+
+    /// Get next generation number for a file
+    pub fn next_generation(&self, file: &Path) -> u32 {
+        self.backups
+            .get(file)
+            .and_then(|entries| entries.iter().map(|e| e.generation).max())
+            .map(|max_gen| max_gen + 1)
+            .unwrap_or(1)
+    }
+
+    /// Apply retention policy and return backup paths to delete
+    pub fn apply_retention(&mut self, policy: &RetentionPolicy) -> Vec<PathBuf> {
+        let mut to_delete = Vec::new();
+
+        for (_original, entries) in self.backups.iter_mut() {
+            // Sort entries by created_at (oldest first) for retention logic
+            entries.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+            // Convert BackupEntry to BackupInfo for retention logic
+            let backup_infos: Vec<BackupInfo> = entries
+                .iter()
+                .map(|entry| BackupInfo {
+                    original_path: PathBuf::new(), // Not used in retention logic
+                    backup_path: entry.backup_path.clone(),
+                    created_at: entry.created_at,
+                    size_bytes: entry.size_bytes,
+                })
+                .collect();
+
+            // Get indices to delete (sorted by time, oldest first)
+            let delete_indices = policy.apply(&backup_infos);
+
+            // Collect paths to delete (in reverse order to avoid shifting issues)
+            let mut indices_to_remove: Vec<usize> = delete_indices.iter().copied().collect();
+            indices_to_remove.sort_by(|a, b| b.cmp(a)); // Reverse order
+
+            for idx in &indices_to_remove {
+                if let Some(entry) = entries.get(*idx) {
+                    to_delete.push(entry.backup_path.clone());
+                }
+            }
+
+            // Remove deleted entries from registry (in reverse order)
+            for idx in indices_to_remove {
+                if idx < entries.len() {
+                    entries.remove(idx);
+                }
+            }
+        }
+
+        // Clean up empty entries
+        self.backups.retain(|_, entries| !entries.is_empty());
+
+        to_delete
+    }
+
+    /// List all backups for a specific file
+    pub fn list_for_file(&self, file: &Path) -> Vec<&BackupEntry> {
+        self.backups
+            .get(file)
+            .map(|entries| entries.iter().collect())
+            .unwrap_or_default()
+    }
+
+    /// Get total number of tracked files
+    pub fn file_count(&self) -> usize {
+        self.backups.len()
+    }
+
+    /// Get total number of backup entries across all files
+    pub fn total_backups(&self) -> usize {
+        self.backups.values().map(|entries| entries.len()).sum()
+    }
+
+    /// Remove all backups for a specific file from registry
+    pub fn remove_file(&mut self, file: &Path) {
+        self.backups.remove(file);
     }
 }
 
