@@ -539,14 +539,15 @@ impl AgeAdapterV2 for ShellAdapterV2 {
 
         // Handle identity-based encryption by deriving recipient from identity file (CAGE-12)
         let mut derived_recipients = Vec::new();
-        let recipients_list = if let (None | Some(&[]), Identity::IdentityFile(path) | Identity::SshKey(path)) = (recipients, identity) {
-            // No explicit recipients provided, but we have an identity file
-            // Extract the public recipient from the identity for encryption
-            let recipient_str = self.identity_to_recipient(path)?;
-            derived_recipients.push(Recipient::PublicKey(recipient_str));
-            &derived_recipients[..]
-        } else {
-            recipients.unwrap_or(&[])
+        let recipients_list = match (recipients, identity) {
+            // Identity file without explicit recipients -> derive recipient
+            (None | Some(&[]), Identity::IdentityFile(path) | Identity::SshKey(path)) => {
+                let recipient_str = self.identity_to_recipient(path)?;
+                derived_recipients.push(Recipient::PublicKey(recipient_str));
+                &derived_recipients[..]
+            }
+            // All other cases -> use provided recipients or empty
+            (recipients_opt, _) => recipients_opt.unwrap_or(&[]),
         };
 
         // Check if we can use pipe streaming

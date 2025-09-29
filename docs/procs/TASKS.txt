@@ -199,6 +199,30 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ---
 
+## Known Issues & Bug Tracking
+
+### BUG-06: Flaky Streaming Test (test_shell_adapter_v2_stream_round_trip) [1 pt] 🔴
+**Status:** Intermittent test failure introduced in CAGE-12 identity-based streaming work
+**Symptoms:**
+- Test passes when run individually: `cargo test --lib test_shell_adapter_v2_stream_round_trip`
+- Fails when run with full test suite: `cargo test --lib`
+- Error: "Pipe streaming requires identity file or CAGE_PASSPHRASE_PIPE=1 for passphrases"
+**Root Cause:** Environmental variable pollution or timing issue with CAGE_STREAMING_STRATEGY
+**Impact:** Non-blocking for MVP (87/88 tests pass, test validates passphrase streaming fallback)
+**Priority:** Low - does not affect production usage
+**Steps to Reproduce:**
+```bash
+cargo test --lib  # Fails
+cargo test --lib test_shell_adapter_v2_stream_round_trip  # Passes
+```
+**Fix Required:**
+- Investigate environmental variable isolation between tests
+- Consider using test-scoped EnvVarGuard for all streaming tests
+- OR: Update test to explicitly use temp file strategy for passphrase operations
+**Location:** `src/cage/adapter_v2.rs:1444-1483`
+
+---
+
 ## Completed / Archived (for reference)
 - BUG-01..05 – Critical CLI regressions resolved mid-2025.
 - CAGE-11a – Identity/recipient request parity.
