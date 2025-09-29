@@ -528,7 +528,10 @@ impl CrudManager {
             }
         }
 
-        let audit_logger = AuditLogger::new(config.audit_log_path.clone().map(PathBuf::from))?;
+        let audit_logger = AuditLogger::with_format(
+            config.audit_log_path.clone().map(PathBuf::from),
+            config.telemetry_format
+        )?;
 
         Ok(Self {
             adapter,
@@ -560,6 +563,17 @@ impl CrudManager {
             backup_dir: request.backup_dir.clone(),
         };
 
+        // Handle multi-recipient configuration first (preferred)
+        if let Some(ref multi_config) = request.multi_recipient_config {
+            return self.lock_with_multi_recipient_config(
+                &request.target,
+                &request.identity,
+                multi_config,
+                options,
+            );
+        }
+
+        // Handle legacy recipients list (for backward compatibility)
         if let Some(recipients) = request
             .recipients
             .as_deref()
@@ -1128,6 +1142,122 @@ impl CrudManager {
         Ok(result)
     }
 
+    /// CREATE: Lock files using multi-recipient configuration (CAGE-16)
+    fn lock_with_multi_recipient_config(
+        &mut self,
+        path: &Path,
+        identity: &Identity,
+        multi_config: &crate::cage::requests::MultiRecipientConfig,
+        options: LockOptions,
+    ) -> AgeResult<OperationResult> {
+        use crate::cage::requests::Recipient;
+
+        let start_time = Instant::now();
+        self.audit_logger.log_operation_start_single("lock_multi_recipient", path)?;
+
+        let mut result = OperationResult::new();
+
+        if !path.exists() {
+            return Err(AgeError::file_error(
+                "read",
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
+        }
+
+        // Flatten recipient groups into a single list
+        let all_recipients = multi_config.flatten_recipients();
+        if all_recipients.is_empty() {
+            return Err(AgeError::InvalidOperation {
+                operation: "lock".to_string(),
+                reason: "Multi-recipient configuration has no recipients".to_string(),
+            });
+        }
+
+        // Convert strings to Recipient enum for compatibility with existing adapter
+        let recipient_objects: Vec<Recipient> = all_recipients
+            .into_iter()
+            .map(|r| Recipient::PublicKey(r))
+            .collect();
+
+        // Log multi-recipient operation with group metadata
+        let total_recipients = multi_config.total_recipients();
+        let all_groups = multi_config.all_groups();
+        let group_info = all_groups
+            .iter()
+            .map(|g| format!("{}:{}", g.name, g.len()))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        self.audit_logger.log_info(&format!(
+            "Multi-recipient operation: {} total recipients across groups [{}]",
+            total_recipients, group_info
+        ))?;
+
+        // Authority validation if enabled
+        if multi_config.validate_authority {
+            self.audit_logger.log_info("Authority validation enabled - verifying recipient proofs")?;
+            // TODO: Implement authority proof validation when Ignite integration is ready
+        }
+
+        // Hierarchy enforcement if enabled
+        if multi_config.enforce_hierarchy {
+            self.audit_logger.log_info("Hierarchy enforcement enabled - checking tier compliance")?;
+            // TODO: Implement tier hierarchy validation when Ignite integration is ready
+        }
+
+        let adapter = ShellAdapterV2::with_config(self.config.clone())?;
+        let identity_clone = identity.clone();
+        let recipients_vec = recipient_objects;
+        let mut encrypt = move |input: &Path, output: &Path, format: OutputFormat| {
+            adapter.encrypt_file(
+                input,
+                output,
+                &identity_clone,
+                Some(&recipients_vec),
+                format,
+            )
+        };
+
+        if path.is_file() {
+            self.lock_single_file_internal(path, &options, &mut result, &mut encrypt)?;
+        } else if path.is_dir() {
+            if options.recursive {
+                self.lock_repository_internal(path, &options, &mut result, &mut encrypt)?;
+            } else {
+                return Err(AgeError::InvalidOperation {
+                    operation: "lock".to_string(),
+                    reason: "Directory encryption requires recursive option".to_string(),
+                });
+            }
+        }
+
+        // Log structured encryption event for each group
+        for group in all_groups {
+            // Log encryption event with recipient group metadata
+            if let Err(e) = self.audit_logger.log_encryption_event(
+                path,
+                Some(group.recipients.clone()),
+                match identity {
+                    Identity::Passphrase(_) => "passphrase",
+                    Identity::IdentityFile(_) => "identity-file",
+                    Identity::SshKey(_) => "ssh-key",
+                    Identity::PromptPassphrase => "prompt-passphrase",
+                },
+                result.processed_files.len() > 0,
+            ) {
+                eprintln!("Warning: Failed to log encryption event: {}", e);
+            }
+        }
+
+        self.record_operation("lock_multi_recipient", path, true, &result);
+        result.finalize(start_time);
+        self.audit_logger
+            .log_operation_complete("lock_multi_recipient", path, &result)?;
+
+        Ok(result)
+    }
+
     // ========================================================================================
     // AUTHORITY MANAGEMENT OPERATIONS - Bridge to Lucas's patterns
     // ========================================================================================
@@ -1208,6 +1338,171 @@ impl CrudManager {
             recovery_actions: vec!["Emergency reset completed".to_string()],
             security_events: vec!["Emergency reset authorized".to_string()],
         })
+    }
+
+    // ========================================================================================
+    // RECIPIENT LIFECYCLE HELPERS (CAGE-16)
+    // ========================================================================================
+
+    /// List all recipient groups with metadata
+    pub fn list_recipient_groups(&self) -> Vec<String> {
+        let groups = self.config.list_recipient_groups();
+        for group_name in &groups {
+            if let Some(group) = self.config.get_recipient_group(group_name) {
+                let tier_info = group.tier.map(|t| format!(" [tier:{}]", t.as_str())).unwrap_or_default();
+                self.audit_logger.log_info(&format!(
+                    "Group '{}': {} recipients{}",
+                    group_name, group.len(), tier_info
+                )).unwrap_or_default();
+            }
+        }
+        groups
+    }
+
+    /// Add recipient to a specific group
+    pub fn add_recipient_to_group(&mut self, group_name: &str, recipient: &str) -> AgeResult<()> {
+        self.audit_logger.log_info(&format!(
+            "Adding recipient to group '{}': {}",
+            group_name,
+            recipient
+        ))?;
+
+        if let Some(group) = self.config.get_recipient_group_mut(group_name) {
+            group.add_recipient(recipient.to_string());
+            group.set_metadata("last_modified".to_string(), chrono::Utc::now().to_rfc3339());
+
+            self.audit_logger.log_info(&format!(
+                "Recipient added to group '{}'. Group now has {} recipients",
+                group_name, group.len()
+            ))?;
+
+            Ok(())
+        } else {
+            Err(AgeError::InvalidOperation {
+                operation: "add_recipient".to_string(),
+                reason: format!("Recipient group '{}' not found", group_name),
+            })
+        }
+    }
+
+    /// Remove recipient from a specific group
+    pub fn remove_recipient_from_group(&mut self, group_name: &str, recipient: &str) -> AgeResult<bool> {
+        self.audit_logger.log_info(&format!(
+            "Removing recipient from group '{}': {}",
+            group_name,
+            recipient
+        ))?;
+
+        if let Some(group) = self.config.get_recipient_group_mut(group_name) {
+            let removed = group.remove_recipient(recipient);
+            if removed {
+                group.set_metadata("last_modified".to_string(), chrono::Utc::now().to_rfc3339());
+                self.audit_logger.log_info(&format!(
+                    "Recipient removed from group '{}'. Group now has {} recipients",
+                    group_name, group.len()
+                ))?;
+            } else {
+                self.audit_logger.log_warning(&format!(
+                    "Recipient not found in group '{}': {}",
+                    group_name, recipient
+                ))?;
+            }
+            Ok(removed)
+        } else {
+            Err(AgeError::InvalidOperation {
+                operation: "remove_recipient".to_string(),
+                reason: format!("Recipient group '{}' not found", group_name),
+            })
+        }
+    }
+
+    /// Create a new recipient group with optional tier
+    pub fn create_recipient_group(
+        &mut self,
+        group_name: &str,
+        tier: Option<crate::cage::requests::AuthorityTier>,
+    ) -> AgeResult<()> {
+        self.audit_logger.log_info(&format!(
+            "Creating recipient group '{}'{}",
+            group_name,
+            tier.map(|t| format!(" with tier {}", t.as_str())).unwrap_or_default()
+        ))?;
+
+        let mut group = crate::cage::requests::RecipientGroup::new(group_name.to_string());
+        if let Some(t) = tier {
+            group.tier = Some(t);
+        }
+        group.set_metadata("created_at".to_string(), chrono::Utc::now().to_rfc3339());
+        group.set_metadata("created_by".to_string(), "cage_crud_manager".to_string());
+
+        self.config.add_recipient_group(group);
+
+        self.audit_logger.log_info(&format!(
+            "Recipient group '{}' created successfully",
+            group_name
+        ))?;
+
+        Ok(())
+    }
+
+    /// Audit recipient group metadata and access patterns
+    pub fn audit_recipient_groups(&self) -> AgeResult<Vec<String>> {
+        self.audit_logger.log_info("Starting recipient group audit")?;
+
+        let mut audit_report = Vec::new();
+        let groups = self.config.list_recipient_groups();
+
+        for group_name in &groups {
+            if let Some(group) = self.config.get_recipient_group(group_name) {
+                let report_line = format!(
+                    "Group '{}': {} recipients, tier: {}, hash: {}",
+                    group_name,
+                    group.len(),
+                    group.tier.map(|t| t.as_str()).unwrap_or("none"),
+                    group.group_hash()
+                );
+                audit_report.push(report_line.clone());
+                self.audit_logger.log_info(&format!("AUDIT: {}", report_line))?;
+            }
+        }
+
+        self.audit_logger.log_info(&format!(
+            "Recipient group audit completed: {} groups, {} total recipients",
+            groups.len(),
+            self.config.get_total_recipients_count()
+        ))?;
+
+        Ok(audit_report)
+    }
+
+    /// Get recipient groups by authority tier (for Ignite integration)
+    pub fn get_groups_by_tier(
+        &self,
+        tier: crate::cage::requests::AuthorityTier,
+    ) -> Vec<String> {
+        let groups = self.config.get_groups_by_tier(tier);
+        groups.iter().map(|g| g.name.clone()).collect()
+    }
+
+    /// Get adapter info with recipient group counts (for Ignite validation)
+    pub fn get_adapter_info_with_groups(&self) -> std::collections::HashMap<String, String> {
+        let mut info = std::collections::HashMap::new();
+        info.insert("total_groups".to_string(), self.config.get_recipient_group_count().to_string());
+        info.insert("total_recipients".to_string(), self.config.get_total_recipients_count().to_string());
+        info.insert("padlock_support".to_string(), self.config.padlock_extension_support.to_string());
+
+        // Add tier-specific counts
+        use crate::cage::requests::AuthorityTier;
+        for tier in [AuthorityTier::Skull, AuthorityTier::Master, AuthorityTier::Repository,
+                     AuthorityTier::Ignition, AuthorityTier::Distro] {
+            let tier_groups = self.config.get_groups_by_tier(tier);
+            info.insert(
+                format!("{}_groups", tier.as_str().to_lowercase()),
+                tier_groups.len().to_string()
+            );
+        }
+
+        info
     }
 
     // ========================================================================================

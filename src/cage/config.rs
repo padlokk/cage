@@ -222,6 +222,15 @@ pub struct AgeConfig {
 
     /// Telemetry output format for audit trails (text or json)
     pub telemetry_format: TelemetryFormat,
+
+    /// Default recipient groups keyed by name
+    pub recipient_groups: std::collections::HashMap<String, crate::cage::requests::RecipientGroup>,
+
+    /// Support .padlock file extension for Padlock integration
+    pub padlock_extension_support: bool,
+
+    /// Default extensions considered encrypted (includes .padlock for Padlock)
+    pub encrypted_extensions: Vec<String>,
 }
 
 impl AgeConfig {
@@ -400,15 +409,6 @@ impl AgeConfig {
         }
     }
 
-    /// Check if a file has the configured encrypted extension
-    pub fn is_encrypted_file(&self, path: &std::path::Path) -> bool {
-        if let Some(ext) = path.extension() {
-            if let Some(ext_str) = ext.to_str() {
-                return ext_str == self.encrypted_file_extension;
-            }
-        }
-        false
-    }
 
     pub fn load_default() -> AgeResult<Self> {
         for path in default_config_paths() {
@@ -508,6 +508,72 @@ impl AgeConfig {
         config.validate()?;
         Ok(config)
     }
+
+    /// Add a recipient group to configuration
+    pub fn add_recipient_group(&mut self, group: crate::cage::requests::RecipientGroup) {
+        self.recipient_groups.insert(group.name.clone(), group);
+    }
+
+    /// Get a recipient group by name
+    pub fn get_recipient_group(&self, name: &str) -> Option<&crate::cage::requests::RecipientGroup> {
+        self.recipient_groups.get(name)
+    }
+
+    /// Get a mutable reference to recipient group by name
+    pub fn get_recipient_group_mut(&mut self, name: &str) -> Option<&mut crate::cage::requests::RecipientGroup> {
+        self.recipient_groups.get_mut(name)
+    }
+
+    /// Remove a recipient group by name
+    pub fn remove_recipient_group(&mut self, name: &str) -> Option<crate::cage::requests::RecipientGroup> {
+        self.recipient_groups.remove(name)
+    }
+
+    /// List all recipient group names
+    pub fn list_recipient_groups(&self) -> Vec<String> {
+        self.recipient_groups.keys().cloned().collect()
+    }
+
+    /// Check if a file path should be considered encrypted based on extension
+    pub fn is_encrypted_file(&self, path: &std::path::Path) -> bool {
+        if let Some(extension) = path.extension() {
+            let ext_str = extension.to_string_lossy().to_lowercase();
+
+            // Check if extension matches configured encrypted extensions
+            if self.encrypted_extensions.iter().any(|e| e.to_lowercase() == ext_str) {
+                return true;
+            }
+
+            // Legacy support for the configured encrypted_file_extension
+            if ext_str == self.encrypted_file_extension.to_lowercase() {
+                return true;
+            }
+
+            // Padlock extension support
+            if self.padlock_extension_support && ext_str == "padlock" {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get recipient group count for reporting to Ignite
+    pub fn get_recipient_group_count(&self) -> usize {
+        self.recipient_groups.len()
+    }
+
+    /// Get total recipients across all groups for reporting to Ignite
+    pub fn get_total_recipients_count(&self) -> usize {
+        self.recipient_groups.values().map(|g| g.len()).sum()
+    }
+
+    /// Get recipient groups by authority tier
+    pub fn get_groups_by_tier(&self, tier: crate::cage::requests::AuthorityTier) -> Vec<&crate::cage::requests::RecipientGroup> {
+        self.recipient_groups
+            .values()
+            .filter(|group| group.tier == Some(tier))
+            .collect()
+    }
 }
 
 impl Default for AgeConfig {
@@ -536,6 +602,13 @@ impl Default for AgeConfig {
             backup_retention: RetentionPolicyConfig::default(),
             streaming_strategy: None,
             telemetry_format: TelemetryFormat::default(),
+            recipient_groups: std::collections::HashMap::new(),
+            padlock_extension_support: true,
+            encrypted_extensions: vec![
+                "cage".to_string(),
+                "age".to_string(),
+                "padlock".to_string()
+            ],
         }
     }
 }

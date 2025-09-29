@@ -5,6 +5,8 @@
 
 use crate::cage::config::{AgeConfig, OutputFormat};
 use std::path::PathBuf;
+use md5;
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // COMMON REQUEST OPTIONS
@@ -64,6 +66,229 @@ pub enum Recipient {
     SelfRecipient,
 }
 
+/// Authority tier in the Ignite X/M/R/I/D hierarchy
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum AuthorityTier {
+    /// X - Skull (top-level authority)
+    Skull,
+    /// M - Master (operational authority)
+    Master,
+    /// R - Repository (per-repo authority)
+    Repository,
+    /// I - Ignition (automation authority)
+    Ignition,
+    /// D - Distro (distribution authority)
+    Distro,
+}
+
+impl AuthorityTier {
+    /// Get tier designation as string
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AuthorityTier::Skull => "X",
+            AuthorityTier::Master => "M",
+            AuthorityTier::Repository => "R",
+            AuthorityTier::Ignition => "I",
+            AuthorityTier::Distro => "D",
+        }
+    }
+
+    /// Parse tier from string designation
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_uppercase().as_str() {
+            "X" => Some(AuthorityTier::Skull),
+            "M" => Some(AuthorityTier::Master),
+            "R" => Some(AuthorityTier::Repository),
+            "I" => Some(AuthorityTier::Ignition),
+            "D" => Some(AuthorityTier::Distro),
+            _ => None,
+        }
+    }
+}
+
+/// Recipient group representing a collection of recipients with tier metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecipientGroup {
+    /// Group identifier/name
+    pub name: String,
+
+    /// Recipients in this group
+    pub recipients: Vec<String>,
+
+    /// Authority tier this group represents
+    pub tier: Option<AuthorityTier>,
+
+    /// Group metadata (fingerprints, creation time, etc.)
+    #[serde(default)]
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+impl RecipientGroup {
+    /// Create a new recipient group
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            recipients: Vec::new(),
+            tier: None,
+            metadata: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Create a group with tier designation
+    pub fn with_tier(name: String, tier: AuthorityTier) -> Self {
+        let mut group = Self::new(name);
+        group.tier = Some(tier);
+        group
+    }
+
+    /// Add recipient to group
+    pub fn add_recipient(&mut self, recipient: String) {
+        if !self.recipients.contains(&recipient) {
+            self.recipients.push(recipient);
+        }
+    }
+
+    /// Remove recipient from group
+    pub fn remove_recipient(&mut self, recipient: &str) -> bool {
+        if let Some(pos) = self.recipients.iter().position(|r| r == recipient) {
+            self.recipients.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if group contains recipient
+    pub fn contains_recipient(&self, recipient: &str) -> bool {
+        self.recipients.contains(&String::from(recipient))
+    }
+
+    /// Get recipient count
+    pub fn len(&self) -> usize {
+        self.recipients.len()
+    }
+
+    /// Check if group is empty
+    pub fn is_empty(&self) -> bool {
+        self.recipients.is_empty()
+    }
+
+    /// Set authority tier for this group
+    pub fn set_tier(&mut self, tier: Option<AuthorityTier>) {
+        self.tier = tier;
+    }
+
+    /// Get group hash for audit logging (with stable ordering)
+    pub fn group_hash(&self) -> String {
+        let mut sorted = self.recipients.clone();
+        sorted.sort();
+        format!("{:x}", md5::compute(sorted.join(",").as_bytes()))
+    }
+
+    /// Set metadata field
+    pub fn set_metadata(&mut self, key: String, value: String) {
+        self.metadata.insert(key, value);
+    }
+
+    /// Get metadata field
+    pub fn get_metadata(&self, key: &str) -> Option<&String> {
+        self.metadata.get(key)
+    }
+}
+
+/// Multi-recipient configuration for operations
+#[derive(Debug, Clone)]
+pub struct MultiRecipientConfig {
+    /// Primary recipient group
+    pub primary_group: Option<RecipientGroup>,
+
+    /// Additional recipient groups to include
+    pub additional_groups: Vec<RecipientGroup>,
+
+    /// Whether to validate recipient authority proofs
+    pub validate_authority: bool,
+
+    /// Whether to enforce tier hierarchy
+    pub enforce_hierarchy: bool,
+}
+
+impl MultiRecipientConfig {
+    /// Create new multi-recipient config
+    pub fn new() -> Self {
+        Self {
+            primary_group: None,
+            additional_groups: Vec::new(),
+            validate_authority: false,
+            enforce_hierarchy: false,
+        }
+    }
+
+    /// Set primary recipient group
+    pub fn with_primary_group(mut self, group: RecipientGroup) -> Self {
+        self.primary_group = Some(group);
+        self
+    }
+
+    /// Add additional recipient group
+    pub fn add_group(mut self, group: RecipientGroup) -> Self {
+        self.additional_groups.push(group);
+        self
+    }
+
+    /// Enable authority validation
+    pub fn with_authority_validation(mut self, enabled: bool) -> Self {
+        self.validate_authority = enabled;
+        self
+    }
+
+    /// Enable hierarchy enforcement
+    pub fn with_hierarchy_enforcement(mut self, enabled: bool) -> Self {
+        self.enforce_hierarchy = enabled;
+        self
+    }
+
+    /// Flatten all groups into a single recipient list
+    pub fn flatten_recipients(&self) -> Vec<String> {
+        let mut all_recipients = Vec::new();
+
+        if let Some(ref primary) = self.primary_group {
+            all_recipients.extend(primary.recipients.clone());
+        }
+
+        for group in &self.additional_groups {
+            for recipient in &group.recipients {
+                if !all_recipients.contains(recipient) {
+                    all_recipients.push(recipient.clone());
+                }
+            }
+        }
+
+        all_recipients
+    }
+
+    /// Get total recipient count (deduplicated)
+    pub fn total_recipients(&self) -> usize {
+        self.flatten_recipients().len()
+    }
+
+    /// Get all groups
+    pub fn all_groups(&self) -> Vec<&RecipientGroup> {
+        let mut groups = Vec::new();
+        if let Some(ref primary) = self.primary_group {
+            groups.push(primary);
+        }
+        groups.extend(self.additional_groups.iter());
+        groups
+    }
+}
+
+impl Default for MultiRecipientConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ============================================================================
 // LOCK REQUEST (ENCRYPTION)
 // ============================================================================
@@ -79,6 +304,9 @@ pub struct LockRequest {
 
     /// Recipients for public key encryption (optional)
     pub recipients: Option<Vec<Recipient>>,
+
+    /// Multi-recipient configuration for advanced scenarios
+    pub multi_recipient_config: Option<MultiRecipientConfig>,
 
     /// Output format (Binary or ASCII armor)
     pub format: OutputFormat,
@@ -109,6 +337,7 @@ impl LockRequest {
             target,
             identity,
             recipients: None,
+            multi_recipient_config: None,
             format: OutputFormat::Binary,
             recursive: false,
             pattern: None,
@@ -122,6 +351,12 @@ impl LockRequest {
     /// Builder method to set recipients
     pub fn with_recipients(mut self, recipients: Vec<Recipient>) -> Self {
         self.recipients = Some(recipients);
+        self
+    }
+
+    /// Builder method to set multi-recipient configuration
+    pub fn with_multi_recipient_config(mut self, config: MultiRecipientConfig) -> Self {
+        self.multi_recipient_config = Some(config);
         self
     }
 

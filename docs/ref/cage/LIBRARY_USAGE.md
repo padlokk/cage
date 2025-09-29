@@ -451,102 +451,65 @@ The configuration system checks these paths in order:
 3. `$HOME/.config/cage/config.toml`
 4. `./cage.toml`
 
-#### Recipient Groups - Persistent Multi-Recipient Sets
+#### Telemetry & Audit Logging Configuration
 
-Cage now supports persistent recipient groups that survive across restarts. This enables team-based encryption, authority chain management, and vault key organization:
+Cage provides structured telemetry for machine-readable audit trails, critical for Padlock/Ignite integration:
 
 ```rust
-use cage::cage::config::AgeConfig;
-use cage::cage::requests::{RecipientGroup, AuthorityTier};
+use cage::cage::config::{AgeConfig, TelemetryFormat};
 
-// Load config with recipient groups
-let mut config = AgeConfig::load_default()?;
+// Create config with JSON telemetry
+let mut config = AgeConfig::default();
+config.telemetry_format = TelemetryFormat::Json;
+config.audit_log_path = Some("/var/log/cage/audit.json".to_string());
 
-// Create a new recipient group
-let mut devops = RecipientGroup::new("devops".to_string());
-devops.add_recipient("age1recipient1abc...".to_string());
-devops.add_recipient("age1recipient2def...".to_string());
-devops.set_tier(Some(AuthorityTier::Repository));
-devops.set_metadata("created_by".to_string(), "admin".to_string());
-devops.set_metadata("created_at".to_string(), "2025-09-29".to_string());
-
-// Add to config
-config.add_recipient_group(devops);
-
-// Access existing groups
-if let Some(group) = config.get_recipient_group("devops") {
-    println!("Group: {}", group.name);
-    println!("Recipients: {:?}", group.recipients);
-    println!("Tier: {:?}", group.tier);
-    println!("Created by: {:?}", group.get_metadata("created_by"));
-
-    // Get stable audit hash
-    let hash = group.group_hash();
-    println!("Audit hash: {}", hash);
-}
-
-// Modify existing groups
-if let Some(group) = config.get_recipient_group_mut("devops") {
-    group.add_recipient("age1recipient3xyz...".to_string());
-}
-
-// Query groups by tier (for Ignite/Padlock authority chains)
-let groups = config.get_groups_by_tier(AuthorityTier::Master);
-println!("Master tier groups: {}", groups.len());
-
-// Get group counts for reporting
-println!("Total groups: {}", config.get_recipient_group_count());
-
-// Save configuration with recipient groups
-config.save_to_file(&std::path::PathBuf::from("cage.toml"))?;
-
-// Load from specific path
-let loaded = AgeConfig::load_from_path(&std::path::PathBuf::from("cage.toml"))?;
-assert_eq!(loaded.get_recipient_group_count(), config.get_recipient_group_count());
+let mut crud_manager = CrudManager::with_config(config)?;
 ```
 
-**TOML Format:**
+**Telemetry Formats:**
+- `TelemetryFormat::Text` - Human-readable log format (default)
+- `TelemetryFormat::Json` - Machine-readable JSON lines for log ingestion
 
+**JSON Event Types:**
+- `operation_start` - Operation initiated
+- `operation_complete` - Operation finished (includes processed file list, timing)
+- `encryption` - File encrypted (includes recipient count, group hash, streaming strategy, authority tier)
+- `decryption` - File decrypted (includes identity type, streaming strategy)
+- `status_check` - Repository status checked
+- `authority_operation` - Authority chain operation
+
+**Example JSON Output:**
+```json
+{
+  "timestamp": "2025-09-29T21:50:48Z",
+  "level": "INFO",
+  "component": "cage_automation",
+  "event_type": "encryption",
+  "path": "/secret.txt",
+  "identity_type": "age_identity",
+  "recipient_count": 2,
+  "recipient_group_hash": "24a003292f7c8b35f07122d4ff0e1fd9",
+  "streaming_strategy": "pipe",
+  "authority_tier": "M",
+  "success": true
+}
+```
+
+**Security Notes:**
+- Recipient public keys are hashed (MD5) for audit trails, not logged in plaintext
+- Passphrases are never logged
+- All sensitive fields are automatically redacted
+
+**Configuration via TOML:**
 ```toml
-[recipient_groups.devops]
-name = "devops"
-recipients = ["age1recipient1abc...", "age1recipient2def..."]
-tier = "REPOSITORY"
-
-[recipient_groups.devops.metadata]
-created_by = "admin"
-created_at = "2025-09-29"
-
-[recipient_groups.security]
-name = "security"
-recipients = ["age1security1xyz...", "age1security2uvw..."]
-tier = "MASTER"
+[telemetry]
+format = "json"  # or "text"
+audit_log_path = "/var/log/cage/audit.json"
 ```
 
-**Authority Tiers** (for Ignite/Padlock integration):
-- `AuthorityTier::Skull` → `SKULL` (X) - Top-level authority
-- `AuthorityTier::Master` → `MASTER` (M) - Operational authority
-- `AuthorityTier::Repository` → `REPOSITORY` (R) - Per-repo authority
-- `AuthorityTier::Ignition` → `IGNITION` (I) - Automation authority
-- `AuthorityTier::Distro` → `DISTRO` (D) - Distribution authority
+#### Recipient Groups (Experimental Roadmap)
 
-**Group Hash Stability:**
-
-The `group_hash()` method provides deterministic MD5 hashes for audit logging. Recipients are sorted before hashing, ensuring consistent hashes regardless of insertion order:
-
-```rust
-let mut group1 = RecipientGroup::new("test".to_string());
-group1.add_recipient("age1aaa...".to_string());
-group1.add_recipient("age1bbb...".to_string());
-
-let mut group2 = RecipientGroup::new("test".to_string());
-group2.add_recipient("age1bbb...".to_string()); // Different order
-group2.add_recipient("age1aaa...".to_string());
-
-assert_eq!(group1.group_hash(), group2.group_hash()); // Always equal
-```
-
-This stability is critical for Ignite authority chain audit trails.
+Recipient group persistence is planned as an optional convenience feature (see task `CONFIG-01`). The current release exposes runtime helpers via `RecipientGroup`/`MultiRecipientConfig`, but durable storage will be formalized later through the JSON backup registry (CAGE-03). For now, treat any TOML examples as experimental and subject to change.
 
 ### 5. Configuration-Driven Operations
 

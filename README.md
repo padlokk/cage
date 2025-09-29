@@ -196,79 +196,7 @@ strategy = "auto"
 cleanup_on_success = true
 directory = "~/.local/share/cage/backups"
 retention = "keep-last-5"
-
-# Recipient Groups (persistent multi-recipient sets)
-[recipient_groups.devops]
-name = "devops"
-recipients = ["age1recipient1abc...", "age1recipient2def..."]
-tier = "REPOSITORY"  # Optional: SKULL, MASTER, REPOSITORY, IGNITION, DISTRO
-
-[recipient_groups.devops.metadata]
-created_by = "admin"
-created_at = "2025-09-29"
-purpose = "development_team"
-
-[recipient_groups.security]
-name = "security"
-recipients = ["age1security1xyz...", "age1security2uvw..."]
-tier = "MASTER"
-
-[recipient_groups.security.metadata]
-purpose = "authority_chain"
-level = "high"
 ```
-
-#### Recipient Groups
-
-Recipient groups allow you to define reusable sets of recipients that persist across Cage restarts. This is particularly useful for:
-
-- **Team-based encryption**: Define groups for different teams or roles
-- **Authority chains**: Organize recipients by security tier (Ignite integration)
-- **Vault management**: Persistent key sets for Padlock vaults
-
-**Usage example:**
-
-```bash
-# Encrypt to a predefined group
-cage lock secret.txt --recipient-group devops
-
-# Any member of the group can decrypt
-cage unlock secret.txt.cage --identity ~/.ssh/id_ed25519
-
-# Groups persist - defined once in config, used everywhere
-```
-
-**Programmatic API:**
-
-```rust
-use cage::cage::config::AgeConfig;
-use cage::cage::requests::{RecipientGroup, AuthorityTier};
-
-// Load config with recipient groups
-let mut config = AgeConfig::load_from_path("cage.toml")?;
-
-// Access existing groups
-let devops = config.get_recipient_group("devops").unwrap();
-println!("Recipients: {:?}", devops.recipients);
-
-// Add new group programmatically
-let mut backup = RecipientGroup::new("backup".to_string());
-backup.add_recipient("age1backup1...".to_string());
-backup.set_tier(Some(AuthorityTier::Distro));
-config.add_recipient_group(backup);
-
-// Save changes back to file
-config.save_to_file("cage.toml")?;
-```
-
-**Authority Tiers** (for Ignite/Padlock integration):
-- `SKULL` (X) - Top-level authority
-- `MASTER` (M) - Operational authority
-- `REPOSITORY` (R) - Per-repo authority
-- `IGNITION` (I) - Automation authority
-- `DISTRO` (D) - Distribution authority
-
-Groups without a tier are still valid and can be used for general team encryption.
 
 #### Quick Configuration Setup
 
@@ -765,7 +693,8 @@ Please report security vulnerabilities via private channels:
 - **In-place operations** with multi-layered safety architecture
 - **Progress indicators** with professional terminal output
 - **Recovery mechanisms** for in-place operations
-- **Comprehensive telemetry** and progress hooks
+- **Structured JSON telemetry** for Padlock/Ignite integration (OBS-01)
+- **Machine-readable audit trails** with sensitive field redaction
 
 ### ⚠️ In Development
 
@@ -780,8 +709,8 @@ See [docs/procs/TASKS.txt](docs/procs/TASKS.txt) for detailed development plan.
 Cage has **comprehensive test coverage** across multiple categories:
 
 ### Test Statistics
-- **64 Total Tests** across 6 test suites
-- **38 Unit Tests** - Core library functionality validation
+- **94 Total Tests** across 7 test suites
+- **87 Unit Tests** - Core library functionality validation (includes JSON telemetry tests)
 - **12 RSB Integration Tests** - Complete framework compatibility validation
 - **5 PTY Tests** - Pseudo-terminal automation testing
 - **7 Integration Tests** - End-to-end functionality verification
