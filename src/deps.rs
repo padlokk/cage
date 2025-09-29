@@ -6,9 +6,11 @@
 //!
 //! # Re-exported Crates
 //!
-//! - **age**: Core Age encryption library (for Identity/Recipient types)
-//! - **rsb**: Rebel String-Biased framework (for CLI macros and utilities)
-//! - **hub**: Terminal utilities and PTY support
+//! - **age** (0.11.1): Core Age encryption library (for Identity/Recipient types)
+//! - **rsb** (git): Rebel String-Biased framework (for CLI macros and utilities)
+//! - **hub** (git): Terminal utilities and PTY support
+//!
+//! Note: rsb and hub are currently git dependencies tracking their main branches.
 //!
 //! # Intentionally Excluded
 //!
@@ -47,11 +49,3 @@ pub mod common {
     /// Re-export PTY types for advanced users
     pub use hub::portable_pty::{PtySize, CommandBuilder};
 }
-
-// Version compatibility checks
-#[doc(hidden)]
-pub const AGE_VERSION: &str = "0.10";
-#[doc(hidden)]
-pub const RSB_VERSION: &str = "0.1";
-#[doc(hidden)]
-pub const HUB_VERSION: &str = "0.1";

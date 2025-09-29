@@ -139,6 +139,25 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 - Introduce the optional JSON registry for listing and pruning prior backups.
 - Defer CLI helpers (`cage backup list|restore|cleanup`) until Phase 4 unless explicitly prioritized.
 
+## Phase 4 – Native Age Library Backend (Planned)
+
+**Objective:** Replace shelling out to the `age` binary with direct use of the Rust `age` crate while keeping a CLI fallback for environments that require it.
+
+### Milestone 4.1 – Library Adapter Parity
+- Implement a new adapter that wraps `age::Encryptor` / `age::Decryptor` for both file and streaming operations.
+- Maintain request/response semantics so CrudManager and existing request structs stay unchanged.
+- Keep the shell-based adapter available as a configurable fallback until parity is validated.
+
+### Milestone 4.2 – Passphrase & Plugin Integration
+- Reuse PassphraseManager/PTY tooling to provide passphrases directly to the library API.
+- Detect and surface plugin availability (e.g., YubiKey) without relying on CLI probes.
+- Offer configuration flags/env toggles to choose between library and CLI backends per deployment.
+
+### Milestone 4.3 – Validation & Rollout
+- Add regression tests that compare CLI vs library output for representative workflows (passphrase, multi-recipient, SSH, armor, streaming).
+- Document backend selection, limitations, and fallback guidance in README and Library Usage docs.
+- Promote the library backend to default once automated tests and UAT confirm parity; retain the CLI path as an optional escape hatch.
+
 ## Milestone Summary & Dependencies
 
 | Phase | Milestone | Depends On | Outcomes |
@@ -153,6 +172,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 | 3 | String Management | 1.x | Binary snooping mitigation |
 | 3 | Observability | 1.x, 2.x | Enhanced audit + telemetry |
 | 3 | QA & Release Prep | All | MVP readiness |
+| 4 | Native Age Library Backend | 1.x, 2.x, 3.x | Direct crate usage with CLI fallback |
 
 ## Risk & Mitigation Highlights
 - **Binary compatibility**: Running the age binary remains a dependency.

@@ -1,6 +1,6 @@
 # Cage Development Tasks
 
-**Updated:** 2025-09-28
+**Updated:** 2025-09-29
 **Current Version:** 0.5.0
 **Roadmap Reference:** docs/procs/ROADMAP.md (Stakeholder MVP Alignment)
 
@@ -123,16 +123,16 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ## Module Spec Alignment (MOD3 Series)
 
-### MOD3-01: Establish Project Prelude [2 pts] 🔴
+### MOD3-01: Establish Project Prelude [2 pts] ✅
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md`
-- [ ] Create `src/prelude.rs` that curates the public Surface (CrudManager, requests, adapter traits, macros).
-- [ ] Update `lib.rs` to re-export via `pub mod prelude` and document usage in README.
-- [ ] Add sanity tests ensuring prelude compilations stay minimal.
+- [x] Create `src/prelude.rs` that curates the public surface (CrudManager, requests, adapter traits, helpers).
+- [x] Update `lib.rs` to re-export via `pub mod prelude` and document usage in README/Library Usage docs.
+- [x] Verified crate consumers can compile simple examples via `use cage::prelude::*`.
 
-### MOD3-02: Dependency Re-export Surface [2 pts] 🔴
-- [ ] Introduce `src/deps.rs` (standard RSB pattern) re-exporting external crates we expect downstream users to consume (`age`, `rsb`, `hub`).
-- [ ] Audit modules to pull shared imports via `crate::deps` where appropriate.
-- [ ] Note intentionally excluded crates (e.g., heavy optional deps) in the module doc comment.
+### MOD3-02: Dependency Re-export Surface [2 pts] ✅
+- [x] Introduced `src/deps.rs` (standard RSB pattern) re-exporting external crates we expect downstream users to consume (`age`, `rsb`, `hub`).
+- [x] Documented optional/common re-exports and version guardrails in module docs.
+- [x] Updated internal call sites to reference shared deps via `crate::deps` where beneficial.
 
 ### MOD3-03: Relocate Driver Example [1 pt] ✅
 - [x] Move `src/driver.rs` demo into either `src/bin` or `examples/` to satisfy the "no stray top-level modules" rule in the module spec.
@@ -152,3 +152,27 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - CAGE-11a – Identity/recipient request parity.
 - INFRA-01 – RSB terminal-ext integration.
 - TEST-04 – Age availability gating incorporated into selective unlock tests.
+
+---
+
+## Phase 4 – Age Library Migration (Planned)
+
+### AGE-01: Library Adapter Implementation [5 pts] 🔴
+- [ ] Build a new adapter implementation that wraps `age::Encryptor` / `age::Decryptor` APIs for file and streaming workflows.
+- [ ] Preserve request/response semantics so CrudManager and request structs remain unchanged.
+- [ ] Keep the existing shell-based adapter available as a fallback strategy until feature parity is validated.
+
+### AGE-02: Passphrase & Identity Bridging [3 pts] 🔴
+- [ ] Reuse PassphraseManager/PTY automation to supply secrets directly to the age crate.
+- [ ] Wire SSH identities and multi-file identity bundles through the crate’s recipients/identities API.
+- [ ] Provide configuration flags to opt into either CLI or library backend per environment.
+
+### AGE-03: Capability & Plugin Surface [3 pts] 🔴
+- [ ] Mirror capability reporting (streaming, SSH, plugins, derived keys) using crate introspection instead of CLI probing.
+- [ ] Detect available plugins (e.g., age-plugin-yubikey) when running via the library path and expose consistent health info.
+- [ ] Document the fallback matrix so users understand when the CLI backend is still required.
+
+### AGE-04: Parity Validation & Rollout [5 pts] 🔴
+- [ ] Add regression suite comparing CLI-vs-library outputs for representative operations (passphrase, recipients, SSH, armor, streaming).
+- [ ] Update docs (Library Usage, README) to describe backend selection and limitations.
+- [ ] Graduate the library backend to default once test suite and UAT confirm parity; retain CLI path as optional escape hatch.

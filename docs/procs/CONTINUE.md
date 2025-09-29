@@ -1,5 +1,9 @@
 # Continue Log – Bug Slate Progress
 
+## NOTE-2025-09-29 (Age Library Planning)
+- Added Phase 4 "Age Library Migration" roadmap milestones and AGE-01..04 tasks.
+- Library adapter work is deferred but now tracked; CLI backend remains default until parity is validated.
+
 ## HANDOFF-2025-09-28-2100 (Test Fixes & Next Tasks)
 
 ### Session Duration: ~15 minutes
