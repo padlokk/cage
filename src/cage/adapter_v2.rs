@@ -536,7 +536,18 @@ impl AgeAdapterV2 for ShellAdapterV2 {
         format: OutputFormat,
     ) -> AgeResult<u64> {
         let strategy = streaming_strategy_from_env();
-        let recipients_list = recipients.unwrap_or(&[]);
+
+        // Handle identity-based encryption by deriving recipient from identity file (CAGE-12)
+        let mut derived_recipients = Vec::new();
+        let recipients_list = if let (None | Some(&[]), Identity::IdentityFile(path) | Identity::SshKey(path)) = (recipients, identity) {
+            // No explicit recipients provided, but we have an identity file
+            // Extract the public recipient from the identity for encryption
+            let recipient_str = self.identity_to_recipient(path)?;
+            derived_recipients.push(Recipient::PublicKey(recipient_str));
+            &derived_recipients[..]
+        } else {
+            recipients.unwrap_or(&[])
+        };
 
         // Check if we can use pipe streaming
         let can_use_pipe_recipients = !recipients_list.is_empty();
@@ -855,6 +866,50 @@ impl AgeAdapterV2 for ShellAdapterV2 {
 }
 
 impl ShellAdapterV2 {
+    /// Extract public recipient from identity file (CAGE-12 helper)
+    /// This enables "identity-based encryption" by deriving the recipient from an identity
+    fn identity_to_recipient(&self, identity_path: &Path) -> AgeResult<String> {
+        if !identity_path.exists() {
+            return Err(AgeError::file_error(
+                "identity_to_recipient",
+                identity_path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Identity file not found"),
+            ));
+        }
+
+        // Use age-keygen -y to extract public recipient from identity file
+        let output = std::process::Command::new("age-keygen")
+            .arg("-y")
+            .arg(identity_path)
+            .output()
+            .map_err(|e| AgeError::ProcessExecutionFailed {
+                command: "age-keygen -y".into(),
+                exit_code: None,
+                stderr: e.to_string(),
+            })?;
+
+        if !output.status.success() {
+            return Err(AgeError::ProcessExecutionFailed {
+                command: "age-keygen -y".into(),
+                exit_code: output.status.code(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            });
+        }
+
+        let recipient = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .to_string();
+
+        if recipient.is_empty() || !recipient.starts_with("age1") {
+            return Err(AgeError::InvalidOperation {
+                operation: "identity_to_recipient".into(),
+                reason: format!("Invalid recipient extracted: {}", recipient),
+            });
+        }
+
+        Ok(recipient)
+    }
+
     fn encrypt_stream_temp(
         &self,
         input: &mut (dyn Read + Send),
@@ -1490,6 +1545,69 @@ mod tests {
             .expect("Pipe streaming decrypt failed");
 
         assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_identity_based_streaming_encrypt() {
+        // Test CAGE-12: identity-based streaming encryption
+        if which::which("age").is_err() || which::which("age-keygen").is_err() {
+            println!("Identity streaming test skipped: age/age-keygen binary not available");
+            return;
+        }
+
+        let adapter = match ShellAdapterV2::new() {
+            Ok(a) => a,
+            Err(e) => {
+                println!("Identity streaming test skipped: ({e})");
+                return;
+            }
+        };
+
+        let identity = X25519Identity::generate();
+        let mut identity_file = NamedTempFile::new().expect("create identity file");
+        let identity_string = identity.to_string();
+        identity_file
+            .write_all(identity_string.expose_secret().as_bytes())
+            .expect("write identity");
+        identity_file.flush().expect("flush identity file");
+
+        let test_data = b"CAGE-12 identity-based streaming encryption test data";
+        let mut plaintext = std::io::Cursor::new(test_data.to_vec());
+        let mut encrypted = Vec::new();
+
+        let _guard = EnvVarGuard::set("CAGE_STREAMING_STRATEGY", "pipe");
+
+        // Encrypt using ONLY identity file (no explicit recipients)
+        // The adapter should extract the public recipient from the identity
+        adapter
+            .encrypt_stream(
+                &mut plaintext,
+                &mut encrypted,
+                &Identity::IdentityFile(identity_file.path().to_path_buf()),
+                None, // No explicit recipients - should derive from identity
+                OutputFormat::Binary,
+            )
+            .expect("Identity-based streaming encrypt failed");
+
+        assert!(!encrypted.is_empty(), "Encrypted data should not be empty");
+
+        // Decrypt with the same identity
+        let mut encrypted_cursor = std::io::Cursor::new(encrypted);
+        let mut decrypted = Vec::new();
+
+        adapter
+            .decrypt_stream(
+                &mut encrypted_cursor,
+                &mut decrypted,
+                &Identity::IdentityFile(identity_file.path().to_path_buf()),
+            )
+            .expect("Identity-based streaming decrypt failed");
+
+        assert_eq!(
+            decrypted,
+            test_data.to_vec(),
+            "Decrypted data should match original"
+        );
     }
 
     #[test]

@@ -107,9 +107,13 @@ let result = crud_manager.lock(&std::path::Path::new("legacy.txt"), "pass", lega
 - **Passphrase-based operations** always use temp-file staging due to age's TTY requirements
   - Performance: ~100-150 MB/s for large files
   - This is a fundamental limitation of the age binary's security model
-- **Recipient-based encryption** (`Recipient::PublicKey`, `Recipient::MultipleKeys`, `Recipient::RecipientsFile`, `Recipient::SshRecipients`) supports true pipe streaming
+- **Recipient-based encryption** (`Recipient::PublicKey`, `Recipient::MultipleKeys`, `Recipient::RecipientsFile`, `Recipient::SshRecipients`) supports true pipe streaming ✅
   - Performance: ~400-500 MB/s when using `pipe` or `auto` strategy
-- **Identity-driven decryption** (`Identity::IdentityFile` or `Identity::SshKey`) also supports pipe streaming
+- **Identity-based encryption** (CAGE-12) - When providing `Identity::IdentityFile` or `Identity::SshKey` without explicit recipients, the adapter automatically extracts the public recipient using `age-keygen -y` ✅
+  - Enables "self-encryption" workflows for key rotation scenarios
+  - Performance: Same as recipient-based (~400-500 MB/s)
+  - Requires `age-keygen` binary on PATH
+- **Identity-driven decryption** (`Identity::IdentityFile` or `Identity::SshKey`) supports pipe streaming ✅
 
 #### Performance Guidelines
 
@@ -128,8 +132,19 @@ use cage::cage::requests::{Identity, Recipient};
 
 let adapter = ShellAdapterV2::new()?;
 
-// Opt into pipe streaming for recipient flows
+// Opt into pipe streaming for recipient and identity flows
 std::env::set_var("CAGE_STREAMING_STRATEGY", "pipe");
+
+// Example: Identity-based encryption (CAGE-12)
+// The adapter automatically extracts the public recipient from the identity file
+let identity_path = PathBuf::from("~/.age/key.txt");
+adapter.encrypt_stream(
+    &mut input_stream,
+    &mut output_stream,
+    &Identity::IdentityFile(identity_path),
+    None, // No explicit recipients needed - derived from identity
+    OutputFormat::Binary,
+)?;
 
 let recipients = vec![Recipient::PublicKey("age1exampleKey".into())];
 let mut plaintext = std::io::Cursor::new(b"stream me".to_vec());

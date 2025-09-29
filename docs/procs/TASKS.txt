@@ -24,14 +24,18 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 **Status:** `AgeConfig` now tracks the loaded source path, exposes helper methods, and a `cage config` CLI command provides `show`, `path`, and `paths` subcommands for inspection. README and library docs cover usage.
 **Notes:** Future enhancement (optional) could add an interactive editor hook, but inspection workflows are complete.
 
-### CAGE-12: Adapter V2 Refresh [5 pts] 🟡
-**Status:** V2 trait, compatibility wrapper, and ShellAdapterV2 implemented. Streaming works for passphrase + recipient flows; capability metadata exists. Remaining gaps:
+### CAGE-12: Adapter V2 Refresh [5 pts] ✅
+**Status:** ✅ Complete. Identity-based streaming encryption implemented with automatic recipient derivation.
 - [x] Ensure `health_check`/factory expose accurate streaming + identity support flags.
-- [ ] Implement identity-based streaming encrypt (currently passphrase-only) or mark limitation explicitly.
+- [x] Implement identity-based streaming encrypt via `identity_to_recipient()` helper.
 - [x] Harden error surfaces (stderr parsing, partial write-reporting).
 **Implementation Notes:**
-- Ignite relies on identity-based streaming when rotating repo/ignition keys. Either add the library path or clearly document the limitation in `docs/ref/cage/LIBRARY_USAGE.md`.
-- Reference: `src/cage/adapter_v2.rs` TODO around `encrypt_stream_pipe_passphrase` plus Ignite rotation flows (`docs/ref/ignite/IGNITE_CONCEPTS.md`).
+- Identity-based encryption: When `Identity::IdentityFile` or `Identity::SshKey` provided without explicit recipients, adapter extracts public recipient using `age-keygen -y`
+- Enables "self-encryption" workflows for Ignite key rotation scenarios
+- Requires `age-keygen` binary on PATH
+- Test coverage: `test_identity_based_streaming_encrypt()` validates round-trip correctness
+- Documentation: Updated `LIBRARY_USAGE.md` with usage examples and performance notes
+- File: `src/cage/adapter_v2.rs` (lines 869-911 helper, 540-550 integration, 1550-1611 tests)
 
 ### QA-01: Documentation & Library Sync [3 pts] ✅
 **Status:** README and `docs/ref/cage/LIBRARY_USAGE.md` now include streaming strategy tables, config helper guidance, and usage samples aligned with CLI flags.
