@@ -83,12 +83,13 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 ## Phase 3 – Hardening & Tooling
 
 ### SEC-01: Centralized String Management [5 pts] 🟡
-**Status:** `src/cage/strings.rs` exists and houses many reusable constants, but glyph/emoji output intentionally retained for UX. Remaining work focuses on linting + guidance.
+**Status:** `src/cage/strings.rs` exists and houses many reusable constants, but glyph/emoji output intentionally retained for UX. Audit and guidance complete, migration ongoing.
 - [x] Create shared string module.
-- [ ] Audit remaining inline literals in critical modules.
-- [ ] Provide lint/check (e.g., deny `todo!` or custom script) to flag new inline strings.
-- [ ] Document expectations in CONTRIBUTING/PROCESS.
-- [ ] Evaluate optional “ASCII-safe” mode without forcing removal of branded glyphs.
+- [x] Audit remaining inline literals in critical modules (705 candidates found).
+- [x] Provide lint/check scripts (check_inline_strings.sh, check_todos.sh).
+- [x] Document expectations in docs/dev/STRING_MANAGEMENT.md.
+- [ ] Evaluate optional "ASCII-safe" mode without forcing removal of branded glyphs.
+- [ ] Migrate high-priority user-facing strings from audit results.
 
 ### CAGE-03: Backup Retention Lifecycle [5 pts] 🟡
 **Reference:** `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`
