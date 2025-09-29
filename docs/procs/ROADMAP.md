@@ -6,7 +6,7 @@ Stakeholders expect Cage to deliver a first-class **library + CLI** experience w
 feature parity and secure operational guarantees. The current implementation meets
 only a subset of those expectations (primarily CLI flows and ASCII armor). This
 roadmap defines the milestones, strategies, and tasks required to reach the
-Minimum Viable Product described in `STAKEHOLDER.txt`.
+minimum viable product expected by stakeholders.
 
 ### Guiding Principles
 - **API parity**: every CLI capability must be accessible through an ergonomic
@@ -19,6 +19,15 @@ Minimum Viable Product described in `STAKEHOLDER.txt`.
   and ensure secrets never leak via compiled artifacts or logs.
 - **Testability**: maintain end-to-end coverage for both CLI and library
   surfaces, with optional gating when external binaries (age) are required.
+
+### Stakeholder MVP Requirements
+1. Cage must be fully usable as both a CLI and a library with parity across surfaces.
+2. A comprehensive configuration surface (`CageConfig`) captures operational knobs.
+3. Streaming encrypt/decrypt flows are first-class, avoiding temporary file staging.
+4. SSH identities are supported for encrypt/decrypt workflows.
+5. ASCII armor output remains available for applicable environments.
+6. Deterministic/derived key workflows (`age --derive`) are supported.
+7. Multi-recipient lifecycle management (structs, helpers, auditing) is provided.
 
 ## Phase 1 – API Foundations & Parity
 
@@ -120,6 +129,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 - Establish end-to-end smoke tests covering CLI + library parity.
 - Update documentation (`README`, `LIBRARY_USAGE`, new “MVP Feature Matrix”).
 - Prepare migration guide for downstream consumers (Padlock, Ignite, etc.).
+- Document that PTY-dependent tests auto-skip when the runtime sandbox denies PTY access.
 
 ### Milestone 3.4 – Backup Retention & Recovery (CAGE-03)
 *Strategy*

@@ -43,6 +43,14 @@ Those documents track current workstreams, handoffs, and priorities.
    recipient lists, not just passphrase inputs.
 
 --------------------------------------------------------------------------------
+ Sandbox / Test Constraints
+--------------------------------------------------------------------------------
+- Some automated tests require a working PTY environment and the `age` binary.
+  When run inside restrictive sandboxes, these tests auto-skip (look for
+  messages indicating PTY unavailability). Always confirm on a full dev box
+  before shipping changes touching PTY flows.
+
+--------------------------------------------------------------------------------
  Security & Quality Concerns
 --------------------------------------------------------------------------------
 - **Binary Snooping**: Centralize user-facing strings and sensitive literals to
@@ -76,7 +84,7 @@ Those documents track current workstreams, handoffs, and priorities.
 - `docs/ref/ROADMAP.md` – Long-term roadmap & milestones.
 - `src/cage/` – Core library modules (adapter, lifecycle, config, etc.).
 - `tests/` – Unit, integration, PTY, and regression suites.
-+ Quick toggles: `CAGE_STREAMING_STRATEGY=temp|pipe|auto` (or `--streaming-strategy`) and
+- Quick toggles: `CAGE_STREAMING_STRATEGY=temp|pipe|auto` (or `--streaming-strategy`) and
   backup settings via `cage.toml` (`backup.cleanup_on_success`, `backup.directory`,
   `backup.retention`).
 

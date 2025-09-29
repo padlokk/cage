@@ -35,13 +35,13 @@ impl AuditLogger {
         };
 
         Ok(Self {
-            component: "age_automation".to_string(),
+            component: "cage_automation".to_string(),
             log_file,
         })
     }
 
     /// Create audit logger with file output
-    pub fn with_file(component: &str, log_path: &Path) -> AgeResult<Self> {
+    pub fn with_file(_component: &str, log_path: &Path) -> AgeResult<Self> {
         let log_file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -49,7 +49,7 @@ impl AuditLogger {
             .map_err(|e| AgeError::file_error("open", log_path.to_path_buf(), e))?;
 
         Ok(Self {
-            component: component.to_string(),
+            component: "cage_automation".to_string(),
             log_file: Some(log_file),
         })
     }

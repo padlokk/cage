@@ -11,6 +11,7 @@
 2. Read docs/procs/CONTINUE.md ← Current session status (1 min read)
 3. Read docs/procs/TASKS.txt ← Active tasks (1 min read)
 4. Begin work with full context
+   - If you are the Codex UAT agent, also review `docs/procs/CODEX_WARMUP.txt`.
 
 ⚡ **Ultra-Fast Start** (30 seconds):
 → Read docs/procs/QUICK_REF.txt for essential context only
