@@ -114,10 +114,10 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Add proxy PTY scenarios with skip gating when `age`/PTY missing.
 - [ ] Confirm age-dependent tests skip gracefully (selective unlock already uses `which::which`).
 
-### DOC-03: Library Usage Accuracy [1 pt] 🟡
+### DOC-03: Library Usage Accuracy [1 pt] ✅
 - [x] Mention request API and streaming basics.
-- [ ] Clearly mark SSH/derive/multi-recipient as roadmap items until implemented.
-- [ ] Add configuration helper usage once CAGE-06 ships.
+- [x] Clearly mark SSH/derive/multi-recipient status (SSH complete, others roadmap).
+- [x] Add configuration helper usage (documented in section 4).
 
 ---
 
