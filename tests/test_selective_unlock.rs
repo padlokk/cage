@@ -285,6 +285,7 @@ fn test_preserve_encrypted_with_selective() -> Result<(), Box<dyn std::error::Er
         recursive: false,
         pattern_filter: None,
         backup_before_lock: false,
+        backup_dir: None,
     };
     let passphrase = "preserve_pass_101";
     manager.lock(&test_file, passphrase, lock_options)?;

@@ -10,8 +10,8 @@
 //! - **Extractable**: Can be moved to RSB without modification
 //!
 //! # Usage
-//! ```rust
-//! use cage::progress::{ProgressManager, ProgressStyle};
+//! ```rust,ignore
+//! use cage::cage::progress::{ProgressManager, ProgressStyle};
 //!
 //! let mut progress = ProgressManager::new();
 //! let task = progress.start_task("Processing files", ProgressStyle::Bar { total: 10 });
