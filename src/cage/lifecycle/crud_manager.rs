@@ -133,18 +133,21 @@ impl RetentionPolicy {
                 if backups.len() <= *keep_count {
                     Vec::new()
                 } else {
-                    (*keep_count..backups.len()).collect()
+                    // Delete oldest backups (indices 0..n), keep newest (last keep_count items)
+                    (0..backups.len() - keep_count).collect()
                 }
             }
 
             RetentionPolicy::KeepLastAndDays { last, days } => {
                 let cutoff_secs = *days as u64 * 86400;
+                let total = backups.len();
                 backups
                     .iter()
                     .enumerate()
                     .filter_map(|(idx, backup)| {
-                        // Keep if within last N OR within time window
-                        if idx < *last || backup.age_seconds() <= cutoff_secs {
+                        // Keep if within last N (newest items) OR within time window
+                        let is_in_last_n = idx >= total.saturating_sub(*last);
+                        if is_in_last_n || backup.age_seconds() <= cutoff_secs {
                             None
                         } else {
                             Some(idx)
@@ -526,7 +529,7 @@ pub struct BackupEntry {
     pub backup_path: PathBuf,
     pub created_at: std::time::SystemTime,
     pub size_bytes: u64,
-    pub generation: u32, // 1 = most recent, 2 = previous, etc.
+    pub generation: u32, // Increments with each backup (1=first, 2=second, etc.)
 }
 
 impl BackupEntry {
@@ -629,8 +632,12 @@ impl BackupRegistry {
         let mut to_delete = Vec::new();
 
         for (_original, entries) in self.backups.iter_mut() {
-            // Sort entries by created_at (oldest first) for retention logic
-            entries.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+            // Sort entries by created_at (oldest first), with generation as tiebreaker
+            // Generation increments (1, 2, 3...) so higher generation = newer backup
+            entries.sort_by(|a, b| {
+                a.created_at.cmp(&b.created_at)
+                    .then_with(|| a.generation.cmp(&b.generation))
+            });
 
             // Convert BackupEntry to BackupInfo for retention logic
             let backup_infos: Vec<BackupInfo> = entries
@@ -2904,8 +2911,8 @@ mod tests {
         let to_delete = policy.apply(&backups);
         assert_eq!(
             to_delete,
-            vec![3, 4],
-            "Should delete backups beyond index 2"
+            vec![0, 1],
+            "Should delete 2 oldest backups (keep last 3)"
         );
 
         let policy_more = RetentionPolicy::KeepLast(10);
@@ -2966,15 +2973,19 @@ mod tests {
             });
         }
 
+        // Sort backups oldest-first (as expected by policy.apply())
+        backups.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
         // Policy: keep last 2 AND those within 3 days
         let policy = RetentionPolicy::KeepLastAndDays { last: 2, days: 3 };
         let to_delete = policy.apply(&backups);
 
+        // After sorting oldest-first: [5d, 4d, 3d, 2d, 1d]
         // Should keep:
-        // - Index 0, 1 (last 2)
-        // - Index 2 (within 3 days = 3 * 86400)
-        // Should delete: Index 3, 4 (beyond last 2 AND older than 3 days)
-        assert_eq!(to_delete, vec![3, 4]);
+        // - Indices 3, 4 (last 2 newest: 2d, 1d)
+        // - Index 2 (within 3 days: 3d)
+        // Should delete: Indices 0, 1 (oldest: 5d, 4d - beyond last 2 AND older than 3 days)
+        assert_eq!(to_delete, vec![0, 1]);
     }
 
     #[test]
