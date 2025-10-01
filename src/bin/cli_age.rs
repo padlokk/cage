@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 // Import cage library modules
 use cage::core::{
-    BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
-    StreamRequest, UnlockRequest,
+    AgeConfig, BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest,
+    StatusRequest, StreamRequest, UnlockRequest,
 };
 use cage::{
     AgeError, AgeResult, CageManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode,
@@ -89,7 +89,8 @@ fn main() {
         "version" => cmd_version,
         "config" => cmd_config,
         "stream" => cmd_stream,
-        "adapter" => cmd_adapter
+        "adapter" => cmd_adapter,
+        "keygen" => cmd_keygen
     });
 }
 
@@ -234,6 +235,118 @@ fn cmd_install(_args: Args) -> i32 {
     // TODO: Implement dependency installation check
     echo!("✅ Dependency check completed");
     0
+}
+
+/// Generate Age identity keypair
+fn cmd_keygen(_args: Args) -> i32 {
+    use cage::keygen::{KeygenRequest, KeygenService};
+
+    // Parse CLI flags
+    let output_path = {
+        let path_str = get_var("opt_output");
+        if !path_str.is_empty() {
+            Some(PathBuf::from(path_str))
+        } else {
+            None
+        }
+    };
+
+    let input_path = {
+        let path_str = get_var("opt_input");
+        if !path_str.is_empty() {
+            Some(PathBuf::from(path_str))
+        } else {
+            None
+        }
+    };
+
+    let register_groups = {
+        let groups_str = get_var("opt_register");
+        if !groups_str.is_empty() {
+            groups_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    };
+
+    let force = is_true("opt_force") || is_true("opt_f");
+    let recipients_only = is_true("opt_recipients_only") || is_true("opt_y");
+    let stdout_only = is_true("opt_stdout_only");
+    let export_mode = is_true("opt_export");
+    let proxy_mode = is_true("opt_proxy");
+    let json_output = !is_true("opt_no_json");
+
+    // Build request
+    let request = KeygenRequest {
+        output_path,
+        input_path,
+        register_groups,
+        recipients_only,
+        force,
+        stdout_only,
+        json_output,
+        proxy_mode,
+        export_mode,
+    };
+
+    // Load config (needed for group registration)
+    let config = if !request.register_groups.is_empty() {
+        match AgeConfig::load_default() {
+            Ok(cfg) => Some(cfg),
+            Err(e) => {
+                stderr!("❌ Failed to load config for group registration: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        None
+    };
+
+    // Create service and generate
+    let service = KeygenService::new(config);
+    match service.generate(&request) {
+        Ok(summary) => {
+            if json_output && !proxy_mode {
+                // Emit JSON summary
+                use serde_json::json;
+                let json_obj = json!({
+                    "status": "success",
+                    "output_path": summary.output_path.as_ref().map(|p| p.to_string_lossy()),
+                    "public_recipient": summary.public_recipient,
+                    "fingerprint_md5": summary.fingerprint_md5,
+                    "fingerprint_sha256": summary.fingerprint_sha256,
+                    "registered_groups": summary.registered_groups,
+                });
+                println!("{}", serde_json::to_string_pretty(&json_obj).unwrap());
+            } else if !proxy_mode {
+                // Plain text output
+                if let Some(ref path) = summary.output_path {
+                    echo!("✅ Identity generated: {}", path.display());
+                }
+                if let Some(ref recipient) = summary.public_recipient {
+                    echo!("📋 Public key: {}", recipient);
+                }
+                if let Some(ref fp) = summary.fingerprint_md5 {
+                    echo!("🔑 Fingerprint (MD5): {}", fp);
+                }
+                if let Some(ref fp) = summary.fingerprint_sha256 {
+                    echo!("🔑 Fingerprint (SHA256): {}", fp);
+                }
+                if !summary.registered_groups.is_empty() {
+                    echo!("📝 Registered with groups: {:?}", summary.registered_groups);
+                }
+            }
+            0
+        }
+        Err(e) => {
+            stderr!("❌ Key generation failed: {}", e);
+            1
+        }
+    }
 }
 
 struct InitReport {
