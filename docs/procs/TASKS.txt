@@ -133,17 +133,17 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Regression tests with generated SSH keypairs.
 - [x] Documentation + security callouts.
 
-### CAGE-21: CLI Keypair Generation Workflow [3 pts] 🔴
+### CAGE-21: CLI Keypair Generation Workflow [3 pts] ✅
 **Reference:** `docs/ref/cage/KEYGEN_STRATEGY.md` (§2–§3)
-- [ ] Implement `cage keygen` that wraps `age-keygen` with opinionated defaults:
+- [x] Implement `cage keygen` that wraps `age-keygen` with opinionated defaults:
   - Default output: `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.agekey` (resolve via existing config helpers) with `chmod 0o600` (or Windows equivalent) applied after write.
   - Capture public key via `age-keygen -y` and emit structured JSON (`path`, `public_recipient`, `fingerprint_md5`, `fingerprint_sha256`, `created_at`) to stdout; mirror details in audit logs.
-- [ ] CLI UX rules: refuse to overwrite existing files unless `--force` (short `-f`) is provided; require explicit `--output` for non-default locations; display a summarized next-step hint for adding the recipient to a group.
-- [ ] Export mode: implement `--export` flag to generate keypair in current directory without registry entry (useful for testing/one-off needs); skip config store and `--register` when `--export` is used.
-- [ ] Error handling: detect missing `age-keygen` binary with actionable guidance; surface stderr from the subprocess in failure cases while ensuring secrets are not echoed back.
-- [ ] Tests: add CLI integration coverage (`tests/cli/test_keygen.rs`) covering success, overwrite prevention, forced overwrite, custom output paths, export mode, and missing `age-keygen` scenarios; verify log entries land in audit log.
-- [ ] Config integration: extend `AgeConfig` helpers to register the generated identity (optional `--register <group>` flag) by appending the derived recipient to the selected recipient group.
-- [ ] Module layout: create `src/cage/keygen/{mod.rs,api.rs,error.rs,helpers.rs}` following `MODULE_SPEC.md`; ensure the CLI command uses this module rather than ad-hoc logic, and add unit tests within the module.
+- [x] CLI UX rules: refuse to overwrite existing files unless `--force` (short `-f`) is provided; require explicit `--output` for non-default locations; display a summarized next-step hint for adding the recipient to a group.
+- [x] Export mode: implement `--export` flag to generate keypair in current directory without registry entry (useful for testing/one-off needs); skip config store and `--register` when `--export` is used.
+- [x] Error handling: detect missing `age-keygen` binary with actionable guidance; surface stderr from the subprocess in failure cases while ensuring secrets are not echoed back.
+- [x] Tests: add CLI integration coverage (`tests/test_keygen.rs`) covering success, overwrite prevention, forced overwrite, custom output paths, export mode, and missing `age-keygen` scenarios; verify log entries land in audit log.
+- [x] Config integration: extend `AgeConfig` helpers to register the generated identity (optional `--register <group>` flag) by appending the derived recipient to the selected recipient group.
+- [x] Module layout: create `src/keygen/{mod.rs,api.rs,error.rs,helpers.rs,audit.rs}` following `MODULE_SPEC.md`; ensure the CLI command uses this module rather than ad-hoc logic, and add unit tests within the module.
 
 ### CAGE-22: Adapter Identity Generation Hook [3 pts] ⏸
 **Reference:** `docs/ref/cage/KEYGEN_STRATEGY.md` (§4–§7)
