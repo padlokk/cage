@@ -16,7 +16,7 @@ fn age_available() -> bool {
 
 fn setup_test_manager(temp_dir: &TempDir) -> Option<CageManager> {
     if which::which("age").is_err() {
-        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
+        println!("{}", cage::lang::TEST_SKIP_NO_AGE);
         return None;
     }
 
@@ -43,7 +43,7 @@ fn setup_test_manager(temp_dir: &TempDir) -> Option<CageManager> {
 #[test]
 fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
+        println!("{}", cage::lang::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
@@ -160,7 +160,7 @@ fn test_selective_unlock_skips_invalid_files() -> Result<(), Box<dyn std::error:
 #[test]
 fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
+        println!("{}", cage::lang::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
@@ -244,7 +244,7 @@ fn test_non_selective_unlock_attempts_all_files() -> Result<(), Box<dyn std::err
 #[test]
 fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
+        println!("{}", cage::lang::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
@@ -333,7 +333,7 @@ fn test_selective_unlock_with_verify_before_unlock() -> Result<(), Box<dyn std::
 #[test]
 fn test_selective_unlock_directory_with_mixed_files() -> Result<(), Box<dyn std::error::Error>> {
     if !age_available() {
-        println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
+        println!("{}", cage::lang::TEST_SKIP_NO_AGE);
         return Ok(());
     }
 
