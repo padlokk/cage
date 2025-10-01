@@ -47,5 +47,5 @@ pub mod common {
     pub use age::{Identity, Recipient};
 
     /// Re-export PTY types for advanced users
-    pub use hub::portable_pty::{PtySize, CommandBuilder};
+    pub use hub::portable_pty::{CommandBuilder, PtySize};
 }

@@ -20,37 +20,49 @@
 
 // Core types from the cage module
 pub use crate::cage::{
+    adapter_v2::{AgeAdapterV2, ShellAdapterV2},
+
+    // Request API (CAGE-11)
+    requests::{LockRequest, RotateRequest, UnlockRequest},
+
+    AdapterFactory,
+    // Adapters
+    AgeAdapter,
+    // Configuration
+    AgeConfig,
+    AgeError,
+    // Results and Errors
+    AgeResult,
+    AuditLogger,
+
     // Management
     CrudManager,
 
-    // Request API (CAGE-11)
-    requests::{LockRequest, UnlockRequest, RotateRequest},
-
-    // Configuration
-    AgeConfig, OutputFormat, TtyMethod,
-
+    FileEncryption,
     // Options
-    LockOptions, UnlockOptions, VerificationResult,
+    LockOptions,
+    // Operations
+    Operation,
+    OperationResult,
 
-    // Results and Errors
-    AgeResult, AgeError, OperationResult,
-
-    // Adapters
-    AgeAdapter, AdapterFactory,
-    adapter_v2::{AgeAdapterV2, ShellAdapterV2},
-
-    // Security
-    SecurityValidator, AuditLogger,
+    OutputFormat,
+    // Passphrase
+    PassphraseManager,
+    PassphraseMode,
 
     // Progress
-    ProgressManager, ProgressReporter,
+    ProgressManager,
+    ProgressReporter,
 
-    // Passphrase
-    PassphraseManager, PassphraseMode,
+    RepositoryOperations,
+    RepositoryStatus,
+    // Security
+    SecurityValidator,
+    TtyMethod,
 
-    // Operations
-    Operation, FileEncryption, RepositoryOperations, RepositoryStatus,
+    UnlockOptions,
+    VerificationResult,
 };
 
 // Constants
-pub use crate::{VERSION, SECURITY_LEVEL, FEATURES};
+pub use crate::{FEATURES, SECURITY_LEVEL, VERSION};

@@ -3,10 +3,11 @@
 ## Overview
 
 Stakeholders expect Cage to deliver a first-class **library + CLI** experience with
-feature parity and secure operational guarantees. The current implementation meets
-only a subset of those expectations (primarily CLI flows and ASCII armor). This
-roadmap defines the milestones, strategies, and tasks required to reach the
-minimum viable product expected by stakeholders.
+feature parity and secure operational guarantees. Core parity now exists across
+lock/unlock/rotate/status/batch/stream workflows; the remaining focus is polish
+and integration readiness (deploy/init UX, derived-key support). This roadmap
+captures the milestones, strategies, and follow-up work still required to keep
+Padlock and Ignite unblocked.
 
 ### Guiding Principles
 - **API parity**: every CLI capability must be accessible through an ergonomic
@@ -21,13 +22,13 @@ minimum viable product expected by stakeholders.
   surfaces, with optional gating when external binaries (age) are required.
 
 ### Stakeholder MVP Requirements
-1. Cage must be fully usable as both a CLI and a library with parity across surfaces.
-2. A comprehensive configuration surface (`CageConfig`) captures operational knobs.
-3. Streaming encrypt/decrypt flows are first-class, avoiding temporary file staging.
-4. SSH identities are supported for encrypt/decrypt workflows.
-5. ASCII armor output remains available for applicable environments.
-6. Deterministic/derived key workflows (`age --derive`) are supported.
-7. Multi-recipient lifecycle management (structs, helpers, auditing) is provided.
+1. ✅ Cage is fully usable as both a CLI and a library with parity across surfaces (shared request API + adapters).
+2. ✅ A comprehensive configuration surface (`AgeConfig`/`CageConfig`) captures operational knobs and is consumed by both surfaces.
+3. ✅ Streaming encrypt/decrypt flows are first-class (`CrudManager::stream_with_request`, `cage stream`).
+4. ✅ SSH identities are supported for encrypt/decrypt workflows.
+5. ✅ ASCII armor output remains available for applicable environments.
+6. ⏸ Deterministic/derived key workflows (`age --derive`) remain deferred pending upstream `age` crate support.
+7. ✅ Multi-recipient lifecycle management (structs, helpers, auditing) is provided.
 
 ## Phase 1 – API Foundations & Parity
 
@@ -66,15 +67,7 @@ structured configuration and operation requests.
 SSH identities, deterministic keys, and multi-recipient lifecycle features.
 
 ### Milestone 2.1 – Streaming Encryption & Decryption
-*Strategy*
-- Implement streaming encrypt/decrypt using the age binary’s stdin/stdout
-  flows (`age -p -o -` etc.) or via pipes.
-- Expose `encrypt_stream` / `decrypt_stream` on `CrudManager` and integrate
-  with `LockRequest` / `UnlockRequest` (e.g. set `source` to `Stream` vs
-  `Path`).
-- Provide fallbacks for environments where streaming is unsupported.
-- Add regression tests using in-memory buffers and large test files.
-- Document passphrase streaming limitations: age requires PTY for passphrases, so pipe streaming is only available for recipient/identity flows (see `.analysis/CAGE-12b_investigation.md`).
+*Status:* ✅ Completed. Streaming runs through shared adapters (`CrudManager::stream_with_request` / `cage stream`) with regressions covering passphrase fallbacks and pipe capability reporting.
 
 ### Milestone 2.2 – SSH Identity Support
 *Strategy*
@@ -95,15 +88,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 *Status:* Deferred until Phase 4 (library adapter). No immediate Padlock/Ignite dependency; revisit when AGE-01 lands.
 
 ### Milestone 2.4 – Multi-Recipient Lifecycle
-*Strategy*
-- Redesign `LockRequest` to accept `Vec<Recipient>` (typed wrapper) and ensure
-  CLI/config paths populate it.
-- Support recipient groups (e.g. team + audit) with helper enums or builder
-  patterns.
-- Update unlock flows to reason about recipient metadata (for auditing) and
-  provide lifecycle helpers (add/remove recipients, inspect metadata).
-- Add tests ensuring all recipients can decrypt (fixtures with generated keys).
-*Ignite/Padlock Priority:* Required for repo/ignition/distro rotations. Align recipient group design with `docs/ref/ignite/IGNITE_CONCEPTS.md` and Padlock authority chain expectations.
+*Status:* ✅ Completed. Request structs, CrudManager helpers, and docs/tests cover recipient group flows aligned with Ignite/Padlock expectations.
 
 ## Phase 3 – Hardening & Tooling
 

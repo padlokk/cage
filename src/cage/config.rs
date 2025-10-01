@@ -409,7 +409,6 @@ impl AgeConfig {
         }
     }
 
-
     pub fn load_default() -> AgeResult<Self> {
         for path in default_config_paths() {
             if path.exists() {
@@ -515,17 +514,26 @@ impl AgeConfig {
     }
 
     /// Get a recipient group by name
-    pub fn get_recipient_group(&self, name: &str) -> Option<&crate::cage::requests::RecipientGroup> {
+    pub fn get_recipient_group(
+        &self,
+        name: &str,
+    ) -> Option<&crate::cage::requests::RecipientGroup> {
         self.recipient_groups.get(name)
     }
 
     /// Get a mutable reference to recipient group by name
-    pub fn get_recipient_group_mut(&mut self, name: &str) -> Option<&mut crate::cage::requests::RecipientGroup> {
+    pub fn get_recipient_group_mut(
+        &mut self,
+        name: &str,
+    ) -> Option<&mut crate::cage::requests::RecipientGroup> {
         self.recipient_groups.get_mut(name)
     }
 
     /// Remove a recipient group by name
-    pub fn remove_recipient_group(&mut self, name: &str) -> Option<crate::cage::requests::RecipientGroup> {
+    pub fn remove_recipient_group(
+        &mut self,
+        name: &str,
+    ) -> Option<crate::cage::requests::RecipientGroup> {
         self.recipient_groups.remove(name)
     }
 
@@ -540,7 +548,11 @@ impl AgeConfig {
             let ext_str = extension.to_string_lossy().to_lowercase();
 
             // Check if extension matches configured encrypted extensions
-            if self.encrypted_extensions.iter().any(|e| e.to_lowercase() == ext_str) {
+            if self
+                .encrypted_extensions
+                .iter()
+                .any(|e| e.to_lowercase() == ext_str)
+            {
                 return true;
             }
 
@@ -568,7 +580,10 @@ impl AgeConfig {
     }
 
     /// Get recipient groups by authority tier
-    pub fn get_groups_by_tier(&self, tier: crate::cage::requests::AuthorityTier) -> Vec<&crate::cage::requests::RecipientGroup> {
+    pub fn get_groups_by_tier(
+        &self,
+        tier: crate::cage::requests::AuthorityTier,
+    ) -> Vec<&crate::cage::requests::RecipientGroup> {
         self.recipient_groups
             .values()
             .filter(|group| group.tier == Some(tier))
@@ -607,7 +622,7 @@ impl Default for AgeConfig {
             encrypted_extensions: vec![
                 "cage".to_string(),
                 "age".to_string(),
-                "padlock".to_string()
+                "padlock".to_string(),
             ],
         }
     }

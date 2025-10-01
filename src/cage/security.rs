@@ -242,13 +242,11 @@ impl AuditLogger {
         authority_tier: Option<&str>,
     ) -> AgeResult<()> {
         if matches!(self.telemetry_format, TelemetryFormat::Json) {
-            let recipient_hash = recipients
-                .as_ref()
-                .map(|r| {
-                    let mut sorted = r.clone();
-                    sorted.sort();
-                    format!("{:x}", md5::compute(sorted.join(",").as_bytes()))
-                });
+            let recipient_hash = recipients.as_ref().map(|r| {
+                let mut sorted = r.clone();
+                sorted.sort();
+                format!("{:x}", md5::compute(sorted.join(",").as_bytes()))
+            });
 
             let mut event = json!({
                 "event_type": "encryption",
@@ -272,14 +270,24 @@ impl AuditLogger {
             self.log_json_event("INFO", event)
         } else {
             let msg = if success {
-                format!("ENCRYPTION {} identity:{} recipients:{} {}{}",
+                format!(
+                    "ENCRYPTION {} identity:{} recipients:{} {}{}",
                     path.display(),
                     identity_type,
                     recipients.as_ref().map(|r| r.len()).unwrap_or(0),
-                    streaming_strategy.map(|s| format!("strategy:{} ", s)).unwrap_or_default(),
-                    authority_tier.map(|t| format!("tier:{}", t)).unwrap_or_default())
+                    streaming_strategy
+                        .map(|s| format!("strategy:{} ", s))
+                        .unwrap_or_default(),
+                    authority_tier
+                        .map(|t| format!("tier:{}", t))
+                        .unwrap_or_default()
+                )
             } else {
-                format!("ENCRYPTION_FAILED {} identity:{}", path.display(), identity_type)
+                format!(
+                    "ENCRYPTION_FAILED {} identity:{}",
+                    path.display(),
+                    identity_type
+                )
             };
             self.log_event("INFO", &msg)
         }
@@ -328,12 +336,20 @@ impl AuditLogger {
             self.log_json_event("INFO", event)
         } else {
             let msg = if success {
-                format!("DECRYPTION {} identity:{} {}",
+                format!(
+                    "DECRYPTION {} identity:{} {}",
                     path.display(),
                     identity_type,
-                    streaming_strategy.map(|s| format!("strategy:{}", s)).unwrap_or_default())
+                    streaming_strategy
+                        .map(|s| format!("strategy:{}", s))
+                        .unwrap_or_default()
+                )
             } else {
-                format!("DECRYPTION_FAILED {} identity:{}", path.display(), identity_type)
+                format!(
+                    "DECRYPTION_FAILED {} identity:{}",
+                    path.display(),
+                    identity_type
+                )
             };
             self.log_event("INFO", &msg)
         }
@@ -550,10 +566,13 @@ mod tests {
         let temp_path = temp_file.path().to_path_buf();
 
         // Create logger with JSON format
-        let logger = AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Json).unwrap();
+        let logger =
+            AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Json).unwrap();
 
         // Log an operation
-        logger.log_operation_start_single("test_op", Path::new("/test/path")).unwrap();
+        logger
+            .log_operation_start_single("test_op", Path::new("/test/path"))
+            .unwrap();
 
         // Read the log file
         let log_content = fs::read_to_string(&temp_path).unwrap();
@@ -571,17 +590,20 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().to_path_buf();
 
-        let logger = AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Json).unwrap();
+        let logger =
+            AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Json).unwrap();
 
         let recipients = vec!["age1abc123".to_string(), "age1xyz789".to_string()];
-        logger.log_encryption_event_extended(
-            Path::new("/secret.txt"),
-            Some(recipients),
-            "age_identity",
-            true,
-            Some("pipe"),
-            Some("M")
-        ).unwrap();
+        logger
+            .log_encryption_event_extended(
+                Path::new("/secret.txt"),
+                Some(recipients),
+                "age_identity",
+                true,
+                Some("pipe"),
+                Some("M"),
+            )
+            .unwrap();
 
         let log_content = fs::read_to_string(&temp_path).unwrap();
 
@@ -599,20 +621,23 @@ mod tests {
 
     #[test]
     fn test_operation_complete_json() {
-        use std::fs;
         use crate::cage::operations::OperationResult;
+        use std::fs;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().to_path_buf();
 
-        let logger = AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Json).unwrap();
+        let logger =
+            AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Json).unwrap();
 
         let mut result = OperationResult::new();
         result.processed_files.push("file1.txt".to_string());
         result.processed_files.push("file2.txt".to_string());
         result.execution_time_ms = 150;
 
-        logger.log_operation_complete("lock", Path::new("/repo"), &result).unwrap();
+        logger
+            .log_operation_complete("lock", Path::new("/repo"), &result)
+            .unwrap();
 
         let log_content = fs::read_to_string(&temp_path).unwrap();
 
@@ -632,10 +657,13 @@ mod tests {
         let temp_path = temp_file.path().to_path_buf();
 
         // Create logger with Text format (default)
-        let logger = AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Text).unwrap();
+        let logger =
+            AuditLogger::with_format(Some(temp_path.clone()), TelemetryFormat::Text).unwrap();
 
         // Log an operation
-        logger.log_operation_start_single("test_op", Path::new("/test/path")).unwrap();
+        logger
+            .log_operation_start_single("test_op", Path::new("/test/path"))
+            .unwrap();
 
         // Read the log file
         let log_content = fs::read_to_string(&temp_path).unwrap();

@@ -1,24 +1,37 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Cage Deploy Script - Age Encryption Automation CLI deployment
-# Deploys cage binary to ~/.local/lib/odx/cage/ and creates bin symlink
-
-# Configuration
-LIB_DIR="$HOME/.local/lib/odx/cage"
-BIN_DIR="$HOME/.local/bin"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BINARY_NAME="cage"
+PROFILE="release"
+PREFIX=""
+LIB_DIR=""
+BIN_DIR=""
+SKIP_BUILD=0
 
-# Extract version from Cargo.toml at repo root
-VERSION=$(grep '^version' "$ROOT_DIR/Cargo.toml" | head -1 | cut -d'"' -f2)
+usage() {
+    cat <<'USAGE'
+Usage: ./bin/deploy.sh [options]
 
-# Check boxy availability
+Options:
+  --prefix <PATH>      Install under the given prefix (default: ~/.local)
+  --lib-dir <PATH>     Override library install directory (default: <prefix>/lib/odx/cage)
+  --bin-dir <PATH>     Override binary symlink directory (default: <prefix>/bin)
+  --profile <NAME>     Build profile to deploy (release|debug, default: release)
+  --skip-build         Reuse existing build artifact (skip cargo build)
+  --help               Show this help message
+
+Examples:
+  ./bin/deploy.sh                         # Build release and install into ~/.local
+  ./bin/deploy.sh --prefix /usr/local     # Install into /usr/local/{bin,lib/odx/cage}
+  ./bin/deploy.sh --profile debug         # Deploy debug build (target/debug/cage)
+USAGE
+}
+
 has_boxy() {
     command -v boxy >/dev/null 2>&1
 }
 
-# Ceremonial messaging
 ceremony_msg() {
     local msg="$1"
     local theme="${2:-info}"
@@ -39,143 +52,126 @@ step_msg() {
     fi
 }
 
-# Welcome ceremony
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --prefix)
+            PREFIX="$2"
+            shift 2
+            ;;
+        --prefix=*)
+            PREFIX="${1#*=}"
+            shift
+            ;;
+        --lib-dir)
+            LIB_DIR="$2"
+            shift 2
+            ;;
+        --lib-dir=*)
+            LIB_DIR="${1#*=}"
+            shift
+            ;;
+        --bin-dir)
+            BIN_DIR="$2"
+            shift 2
+            ;;
+        --bin-dir=*)
+            BIN_DIR="${1#*=}"
+            shift
+            ;;
+        --profile)
+            PROFILE="$2"
+            shift 2
+            ;;
+        --profile=*)
+            PROFILE="${1#*=}"
+            shift
+            ;;
+        --skip-build)
+            SKIP_BUILD=1
+            shift
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+case "$PROFILE" in
+    release|debug) ;;
+    *)
+        echo "Invalid profile '$PROFILE'. Use 'release' or 'debug'." >&2
+        exit 1
+        ;;
+esac
+
+if [[ -z "$PREFIX" ]]; then
+    PREFIX="$HOME/.local"
+fi
+
+if [[ -z "$LIB_DIR" ]]; then
+    LIB_DIR="$PREFIX/lib/odx/cage"
+fi
+
+if [[ -z "$BIN_DIR" ]]; then
+    BIN_DIR="$PREFIX/bin"
+fi
+
+VERSION=$(grep '^version' "$ROOT_DIR/Cargo.toml" | head -1 | cut -d'"' -f2)
+ARTIFACT="$ROOT_DIR/target/$PROFILE/${BINARY_NAME}"
+
 ceremony_msg "🔒 CAGE DEPLOYMENT CEREMONY v$VERSION" "success"
 echo
 
-step_msg "Step 1" "Building cage v$VERSION..."
+step_msg "Step 1" "Preparing build artifact (profile: $PROFILE)"
 cd "$ROOT_DIR"
-if ! cargo build --release --bin cage; then
-    ceremony_msg "❌ Build failed!" "error"
+if [[ $SKIP_BUILD -eq 0 ]]; then
+    if [[ "$PROFILE" == "release" ]]; then
+        cargo build --release --bin "$BINARY_NAME"
+    else
+        cargo build --bin "$BINARY_NAME"
+    fi
+fi
+
+if [[ ! -f "$ARTIFACT" ]]; then
+    ceremony_msg "❌ Binary not found at $ARTIFACT" "error"
     exit 1
 fi
 
-# Check if binary was created
-if [ ! -f "$ROOT_DIR/target/release/${BINARY_NAME}" ]; then
-    ceremony_msg "❌ Binary not found at target/release/${BINARY_NAME}" "error"
+if [[ ! -s "$ARTIFACT" ]]; then
+    ceremony_msg "❌ Binary at $ARTIFACT appears empty" "error"
     exit 1
 fi
 
-step_msg "Step 2" "Creating lib directory: $LIB_DIR"
+step_msg "Step 2" "Ensuring install directories exist"
 mkdir -p "$LIB_DIR"
-
-step_msg "Step 3" "Deploying cage to lib directory..."
-if ! cp "$ROOT_DIR/target/release/${BINARY_NAME}" "$LIB_DIR/${BINARY_NAME}"; then
-    ceremony_msg "❌ Failed to copy ${BINARY_NAME} to $LIB_DIR" "error"
-    exit 1
-fi
-
-if ! chmod +x "$LIB_DIR/${BINARY_NAME}"; then
-    ceremony_msg "❌ Failed to make ${BINARY_NAME} executable" "error"
-    exit 1
-fi
-
-step_msg "Step 4" "Creating bin directory: $BIN_DIR"
 mkdir -p "$BIN_DIR"
 
-step_msg "Step 5" "Creating bin symlink for cage..."
-if [[ -L "$BIN_DIR/${BINARY_NAME}" ]] || [[ -f "$BIN_DIR/${BINARY_NAME}" ]]; then
-    rm "$BIN_DIR/${BINARY_NAME}"
-fi
+step_msg "Step 3" "Installing cage to $LIB_DIR"
+install -m 755 "$ARTIFACT" "$LIB_DIR/${BINARY_NAME}"
 
-if ! ln -s "$LIB_DIR/${BINARY_NAME}" "$BIN_DIR/${BINARY_NAME}"; then
-    ceremony_msg "❌ Failed to create symlink for ${BINARY_NAME}" "error"
+step_msg "Step 4" "Updating symlink in $BIN_DIR"
+ln -sf "$LIB_DIR/${BINARY_NAME}" "$BIN_DIR/${BINARY_NAME}"
+echo "  Symlink: $BIN_DIR/${BINARY_NAME} → $LIB_DIR/${BINARY_NAME}"
+
+step_msg "Step 5" "Running smoke check"
+if ! "$BIN_DIR/${BINARY_NAME}" --help >/dev/null 2>&1; then
+    ceremony_msg "❌ cage command test failed" "error"
     exit 1
 fi
-echo "  Created: $BIN_DIR/${BINARY_NAME} → $LIB_DIR/${BINARY_NAME}"
+echo "✅ cage --help responded successfully"
 
-step_msg "Step 6" "Verifying deployment..."
-if [[ ! -x "$LIB_DIR/${BINARY_NAME}" ]]; then
-    ceremony_msg "❌ ${BINARY_NAME} is not executable at $LIB_DIR/${BINARY_NAME}" "error"
-    exit 1
-fi
+ceremony_msg "✅ CAGE v$VERSION DEPLOYED" "success"
+cat <<SUMMARY
+📍 Library: $LIB_DIR/${BINARY_NAME}
+📍 Binary:  $BIN_DIR/${BINARY_NAME}
 
-if [[ ! -L "$BIN_DIR/${BINARY_NAME}" ]]; then
-    ceremony_msg "❌ Symlink not created at $BIN_DIR/${BINARY_NAME}" "error"
-    exit 1
-fi
-
-step_msg "Step 7" "Testing cage command..."
-if ! "$BIN_DIR/cage" --help >/dev/null 2>&1; then
-    ceremony_msg "❌ cage command test failed!" "error"
-    exit 1
-fi
-echo "✅ cage command operational"
-
-# Success ceremony
-ceremony_msg "✅ CAGE v$VERSION DEPLOYED SUCCESSFULLY!" "success"
-echo
-
-if has_boxy; then
-    {
-        echo "🔒 Cage - Age encryption automation CLI"
-        echo "📍 Library: $LIB_DIR/${BINARY_NAME}"
-        echo "📍 Binary: $BIN_DIR/${BINARY_NAME}"
-        echo
-        echo "💡 Usage Examples:"
-        echo "   cage lock file.txt --passphrase secret123    # Encrypt files"
-        echo "   cage unlock file.txt.age --passphrase secret123 # Decrypt files"
-        echo "   cage status /path/to/files                    # Check status"
-        echo "   cage --help                                   # Full reference"
-        echo
-        echo "🎭 Features:"
-        echo "   • PTY automation for Age encryption"
-        echo "   • Batch processing support"
-        echo "   • Secure passphrase handling"
-        echo "   • ASCII armor support"
-        echo "   • Production-grade reliability"
-    } | boxy --theme success --header "🔒 Cage v$VERSION Deployed" \
-             --status "sr:$(date '+%H:%M:%S')" \
-             --footer "✅ Ready for use" \
-             --width max
-else
-    echo "📍 Library location: $LIB_DIR/${BINARY_NAME}"
-    echo "📍 Binary symlink: $BIN_DIR/${BINARY_NAME}"
-    echo
-    echo "💡 Usage Examples:"
-    echo "   cage lock file.txt --passphrase secret123    # Encrypt files"
-    echo "   cage unlock file.txt.age --passphrase secret123 # Decrypt files"
-    echo "   cage status /path/to/files                    # Check status"
-    echo "   cage --help                                   # Full reference"
-fi
-
-echo
-step_msg "🧪 Quick Test" "Running cage functionality test"
-
-# Test cage functionality (basic help command)
-echo "Testing cage help command..."
-if "$BIN_DIR/cage" --help >/dev/null 2>&1; then
-    echo "✅ cage help command functional"
-else
-    ceremony_msg "❌ cage help command failed!" "error"
-    exit 1
-fi
-
-# Test if we can create a simple test file
-TEST_FILE="/tmp/cage_test_$(date '+%s').txt"
-TEST_CONTENT="Cage deployment test $(date '+%Y-%m-%d %H:%M:%S')"
-
-echo "Testing basic cage workflow..."
-echo "$TEST_CONTENT" > "$TEST_FILE"
-
-# Note: For now we'll just test that the commands exist and respond
-# Full encryption/decryption testing would require a test passphrase setup
-echo "✅ cage deployment verification complete"
-
-# Clean up test file
-rm -f "$TEST_FILE" 2>/dev/null
-
-# Final ceremony
-ceremony_msg "🎉 CAGE v$VERSION READY FOR USE!" "success"
-
-if has_boxy; then
-    {
-        echo "Run comprehensive tests:"
-        echo "   cd $ROOT_DIR && ./bin/build.sh test"
-        echo
-        echo "Test immediately:"
-        echo "   cage --help                              # Show all commands"
-        echo "   cage demo                                # See demonstration"
-        echo "   cage status .                            # Check current directory"
-    } | boxy --theme info --header "🚀 Next Steps"
-fi
+Next steps:
+  cage stream encrypt --input file --output file.cage --recipient age1...
+  cage init    # hydrate XDG config/data directories
+SUMMARY

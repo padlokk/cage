@@ -4,9 +4,9 @@
 //! enabling a clean API for all encryption operations while maintaining backward compatibility.
 
 use crate::cage::config::{AgeConfig, OutputFormat};
-use std::path::PathBuf;
 use md5;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 // ============================================================================
 // COMMON REQUEST OPTIONS
@@ -693,6 +693,117 @@ impl StreamRequest {
             buffer_size: 8192,
             common: CommonOptions::default(),
         }
+    }
+}
+
+// ============================================================================
+// BATCH REQUEST (BULK OPERATIONS)
+// ============================================================================
+
+/// Batch operation type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchOperation {
+    /// Batch encrypt (lock)
+    Lock,
+    /// Batch decrypt (unlock)
+    Unlock,
+}
+
+/// Request structure for batch directory operations
+#[derive(Debug, Clone)]
+pub struct BatchRequest {
+    /// Target directory for the batch operation
+    pub target: PathBuf,
+
+    /// Operation (lock or unlock)
+    pub operation: BatchOperation,
+
+    /// Identity/passphrase used for the operation
+    pub identity: Identity,
+
+    /// Recipients for encryption workflows
+    pub recipients: Option<Vec<Recipient>>,
+
+    /// File pattern filter (glob)
+    pub pattern: Option<String>,
+
+    /// Recurse into sub-directories
+    pub recursive: bool,
+
+    /// Output format for encryption operations
+    pub format: OutputFormat,
+
+    /// Create backups before encrypting
+    pub backup: bool,
+
+    /// Unlock option: preserve encrypted file after decrypting
+    pub preserve_encrypted: bool,
+
+    /// Unlock option: verify before attempting decrypt
+    pub verify_before_unlock: bool,
+
+    /// Common request options (verbosity, dry-run, etc.)
+    pub common: CommonOptions,
+}
+
+impl BatchRequest {
+    /// Create a new batch request with required fields
+    pub fn new(target: PathBuf, operation: BatchOperation, identity: Identity) -> Self {
+        Self {
+            target,
+            operation,
+            identity,
+            recipients: None,
+            pattern: None,
+            recursive: true,
+            format: OutputFormat::Binary,
+            backup: false,
+            preserve_encrypted: false,
+            verify_before_unlock: true,
+            common: CommonOptions::default(),
+        }
+    }
+
+    /// Builder: set recipients for encryption operations
+    pub fn with_recipients(mut self, recipients: Vec<Recipient>) -> Self {
+        self.recipients = Some(recipients);
+        self
+    }
+
+    /// Builder: apply glob pattern filter
+    pub fn with_pattern(mut self, pattern: String) -> Self {
+        self.pattern = Some(pattern);
+        self
+    }
+
+    /// Builder: enable/disable recursive traversal
+    pub fn recursive(mut self, enabled: bool) -> Self {
+        self.recursive = enabled;
+        self
+    }
+
+    /// Builder: set output format for encryption operations
+    pub fn with_format(mut self, format: OutputFormat) -> Self {
+        self.format = format;
+        self
+    }
+
+    /// Builder: enable backup before lock operations
+    pub fn backup(mut self, enabled: bool) -> Self {
+        self.backup = enabled;
+        self
+    }
+
+    /// Builder: configure unlock preservation behaviour
+    pub fn preserve_encrypted(mut self, enabled: bool) -> Self {
+        self.preserve_encrypted = enabled;
+        self
+    }
+
+    /// Builder: configure unlock verification behaviour
+    pub fn verify_before_unlock(mut self, enabled: bool) -> Self {
+        self.verify_before_unlock = enabled;
+        self
     }
 }
 

@@ -68,7 +68,8 @@ fn test_ssh_encryption_decryption() {
     };
 
     // First verify the SSH key is valid for use as recipient
-    let age_recipient = adapter.ssh_to_recipient(&pub_key)
+    let age_recipient = adapter
+        .ssh_to_recipient(&pub_key)
         .expect("Failed to validate SSH key as recipient");
     // For CLI usage, SSH keys are passed directly to age
     assert_eq!(age_recipient, pub_key, "SSH key should be returned as-is");
@@ -96,9 +97,12 @@ fn test_ssh_encryption_decryption() {
     assert!(decrypted_path.exists(), "Decrypted file not created");
 
     // Verify content
-    let decrypted_content = fs::read_to_string(&decrypted_path)
-        .expect("Failed to read decrypted content");
-    assert_eq!(decrypted_content, test_content, "Content mismatch after decryption");
+    let decrypted_content =
+        fs::read_to_string(&decrypted_path).expect("Failed to read decrypted content");
+    assert_eq!(
+        decrypted_content, test_content,
+        "Content mismatch after decryption"
+    );
 }
 
 /// Test that invalid SSH keys are rejected
@@ -107,7 +111,9 @@ fn test_invalid_ssh_key_rejection() {
     let adapter = match ShellAdapterV2::new() {
         Ok(a) => a,
         Err(_) => {
-            eprintln!("Skipping SSH rejection test: Failed to create adapter (PTY/age not available)");
+            eprintln!(
+                "Skipping SSH rejection test: Failed to create adapter (PTY/age not available)"
+            );
             return;
         }
     };
@@ -115,7 +121,7 @@ fn test_invalid_ssh_key_rejection() {
     // Test invalid SSH key format
     let invalid_keys = vec![
         "not-an-ssh-key",
-        "age1somekey", // Age key, not SSH
+        "age1somekey",  // Age key, not SSH
         "rsa key data", // Missing ssh- prefix
     ];
 

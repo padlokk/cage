@@ -1,7 +1,7 @@
 //! Tests for structured audit and telemetry (OBS-01)
 
 use cage::cage::{
-    config::{TelemetryFormat, AgeConfig},
+    config::{AgeConfig, TelemetryFormat},
     security::AuditLogger,
 };
 use serde_json::Value;
@@ -14,10 +14,8 @@ fn test_text_format_telemetry() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let log_path = temp_dir.path().join("audit.log");
 
-    let logger = AuditLogger::with_format(
-        Some(log_path.clone()),
-        TelemetryFormat::Text
-    ).expect("Failed to create logger");
+    let logger = AuditLogger::with_format(Some(log_path.clone()), TelemetryFormat::Text)
+        .expect("Failed to create logger");
 
     logger.log_info("Test message").expect("Failed to log");
     logger.log_warning("Test warning").expect("Failed to log");
@@ -40,10 +38,8 @@ fn test_json_format_telemetry() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let log_path = temp_dir.path().join("audit.json");
 
-    let logger = AuditLogger::with_format(
-        Some(log_path.clone()),
-        TelemetryFormat::Json
-    ).expect("Failed to create logger");
+    let logger = AuditLogger::with_format(Some(log_path.clone()), TelemetryFormat::Json)
+        .expect("Failed to create logger");
 
     logger.log_info("Test JSON message").expect("Failed to log");
 
@@ -52,8 +48,7 @@ fn test_json_format_telemetry() {
 
     // Parse JSON and verify structure
     for line in lines {
-        let json: Value = serde_json::from_str(line)
-            .expect("Failed to parse JSON log line");
+        let json: Value = serde_json::from_str(line).expect("Failed to parse JSON log line");
 
         assert!(json.get("timestamp").is_some());
         assert!(json.get("level").is_some());
@@ -72,23 +67,17 @@ fn test_encryption_event_json() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let log_path = temp_dir.path().join("encryption.json");
 
-    let logger = AuditLogger::with_format(
-        Some(log_path.clone()),
-        TelemetryFormat::Json
-    ).expect("Failed to create logger");
+    let logger = AuditLogger::with_format(Some(log_path.clone()), TelemetryFormat::Json)
+        .expect("Failed to create logger");
 
     // Test encryption event with recipients
     let recipients = vec!["age1abc...".to_string(), "age1def...".to_string()];
-    logger.log_encryption_event(
-        Path::new("test.txt"),
-        Some(recipients),
-        "passphrase",
-        true
-    ).expect("Failed to log");
+    logger
+        .log_encryption_event(Path::new("test.txt"), Some(recipients), "passphrase", true)
+        .expect("Failed to log");
 
     let content = fs::read_to_string(&log_path).expect("Failed to read log file");
-    let json: Value = serde_json::from_str(&content.trim())
-        .expect("Failed to parse JSON");
+    let json: Value = serde_json::from_str(&content.trim()).expect("Failed to parse JSON");
 
     assert_eq!(json.get("event_type").unwrap(), "encryption");
     assert_eq!(json.get("identity_type").unwrap(), "passphrase");
@@ -102,20 +91,15 @@ fn test_decryption_event_json() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let log_path = temp_dir.path().join("decryption.json");
 
-    let logger = AuditLogger::with_format(
-        Some(log_path.clone()),
-        TelemetryFormat::Json
-    ).expect("Failed to create logger");
+    let logger = AuditLogger::with_format(Some(log_path.clone()), TelemetryFormat::Json)
+        .expect("Failed to create logger");
 
-    logger.log_decryption_event(
-        Path::new("test.age"),
-        "ssh-key",
-        true
-    ).expect("Failed to log");
+    logger
+        .log_decryption_event(Path::new("test.age"), "ssh-key", true)
+        .expect("Failed to log");
 
     let content = fs::read_to_string(&log_path).expect("Failed to read log file");
-    let json: Value = serde_json::from_str(&content.trim())
-        .expect("Failed to parse JSON");
+    let json: Value = serde_json::from_str(&content.trim()).expect("Failed to parse JSON");
 
     assert_eq!(json.get("event_type").unwrap(), "decryption");
     assert_eq!(json.get("identity_type").unwrap(), "ssh-key");
@@ -137,19 +121,19 @@ fn test_sensitive_field_redaction() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let log_path = temp_dir.path().join("sensitive.json");
 
-    let logger = AuditLogger::with_format(
-        Some(log_path.clone()),
-        TelemetryFormat::Json
-    ).expect("Failed to create logger");
+    let logger = AuditLogger::with_format(Some(log_path.clone()), TelemetryFormat::Json)
+        .expect("Failed to create logger");
 
     // Log encryption with recipients - should hash, not expose
     let recipients = vec!["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5...".to_string()];
-    logger.log_encryption_event(
-        Path::new("secret.txt"),
-        Some(recipients.clone()),
-        "identity-file",
-        true
-    ).expect("Failed to log");
+    logger
+        .log_encryption_event(
+            Path::new("secret.txt"),
+            Some(recipients.clone()),
+            "identity-file",
+            true,
+        )
+        .expect("Failed to log");
 
     let content = fs::read_to_string(&log_path).expect("Failed to read log file");
 

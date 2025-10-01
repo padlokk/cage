@@ -2,10 +2,8 @@
 
 use cage::cage::{
     config::AgeConfig,
-    requests::{
-        AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup,
-    },
     lifecycle::crud_manager::CrudManager,
+    requests::{AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup},
 };
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -80,7 +78,10 @@ fn test_authority_tier_enum() {
     assert_eq!(AuthorityTier::from_str("X"), Some(AuthorityTier::Skull));
     assert_eq!(AuthorityTier::from_str("x"), Some(AuthorityTier::Skull)); // Case insensitive
     assert_eq!(AuthorityTier::from_str("M"), Some(AuthorityTier::Master));
-    assert_eq!(AuthorityTier::from_str("R"), Some(AuthorityTier::Repository));
+    assert_eq!(
+        AuthorityTier::from_str("R"),
+        Some(AuthorityTier::Repository)
+    );
     assert_eq!(AuthorityTier::from_str("I"), Some(AuthorityTier::Ignition));
     assert_eq!(AuthorityTier::from_str("D"), Some(AuthorityTier::Distro));
     assert_eq!(AuthorityTier::from_str("Z"), None); // Invalid
@@ -88,11 +89,13 @@ fn test_authority_tier_enum() {
 
 #[test]
 fn test_multi_recipient_config() {
-    let mut primary_group = RecipientGroup::with_tier("primary".to_string(), AuthorityTier::Repository);
+    let mut primary_group =
+        RecipientGroup::with_tier("primary".to_string(), AuthorityTier::Repository);
     primary_group.add_recipient("age1primary1".to_string());
     primary_group.add_recipient("age1primary2".to_string());
 
-    let mut secondary_group = RecipientGroup::with_tier("secondary".to_string(), AuthorityTier::Ignition);
+    let mut secondary_group =
+        RecipientGroup::with_tier("secondary".to_string(), AuthorityTier::Ignition);
     secondary_group.add_recipient("age1secondary1".to_string());
 
     let config = MultiRecipientConfig::new()
@@ -191,8 +194,7 @@ fn test_lock_request_with_multi_recipient_config() {
     let mut primary_group = RecipientGroup::new("primary".to_string());
     primary_group.add_recipient("age1primary".to_string());
 
-    let multi_config = MultiRecipientConfig::new()
-        .with_primary_group(primary_group);
+    let multi_config = MultiRecipientConfig::new().with_primary_group(primary_group);
 
     let request = LockRequest::new(
         PathBuf::from("/test/file.txt"),
@@ -210,7 +212,8 @@ fn test_lock_request_with_multi_recipient_config() {
 fn test_crud_manager_recipient_lifecycle() {
     if let Ok(mut crud_manager) = CrudManager::with_defaults() {
         // Test creating a recipient group
-        let result = crud_manager.create_recipient_group("test_group", Some(AuthorityTier::Repository));
+        let result =
+            crud_manager.create_recipient_group("test_group", Some(AuthorityTier::Repository));
         assert!(result.is_ok());
 
         // Test listing groups
@@ -227,7 +230,8 @@ fn test_crud_manager_recipient_lifecycle() {
         assert!(remove_result.unwrap()); // Should return true for successful removal
 
         // Test removing non-existent recipient
-        let remove_nonexistent = crud_manager.remove_recipient_from_group("test_group", "nonexistent");
+        let remove_nonexistent =
+            crud_manager.remove_recipient_from_group("test_group", "nonexistent");
         assert!(remove_nonexistent.is_ok());
         assert!(!remove_nonexistent.unwrap()); // Should return false
 
@@ -268,11 +272,13 @@ fn test_multi_recipient_encryption_integration() {
     std::fs::write(&test_file, b"Test content for multi-recipient encryption").unwrap();
 
     // Create recipient groups for testing
-    let mut repo_group = RecipientGroup::with_tier("repository".to_string(), AuthorityTier::Repository);
+    let mut repo_group =
+        RecipientGroup::with_tier("repository".to_string(), AuthorityTier::Repository);
     // In real testing, these would be actual age public keys
     repo_group.add_recipient("age1mock_repo_key_123".to_string());
 
-    let mut ignition_group = RecipientGroup::with_tier("ignition".to_string(), AuthorityTier::Ignition);
+    let mut ignition_group =
+        RecipientGroup::with_tier("ignition".to_string(), AuthorityTier::Ignition);
     ignition_group.add_recipient("age1mock_ignition_key_456".to_string());
 
     let multi_config = MultiRecipientConfig::new()

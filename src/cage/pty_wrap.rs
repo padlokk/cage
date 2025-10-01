@@ -33,7 +33,10 @@ impl PtyAgeAutomator {
         let temp_dir = tempfile::tempdir().map_err(|e| AgeError::TemporaryResourceError {
             resource_type: "directory".to_string(),
             operation: "create".to_string(),
-            reason: format!("Failed to create temporary directory for PTY operations: {}", e),
+            reason: format!(
+                "Failed to create temporary directory for PTY operations: {}",
+                e
+            ),
         })?;
 
         Ok(Self {
@@ -185,14 +188,21 @@ impl PtyAgeAutomator {
                                 AgeError::ProcessExecutionFailed {
                                     command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write passphrase to PTY: {}. Prompt was: '{}'", e, output_buffer.trim()),
+                                    stderr: format!(
+                                        "Failed to write passphrase to PTY: {}. Prompt was: '{}'",
+                                        e,
+                                        output_buffer.trim()
+                                    ),
                                 }
                             })?;
                             writer.write_all(b"\n").map_err(|e| {
                                 AgeError::ProcessExecutionFailed {
                                     command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to send newline after passphrase: {}", e),
+                                    stderr: format!(
+                                        "Failed to send newline after passphrase: {}",
+                                        e
+                                    ),
                                 }
                             })?;
 
@@ -219,7 +229,10 @@ impl PtyAgeAutomator {
                                 AgeError::ProcessExecutionFailed {
                                     command: "pty_write".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to send newline after confirmation: {}", e),
+                                    stderr: format!(
+                                        "Failed to send newline after confirmation: {}",
+                                        e
+                                    ),
                                 }
                             })?;
 
@@ -278,7 +291,11 @@ impl PtyAgeAutomator {
             Ok(())
         } else {
             let reason = if !captured_stderr.is_empty() {
-                format!("Age encryption failed with exit status: {:?}. Stderr: {}", exit_status, captured_stderr.trim())
+                format!(
+                    "Age encryption failed with exit status: {:?}. Stderr: {}",
+                    exit_status,
+                    captured_stderr.trim()
+                )
             } else {
                 format!("Age encryption failed with exit status: {:?}", exit_status)
             };
@@ -411,7 +428,11 @@ impl PtyAgeAutomator {
                                 AgeError::ProcessExecutionFailed {
                                     command: "pty_write_passphrase".to_string(),
                                     exit_code: None,
-                                    stderr: format!("Failed to write passphrase: {}. Prompt was: '{}'", e, output_buffer.trim()),
+                                    stderr: format!(
+                                        "Failed to write passphrase: {}. Prompt was: '{}'",
+                                        e,
+                                        output_buffer.trim()
+                                    ),
                                 }
                             })?;
                             writer.write_all(b"\n").map_err(|e| {
@@ -475,7 +496,11 @@ impl PtyAgeAutomator {
             Ok(())
         } else {
             let reason = if !captured_stderr.is_empty() {
-                format!("Age decryption failed with exit status: {:?}. Stderr: {}", exit_status, captured_stderr.trim())
+                format!(
+                    "Age decryption failed with exit status: {:?}. Stderr: {}",
+                    exit_status,
+                    captured_stderr.trim()
+                )
             } else {
                 format!("Age decryption failed with exit status: {:?}", exit_status)
             };

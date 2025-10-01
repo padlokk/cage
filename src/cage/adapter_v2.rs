@@ -379,7 +379,9 @@ impl ShellAdapterV2 {
             PtyAgeAutomator::new()?
         };
         automator.check_age_binary()?;
-        Ok(Self { config: Some(config) })
+        Ok(Self {
+            config: Some(config),
+        })
     }
 
     fn get_automator(&self) -> AgeResult<PtyAgeAutomator> {
@@ -711,11 +713,12 @@ impl AgeAdapterV2 for ShellAdapterV2 {
         // For CLI usage, age accepts SSH keys directly
         // Just validate it looks like an SSH key and return as-is
         // Note: Real ECDSA keys use ecdsa-sha2-nistp256/384/521 prefixes
-        if ssh_pubkey.starts_with("ssh-rsa ") ||
-           ssh_pubkey.starts_with("ssh-ed25519 ") ||
-           ssh_pubkey.starts_with("ecdsa-sha2-nistp256 ") ||
-           ssh_pubkey.starts_with("ecdsa-sha2-nistp384 ") ||
-           ssh_pubkey.starts_with("ecdsa-sha2-nistp521 ") {
+        if ssh_pubkey.starts_with("ssh-rsa ")
+            || ssh_pubkey.starts_with("ssh-ed25519 ")
+            || ssh_pubkey.starts_with("ecdsa-sha2-nistp256 ")
+            || ssh_pubkey.starts_with("ecdsa-sha2-nistp384 ")
+            || ssh_pubkey.starts_with("ecdsa-sha2-nistp521 ")
+        {
             Ok(ssh_pubkey.to_string())
         } else {
             Err(AgeError::InvalidOperation {
@@ -847,9 +850,9 @@ impl AgeAdapterV2 for ShellAdapterV2 {
                 pipe_requires_identity: true,
             },
             ascii_armor: age_available,
-            hardware_keys: false, // Not yet implemented
+            hardware_keys: false,  // Not yet implemented
             key_derivation: false, // Not yet implemented (CAGE-15)
-            max_file_size: None, // No hard limit
+            max_file_size: None,   // No hard limit
         }
     }
 
@@ -897,9 +900,7 @@ impl ShellAdapterV2 {
             });
         }
 
-        let recipient = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string();
+        let recipient = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
         if recipient.is_empty() || !recipient.starts_with("age1") {
             return Err(AgeError::InvalidOperation {

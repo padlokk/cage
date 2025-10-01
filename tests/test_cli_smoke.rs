@@ -81,8 +81,11 @@ fn generate_test_identity(temp_dir: &Path) -> Result<PathBuf, Box<dyn std::error
         .output()?;
 
     if !output.status.success() {
-        return Err(format!("Failed to generate age identity: {}",
-            String::from_utf8_lossy(&output.stderr)).into());
+        return Err(format!(
+            "Failed to generate age identity: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
     }
 
     Ok(identity_path)
@@ -135,11 +138,16 @@ fn test_extension_preservation_single_file() -> Result<(), Box<dyn std::error::E
 
     // Verify encrypted file has correct extension: document.txt.cage (NOT document.cage)
     let expected_encrypted = temp_dir.path().join("document.txt.cage");
-    assert!(expected_encrypted.exists(),
-        "BUG-01: Encrypted file should be document.txt.cage, not document.cage");
+    assert!(
+        expected_encrypted.exists(),
+        "BUG-01: Encrypted file should be document.txt.cage, not document.cage"
+    );
 
     // Verify original is preserved by default (current behavior)
-    assert!(test_file.exists(), "Original file should be preserved by default");
+    assert!(
+        test_file.exists(),
+        "Original file should be preserved by default"
+    );
 
     println!("✅ Extension preserved: document.txt -> document.txt.cage");
 
@@ -185,11 +193,16 @@ fn test_extension_preservation_unlock() -> Result<(), Box<dyn std::error::Error>
 
     // Verify decrypted file has original extension restored
     let decrypted_file = temp_dir.path().join("data.json");
-    assert!(decrypted_file.exists(),
-        "BUG-01: Decrypted file should be data.json (original extension restored)");
+    assert!(
+        decrypted_file.exists(),
+        "BUG-01: Decrypted file should be data.json (original extension restored)"
+    );
 
     let content = fs::read_to_string(&decrypted_file)?;
-    assert!(content.contains("\"key\""), "Decrypted content should match original");
+    assert!(
+        content.contains("\"key\""),
+        "Decrypted content should match original"
+    );
 
     println!("✅ Extension restored on unlock: data.json.cage -> data.json");
 
@@ -230,7 +243,9 @@ fn test_padlock_extension_lock() -> Result<(), Box<dyn std::error::Error>> {
     assert!(encrypted_file.exists());
 
     println!("✅ Encryption works (cage extension)");
-    println!("   Note: .padlock extension support tracked in config (padlock_extension_support=true)");
+    println!(
+        "   Note: .padlock extension support tracked in config (padlock_extension_support=true)"
+    );
 
     Ok(())
 }
@@ -269,9 +284,11 @@ fn test_recursive_directory_lock() -> Result<(), Box<dyn std::error::Error>> {
         .arg(format!("--recipient={}", recipient))
         .output()?;
 
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "BUG-02: Recursive lock must succeed. stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Verify files in subdirectories were encrypted
     let root_encrypted = temp_dir.path().join("root.txt.cage").exists();
@@ -318,15 +335,29 @@ fn test_glob_pattern_matching() -> Result<(), Box<dyn std::error::Error>> {
         .arg(format!("--recipient={}", recipient))
         .output()?;
 
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "BUG-03: Glob-filtered lock must succeed. stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Verify only .txt files were encrypted
-    assert!(temp_dir.path().join("data.txt.cage").exists(), "BUG-03: *.txt should match data.txt");
-    assert!(temp_dir.path().join("readme.txt.cage").exists(), "BUG-03: *.txt should match readme.txt");
-    assert!(!temp_dir.path().join("data.json.cage").exists(), "BUG-03: *.txt should NOT match data.json");
-    assert!(!temp_dir.path().join("config.yaml.cage").exists(), "BUG-03: *.txt should NOT match config.yaml");
+    assert!(
+        temp_dir.path().join("data.txt.cage").exists(),
+        "BUG-03: *.txt should match data.txt"
+    );
+    assert!(
+        temp_dir.path().join("readme.txt.cage").exists(),
+        "BUG-03: *.txt should match readme.txt"
+    );
+    assert!(
+        !temp_dir.path().join("data.json.cage").exists(),
+        "BUG-03: *.txt should NOT match data.json"
+    );
+    assert!(
+        !temp_dir.path().join("config.yaml.cage").exists(),
+        "BUG-03: *.txt should NOT match config.yaml"
+    );
 
     println!("✅ BUG-03 FIXED: Glob patterns correctly filter files");
 
@@ -359,12 +390,17 @@ fn test_unlock_preserve_option() -> Result<(), Box<dyn std::error::Error>> {
         .arg(format!("--recipient={}", recipient))
         .output()?;
 
-    assert!(lock_output.status.success(),
+    assert!(
+        lock_output.status.success(),
         "Lock must succeed. stderr: {}",
-        String::from_utf8_lossy(&lock_output.stderr));
+        String::from_utf8_lossy(&lock_output.stderr)
+    );
 
     let encrypted_file = temp_dir.path().join("preserve_test.txt.cage");
-    assert!(encrypted_file.exists(), "Encrypted file must exist after lock");
+    assert!(
+        encrypted_file.exists(),
+        "Encrypted file must exist after lock"
+    );
 
     // Unlock with --preserve (CLI flag from src/bin/cli_age.rs:251,1070)
     let output = Command::new(&cage_bin)
@@ -374,14 +410,22 @@ fn test_unlock_preserve_option() -> Result<(), Box<dyn std::error::Error>> {
         .arg("--preserve")
         .output()?;
 
-    assert!(output.status.success(),
+    assert!(
+        output.status.success(),
         "BUG-04: Unlock with --preserve must succeed. stderr: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Verify both files exist
     let decrypted_file = temp_dir.path().join("preserve_test.txt");
-    assert!(decrypted_file.exists(), "BUG-04: Decrypted file should exist");
-    assert!(encrypted_file.exists(), "BUG-04: Encrypted file should be preserved with --preserve flag");
+    assert!(
+        decrypted_file.exists(),
+        "BUG-04: Decrypted file should exist"
+    );
+    assert!(
+        encrypted_file.exists(),
+        "BUG-04: Encrypted file should be preserved with --preserve flag"
+    );
 
     println!("✅ BUG-04: --preserve option correctly preserves encrypted file");
 
@@ -401,15 +445,15 @@ fn test_cli_version() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("🧪 TEST: CLI version command");
 
-    let output = Command::new(&cage_bin)
-        .arg("version")
-        .output()?;
+    let output = Command::new(&cage_bin).arg("version").output()?;
 
     assert!(output.status.success(), "cage version should succeed");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("0.") || stdout.contains("Cage"),
-        "Version output should contain version info");
+    assert!(
+        stdout.contains("0.") || stdout.contains("Cage"),
+        "Version output should contain version info"
+    );
 
     println!("✅ CLI version command works");
 
@@ -425,16 +469,18 @@ fn test_cli_help() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("🧪 TEST: CLI help command");
 
-    let output = Command::new(&cage_bin)
-        .arg("help")
-        .output()?;
+    let output = Command::new(&cage_bin).arg("help").output()?;
 
-    assert!(output.status.success() || output.status.code() == Some(0),
-        "cage help should succeed");
+    assert!(
+        output.status.success() || output.status.code() == Some(0),
+        "cage help should succeed"
+    );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("lock") || stdout.contains("unlock") || stdout.contains("COMMANDS"),
-        "Help output should contain command information");
+    assert!(
+        stdout.contains("lock") || stdout.contains("unlock") || stdout.contains("COMMANDS"),
+        "Help output should contain command information"
+    );
 
     println!("✅ CLI help command works");
 
@@ -450,14 +496,13 @@ fn test_cli_config_show() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("🧪 TEST: CLI config show command");
 
-    let output = Command::new(&cage_bin)
-        .arg("config")
-        .arg("show")
-        .output()?;
+    let output = Command::new(&cage_bin).arg("config").arg("show").output()?;
 
     // Config show should work even if no config file exists
-    assert!(output.status.success() || output.status.code() == Some(0),
-        "cage config show should not fail");
+    assert!(
+        output.status.success() || output.status.code() == Some(0),
+        "cage config show should not fail"
+    );
 
     println!("✅ CLI config show command works");
 

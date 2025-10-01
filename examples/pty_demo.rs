@@ -1,13 +1,16 @@
+use hub::portable_pty::*;
 use std::io::{Read, Write};
 use std::thread;
 use std::time::Duration;
-use hub::portable_pty::*;
 
 fn main() {
     println!("🧪 Simple PTY + age driver test");
 
     // Show current directory
-    println!("📁 Current directory: {:?}", std::env::current_dir().unwrap());
+    println!(
+        "📁 Current directory: {:?}",
+        std::env::current_dir().unwrap()
+    );
 
     // Create test file
     std::fs::write("test.txt", "Hello PTY world!").expect("Failed to create test file");
@@ -60,58 +63,61 @@ fn test_age_pty() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     println!("🚀 Spawning age in PTY...");
     let child = pair.slave.spawn_command(cmd)?;
-    drop(pair.slave);  // Important: close slave in parent
+    drop(pair.slave); // Important: close slave in parent
 
     let mut writer = pair.master.take_writer()?;
     let mut reader = pair.master.try_clone_reader()?;
 
     println!("🔄 Starting automation thread...");
-    let handle = thread::spawn(move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut buffer = [0u8; 256];
-        let passphrase = "testpass123";
+    let handle = thread::spawn(
+        move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            let mut buffer = [0u8; 256];
+            let passphrase = "testpass123";
 
-        println!("👂 Thread: Listening for age output...");
+            println!("👂 Thread: Listening for age output...");
 
-        for i in 1..=20 {  // Try 20 times, 100ms each = 2 seconds max
-            println!("👂 Thread: Read attempt {}", i);
+            for i in 1..=20 {
+                // Try 20 times, 100ms each = 2 seconds max
+                println!("👂 Thread: Read attempt {}", i);
 
-            match reader.read(&mut buffer) {
-                Ok(0) => {
-                    println!("📄 Thread: EOF - age finished");
-                    break;
-                }
-                Ok(n) => {
-                    let text = String::from_utf8_lossy(&buffer[..n]);
-                    println!("📨 Thread: Got output: {:?}", text);
-
-                    // Look for passphrase prompt
-                    if text.to_lowercase().contains("passphrase") {
-                        println!("🔐 Thread: Sending passphrase...");
-                        writer.write_all(passphrase.as_bytes())?;
-                        writer.write_all(b"\n")?;
-                        println!("✅ Thread: Passphrase sent");
+                match reader.read(&mut buffer) {
+                    Ok(0) => {
+                        println!("📄 Thread: EOF - age finished");
+                        break;
                     }
+                    Ok(n) => {
+                        let text = String::from_utf8_lossy(&buffer[..n]);
+                        println!("📨 Thread: Got output: {:?}", text);
 
-                    if text.to_lowercase().contains("confirm") {
-                        println!("🔐 Thread: Sending confirmation...");
-                        writer.write_all(passphrase.as_bytes())?;
-                        writer.write_all(b"\n")?;
-                        println!("✅ Thread: Confirmation sent");
+                        // Look for passphrase prompt
+                        if text.to_lowercase().contains("passphrase") {
+                            println!("🔐 Thread: Sending passphrase...");
+                            writer.write_all(passphrase.as_bytes())?;
+                            writer.write_all(b"\n")?;
+                            println!("✅ Thread: Passphrase sent");
+                        }
+
+                        if text.to_lowercase().contains("confirm") {
+                            println!("🔐 Thread: Sending confirmation...");
+                            writer.write_all(passphrase.as_bytes())?;
+                            writer.write_all(b"\n")?;
+                            println!("✅ Thread: Confirmation sent");
+                        }
+                    }
+                    Err(e) => {
+                        println!("⚠️ Thread: Read error (attempt {}): {}", i, e);
+                        thread::sleep(Duration::from_millis(100));
+                        continue;
                     }
                 }
-                Err(e) => {
-                    println!("⚠️ Thread: Read error (attempt {}): {}", i, e);
-                    thread::sleep(Duration::from_millis(100));
-                    continue;
-                }
+
+                thread::sleep(Duration::from_millis(100));
             }
 
-            thread::sleep(Duration::from_millis(100));
-        }
-
-        println!("🏁 Thread: Finished");
-        Ok(())
-    });
+            println!("🏁 Thread: Finished");
+            Ok(())
+        },
+    );
 
     println!("⏰ Main: Waiting for automation thread...");
     handle.join().map_err(|_| "Thread panicked")??;
@@ -143,7 +149,9 @@ fn test_age_pty() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 }
 
-fn test_decrypt(encrypted_file: &std::path::Path) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn test_decrypt(
+    encrypted_file: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use hub::portable_pty::*;
 
     let pty_system = native_pty_system();
@@ -177,44 +185,46 @@ fn test_decrypt(encrypted_file: &std::path::Path) -> Result<(), Box<dyn std::err
     let mut reader = pair.master.try_clone_reader()?;
 
     println!("🔄 Starting decryption automation thread...");
-    let handle = thread::spawn(move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut buffer = [0u8; 256];
-        let passphrase = "testpass123";
+    let handle = thread::spawn(
+        move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            let mut buffer = [0u8; 256];
+            let passphrase = "testpass123";
 
-        println!("👂 Decrypt thread: Listening for age output...");
+            println!("👂 Decrypt thread: Listening for age output...");
 
-        for i in 1..=20 {
-            println!("👂 Decrypt thread: Read attempt {}", i);
+            for i in 1..=20 {
+                println!("👂 Decrypt thread: Read attempt {}", i);
 
-            match reader.read(&mut buffer) {
-                Ok(0) => {
-                    println!("📄 Decrypt thread: EOF - age finished");
-                    break;
-                }
-                Ok(n) => {
-                    let text = String::from_utf8_lossy(&buffer[..n]);
-                    println!("📨 Decrypt thread: Got output: {:?}", text);
+                match reader.read(&mut buffer) {
+                    Ok(0) => {
+                        println!("📄 Decrypt thread: EOF - age finished");
+                        break;
+                    }
+                    Ok(n) => {
+                        let text = String::from_utf8_lossy(&buffer[..n]);
+                        println!("📨 Decrypt thread: Got output: {:?}", text);
 
-                    if text.to_lowercase().contains("passphrase") {
-                        println!("🔐 Decrypt thread: Sending passphrase...");
-                        writer.write_all(passphrase.as_bytes())?;
-                        writer.write_all(b"\n")?;
-                        println!("✅ Decrypt thread: Passphrase sent");
+                        if text.to_lowercase().contains("passphrase") {
+                            println!("🔐 Decrypt thread: Sending passphrase...");
+                            writer.write_all(passphrase.as_bytes())?;
+                            writer.write_all(b"\n")?;
+                            println!("✅ Decrypt thread: Passphrase sent");
+                        }
+                    }
+                    Err(e) => {
+                        println!("⚠️ Decrypt thread: Read error (attempt {}): {}", i, e);
+                        thread::sleep(Duration::from_millis(100));
+                        continue;
                     }
                 }
-                Err(e) => {
-                    println!("⚠️ Decrypt thread: Read error (attempt {}): {}", i, e);
-                    thread::sleep(Duration::from_millis(100));
-                    continue;
-                }
+
+                thread::sleep(Duration::from_millis(100));
             }
 
-            thread::sleep(Duration::from_millis(100));
-        }
-
-        println!("🏁 Decrypt thread: Finished");
-        Ok(())
-    });
+            println!("🏁 Decrypt thread: Finished");
+            Ok(())
+        },
+    );
 
     println!("⏰ Main: Waiting for decrypt automation thread...");
     handle.join().map_err(|_| "Decrypt thread panicked")??;
@@ -234,7 +244,11 @@ fn test_decrypt(encrypted_file: &std::path::Path) -> Result<(), Box<dyn std::err
             println!("✅ Content verification passed!");
             return Ok(());
         } else {
-            return Err(format!("Content mismatch: expected 'Hello PTY world!', got '{}'", decrypted_content).into());
+            return Err(format!(
+                "Content mismatch: expected 'Hello PTY world!', got '{}'",
+                decrypted_content
+            )
+            .into());
         }
     } else {
         return Err("Decrypted file not found".into());

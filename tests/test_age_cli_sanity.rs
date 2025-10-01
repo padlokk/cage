@@ -70,14 +70,14 @@ fn test_age_help_output() {
     // Verify expected help content
     // These are core flags that should always be present
     let expected_flags = vec![
-        "Usage:",      // Usage line
-        "--encrypt",   // Encrypt flag
-        "--decrypt",   // Decrypt flag
-        "-p",          // Passphrase flag
-        "-i",          // Identity flag
-        "-r",          // Recipient flag
-        "-o",          // Output flag
-        "--armor",     // ASCII armor flag
+        "Usage:",    // Usage line
+        "--encrypt", // Encrypt flag
+        "--decrypt", // Decrypt flag
+        "-p",        // Passphrase flag
+        "-i",        // Identity flag
+        "-r",        // Recipient flag
+        "-o",        // Output flag
+        "--armor",   // ASCII armor flag
     ];
 
     for flag in &expected_flags {
@@ -154,8 +154,22 @@ fn test_age_binary_detection() {
     let age_keygen_available = which::which("age-keygen").is_ok();
 
     println!("🔍 Age binary detection results:");
-    println!("  - age: {}", if age_available { "✅ Found" } else { "❌ Not found" });
-    println!("  - age-keygen: {}", if age_keygen_available { "✅ Found" } else { "❌ Not found (optional)" });
+    println!(
+        "  - age: {}",
+        if age_available {
+            "✅ Found"
+        } else {
+            "❌ Not found"
+        }
+    );
+    println!(
+        "  - age-keygen: {}",
+        if age_keygen_available {
+            "✅ Found"
+        } else {
+            "❌ Not found (optional)"
+        }
+    );
 
     if !age_available {
         println!("\n📦 Installation instructions:");
