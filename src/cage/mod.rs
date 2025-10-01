@@ -17,13 +17,13 @@ pub mod adapter;
 pub mod adapter_v2; // Enhanced adapter with streaming (CAGE-12)
 pub mod adapter_v2_pipe_passphrase; // True pipe streaming for passphrases (CAGE-12b)
 pub mod age_engine;
+pub mod chunker;
 pub mod config;
 pub mod error;
 pub mod in_place;
 pub mod lifecycle;
 pub mod operations;
 pub mod passphrase;
-pub mod progress;
 pub mod pty_wrap; // New PTY automation module
 pub mod requests;
 pub mod security;
@@ -33,6 +33,7 @@ pub mod tty_automation; // Request structs for unified API (CAGE-11)
 // Re-export core types for convenience
 pub use adapter::{AdapterFactory, AgeAdapter};
 pub use age_engine::AgeAutomator;
+pub use chunker::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker};
 pub use config::{AgeConfig, OutputFormat, TtyMethod};
 pub use error::{AgeError, AgeResult};
 pub use in_place::{InPlaceOperation, InPlaceOptions, RecoveryManager, SafetyValidator};
@@ -41,7 +42,6 @@ pub use operations::{
     FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus,
 };
 pub use passphrase::{PassphraseManager, PassphraseMode};
-pub use progress::{ProgressManager, ProgressReporter, ProgressStyle, TerminalReporter};
 pub use security::{AuditLogger, SecurityValidator};
 
 /// Module version synchronized with Cargo.toml

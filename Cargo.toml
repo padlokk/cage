@@ -34,5 +34,5 @@ toml = "0.8"
 libc = "0.2"  # TTY detection on Unix systems
 
 # RSB ecosystem dependencies
-rsb = { git = "https://github.com/oodx/rsb", branch = "main" }
+rsb = { git = "https://github.com/oodx/rsb", branch = "main", features = ["progress"] }
 hub = { git = "https://github.com/oodx/hub.git", features = ["terminal-ext"] }

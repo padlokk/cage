@@ -346,11 +346,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Progress Integration
 
 ```rust
-use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
+use rsb::progress::{ProgressManager, ProgressStyle, TerminalConfig, TerminalReporter};
 use std::sync::Arc;
 
 let manager = ProgressManager::new();
-manager.add_reporter(Arc::new(TerminalReporter::new()));
+let reporter = TerminalReporter::with_config(TerminalConfig {
+    use_colors: true,
+    use_unicode: true,
+    use_stderr: true,
+    ..Default::default()
+});
+manager.add_reporter(Arc::new(reporter));
 
 let task = manager.start_task("Encrypting files", ProgressStyle::Bar { total: 10 });
 for i in 0..10 {
@@ -394,7 +400,7 @@ let result = automator.execute_age_command(
 ### Available Modules
 
 - **`cage::cage::CrudManager`** - Core file encryption/decryption operations
-- **`cage::cage::progress`** - Progress reporting framework
+- **`rsb::progress`** - Progress reporting framework (used by Cage)
 - **`cage::cage::pty_wrap`** - PTY automation for Age binary
 - **`cage::cage::SafetyValidator`** - In-place operation safety checks
 - **`cage::cage::InPlaceOperation`** - Atomic in-place file operations

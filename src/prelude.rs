@@ -50,10 +50,6 @@ pub use crate::cage::{
     PassphraseManager,
     PassphraseMode,
 
-    // Progress
-    ProgressManager,
-    ProgressReporter,
-
     RepositoryOperations,
     RepositoryStatus,
     // Security

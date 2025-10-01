@@ -241,14 +241,20 @@ assert_eq!(recovered.into_inner(), b"large payload");
 Professional progress indicators with multiple styles and terminal features.
 
 ```rust
-use cage::cage::progress::{
-    ProgressManager, ProgressStyle, TerminalReporter
+use rsb::progress::{
+    ProgressManager, ProgressStyle, TerminalConfig, TerminalReporter
 };
 use std::sync::Arc;
 
 // Create progress manager
 let manager = ProgressManager::new();
-manager.add_reporter(Arc::new(TerminalReporter::new()));
+let reporter = TerminalReporter::with_config(TerminalConfig {
+    use_colors: true,
+    use_unicode: true,
+    use_stderr: true,
+    ..Default::default()
+});
+manager.add_reporter(Arc::new(reporter));
 
 // Different progress styles
 let spinner = manager.start_task("Loading", ProgressStyle::Spinner);
@@ -276,7 +282,7 @@ bar.complete("Processing complete");
 #### Terminal Features
 
 ```rust
-use cage::cage::progress::{TerminalReporter, TerminalConfig};
+use rsb::progress::{TerminalReporter, TerminalConfig};
 
 let config = TerminalConfig {
     use_colors: true,         // Enable ANSI colors
@@ -400,12 +406,18 @@ let passphrase = passphrase_manager.get_passphrase_with_mode(
 ### 1. Integrated Progress with Operations
 
 ```rust
-use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
+use rsb::progress::{ProgressManager, ProgressStyle, TerminalConfig, TerminalReporter};
 use std::sync::Arc;
 
 fn encrypt_with_progress(files: Vec<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let manager = ProgressManager::new();
-    manager.add_reporter(Arc::new(TerminalReporter::new()));
+    let reporter = TerminalReporter::with_config(TerminalConfig {
+        use_colors: true,
+        use_unicode: true,
+        use_stderr: true,
+        ..Default::default()
+    });
+    manager.add_reporter(Arc::new(reporter));
 
     let task = manager.start_task(
         "Encrypting files",
@@ -465,7 +477,7 @@ fn batch_encrypt_with_recovery(
 ### 3. Custom Progress Reporter
 
 ```rust
-use cage::cage::progress::{ProgressReporter, ProgressEvent};
+use rsb::progress::{ProgressReporter, ProgressEvent};
 use std::sync::{Arc, Mutex};
 
 struct CustomReporter {
@@ -813,7 +825,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if show_progress {
         let manager = ProgressManager::new();
-        manager.add_reporter(Arc::new(TerminalReporter::new()));
+        let reporter = TerminalReporter::with_config(TerminalConfig {
+            use_colors: true,
+            use_unicode: true,
+            use_stderr: true,
+            ..Default::default()
+        });
+        manager.add_reporter(Arc::new(reporter));
 
         let task = manager.start_task("Encrypting", ProgressStyle::Spinner);
 

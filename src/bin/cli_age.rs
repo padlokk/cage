@@ -8,9 +8,9 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 // Import cage library modules
-use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
 use cage::cage::requests::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamRequest, UnlockRequest,
@@ -22,6 +22,7 @@ use cage::{
 
 // Import RSB utilities for enhanced CLI experience
 use rsb::prelude::*;
+use rsb::progress::{ProgressManager, ProgressStyle, TerminalConfig, TerminalReporter};
 
 /// Print the Cage logo
 fn logo() {
@@ -978,33 +979,36 @@ fn execute_lock_operation(
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
-        let manager = ProgressManager::new();
-        manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
-        Some(std::sync::Arc::new(manager))
+        let manager = Arc::new(ProgressManager::new());
+        let reporter = TerminalReporter::with_config(TerminalConfig {
+            use_colors: true,
+            use_unicode: true,
+            use_stderr: true,
+            ..Default::default()
+        });
+        manager.add_reporter(Arc::new(reporter));
+        Some(manager)
     } else {
         None
     };
 
     for (index, path) in paths.iter().enumerate() {
-        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> =
-            if let Some(ref pm) = progress_manager {
-                let style = if paths.len() > 1 {
-                    ProgressStyle::Counter {
-                        total: paths.len() as u64,
-                    }
-                } else {
-                    ProgressStyle::Spinner
-                };
-                Some(pm.start_task(
-                    &format!(
-                        "🔒 Encrypting {}",
-                        path.file_name().unwrap_or_default().to_string_lossy()
-                    ),
-                    style,
-                ))
+        let progress_task = progress_manager.as_ref().map(|pm| {
+            let style = if paths.len() > 1 {
+                ProgressStyle::Counter {
+                    total: paths.len() as u64,
+                }
             } else {
-                None
+                ProgressStyle::Spinner
             };
+            pm.start_task(
+                &format!(
+                    "🔒 Encrypting {}",
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                ),
+                style,
+            )
+        });
 
         if verbose && progress_task.is_none() {
             echo!("  Locking: {}", path.display());
@@ -1109,33 +1113,36 @@ fn execute_in_place_lock_operation(
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
-        let manager = ProgressManager::new();
-        manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
-        Some(std::sync::Arc::new(manager))
+        let manager = Arc::new(ProgressManager::new());
+        let reporter = TerminalReporter::with_config(TerminalConfig {
+            use_colors: true,
+            use_unicode: true,
+            use_stderr: true,
+            ..Default::default()
+        });
+        manager.add_reporter(Arc::new(reporter));
+        Some(manager)
     } else {
         None
     };
 
     for (index, path) in paths.iter().enumerate() {
-        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> =
-            if let Some(ref pm) = progress_manager {
-                let style = if paths.len() > 1 {
-                    ProgressStyle::Counter {
-                        total: paths.len() as u64,
-                    }
-                } else {
-                    ProgressStyle::Spinner
-                };
-                Some(pm.start_task(
-                    &format!(
-                        "🔒 In-place encrypting {}",
-                        path.file_name().unwrap_or_default().to_string_lossy()
-                    ),
-                    style,
-                ))
+        let progress_task = progress_manager.as_ref().map(|pm| {
+            let style = if paths.len() > 1 {
+                ProgressStyle::Counter {
+                    total: paths.len() as u64,
+                }
             } else {
-                None
+                ProgressStyle::Spinner
             };
+            pm.start_task(
+                &format!(
+                    "🔒 In-place encrypting {}",
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                ),
+                style,
+            )
+        });
 
         if verbose && progress_task.is_none() {
             echo!("  🔒 In-place locking: {}", path.display());
@@ -1305,33 +1312,36 @@ fn execute_unlock_operation(
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
-        let manager = ProgressManager::new();
-        manager.add_reporter(std::sync::Arc::new(TerminalReporter::new()));
-        Some(std::sync::Arc::new(manager))
+        let manager = Arc::new(ProgressManager::new());
+        let reporter = TerminalReporter::with_config(TerminalConfig {
+            use_colors: true,
+            use_unicode: true,
+            use_stderr: true,
+            ..Default::default()
+        });
+        manager.add_reporter(Arc::new(reporter));
+        Some(manager)
     } else {
         None
     };
 
     for (index, path) in paths.iter().enumerate() {
-        let progress_task: Option<std::sync::Arc<cage::cage::progress::ProgressTask>> =
-            if let Some(ref pm) = progress_manager {
-                let style = if paths.len() > 1 {
-                    ProgressStyle::Counter {
-                        total: paths.len() as u64,
-                    }
-                } else {
-                    ProgressStyle::Spinner
-                };
-                Some(pm.start_task(
-                    &format!(
-                        "🔓 Decrypting {}",
-                        path.file_name().unwrap_or_default().to_string_lossy()
-                    ),
-                    style,
-                ))
+        let progress_task = progress_manager.as_ref().map(|pm| {
+            let style = if paths.len() > 1 {
+                ProgressStyle::Counter {
+                    total: paths.len() as u64,
+                }
             } else {
-                None
+                ProgressStyle::Spinner
             };
+            pm.start_task(
+                &format!(
+                    "🔓 Decrypting {}",
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                ),
+                style,
+            )
+        });
 
         if verbose && progress_task.is_none() {
             echo!("  Unlocking: {}", path.display());
@@ -2366,8 +2376,7 @@ fn cmd_adapter(args: Args) -> i32 {
 
 /// UAT Demo for Progress Indicators
 fn run_progress_demo() -> i32 {
-    use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
-    use std::sync::Arc;
+    use rsb::progress::{ProgressManager, ProgressStyle, TerminalConfig, TerminalReporter};
     use std::thread;
     use std::time::Duration;
 
@@ -2378,7 +2387,13 @@ fn run_progress_demo() -> i32 {
     // Create progress manager with terminal reporter
     let manager = Arc::new({
         let manager = ProgressManager::new();
-        manager.add_reporter(Arc::new(TerminalReporter::new()));
+        let reporter = TerminalReporter::with_config(TerminalConfig {
+            use_colors: true,
+            use_unicode: true,
+            use_stderr: true,
+            ..Default::default()
+        });
+        manager.add_reporter(Arc::new(reporter));
         manager
     });
 
