@@ -137,7 +137,9 @@ mod tests {
         let public_key = "age1abcdefghijklmnopqrstuvwxyz1234567890";
         let fp = compute_fingerprint_sha256(public_key);
         assert!(fp.starts_with("SHA256:"));
-        assert!(!fp.contains(':')); // Base64 should not have colons
+        // Base64 portion (after SHA256:) should not have colons
+        let base64_part = &fp[7..];
+        assert!(!base64_part.contains(':'));
     }
 
     #[test]
