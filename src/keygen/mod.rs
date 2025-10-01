@@ -7,8 +7,8 @@
 
 pub mod api;
 pub mod error;
-mod audit;
-mod helpers;
+pub(crate) mod audit;
+pub(crate) mod helpers;
 
 pub use api::{KeygenRequest, KeygenService, KeygenSummary};
 pub use error::KeygenError;
