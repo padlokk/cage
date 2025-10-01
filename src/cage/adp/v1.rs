@@ -40,14 +40,14 @@ pub trait AgeAdapter {
 
 /// Shell-based Age adapter using PTY automation methods
 pub struct ShellAdapter {
-    pty_automator: crate::cage::pty_wrap::PtyAgeAutomator,
+    pty_automator: crate::cage::pty::PtyAgeAutomator,
     audit_logger: crate::cage::security::AuditLogger,
 }
 
 impl ShellAdapter {
     /// Create new ShellAdapter with PTY automation
     pub fn new() -> AgeResult<Self> {
-        let pty_automator = crate::cage::pty_wrap::PtyAgeAutomator::new()?;
+        let pty_automator = crate::cage::pty::PtyAgeAutomator::new()?;
         let audit_logger = crate::cage::security::AuditLogger::new(None)?;
 
         Ok(Self {
@@ -133,7 +133,7 @@ impl AgeAdapter for ShellAdapter {
 
     fn clone_box(&self) -> Box<dyn AgeAdapter> {
         Box::new(ShellAdapter {
-            pty_automator: crate::cage::pty_wrap::PtyAgeAutomator::new().unwrap(),
+            pty_automator: crate::cage::pty::PtyAgeAutomator::new().unwrap(),
             audit_logger: crate::cage::security::AuditLogger::new(None).unwrap(),
         })
     }

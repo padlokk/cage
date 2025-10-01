@@ -24,7 +24,7 @@ use crate::cage::requests::{
 use crate::cage::security::AuditLogger;
 use crate::cage::strings::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
-use crate::cage::tty_automation::TtyAutomator;
+use crate::cage::pty::TtyAutomator;
 use globset::{Glob, GlobMatcher};
 use rsb::visual::glyphs::glyph_enable;
 use tempfile::NamedTempFile;

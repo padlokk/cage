@@ -1583,7 +1583,7 @@ fn cmd_proxy(args: Args) -> i32 {
 }
 
 fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
-    use cage::cage::pty_wrap::PtyAgeAutomator;
+    use cage::cage::pty::PtyAgeAutomator;
 
     echo!("🔗 Cage Age Proxy - PTY automation for direct Age commands");
 

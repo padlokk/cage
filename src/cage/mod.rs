@@ -23,11 +23,10 @@ pub mod keygen; // Key generation service module (CAGE-21)
 pub mod manager; // CageManager lifecycle coordination
 pub mod operations;
 pub mod passphrase;
-pub mod pty_wrap; // New PTY automation module
+pub mod pty; // PTY automation (wrap and tty methods)
 pub mod requests;
 pub mod security;
 pub mod strings; // Centralized string constants (SEC-01)
-pub mod tty_automation; // Request structs for unified API (CAGE-11)
 
 // Re-export core types for convenience
 pub use adp::{AdapterFactory, AgeAdapter};

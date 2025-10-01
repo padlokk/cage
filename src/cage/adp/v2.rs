@@ -5,7 +5,7 @@
 
 use crate::cage::config::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::pty_wrap::PtyAgeAutomator;
+use crate::cage::pty::PtyAgeAutomator;
 use crate::cage::requests::{Identity, Recipient};
 use crate::cage::strings;
 use std::env;

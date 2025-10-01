@@ -6,8 +6,8 @@
 //!
 //! Security Guardian: Edgar - Production implementation of proven automation patterns
 
-use super::config::{OutputFormat, TtyMethod};
-use super::error::{AgeError, AgeResult};
+use crate::cage::config::{OutputFormat, TtyMethod};
+use crate::cage::error::{AgeError, AgeResult};
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
