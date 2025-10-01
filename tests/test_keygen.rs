@@ -84,10 +84,10 @@ fn test_keygen_basic_generation() -> Result<(), Box<dyn std::error::Error>> {
     let identities_dir = xdg_config.join("cage/identities");
     assert_exists(&identities_dir);
 
-    // Find generated .agekey file
+    // Find generated .cagekey file
     let entries: Vec<_> = fs::read_dir(&identities_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "agekey"))
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "cagekey"))
         .collect();
 
     assert_eq!(entries.len(), 1, "expected exactly one identity file");
@@ -142,10 +142,10 @@ fn test_keygen_export_mode() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(json["status"], "success");
 
-    // Find generated .agekey file in current directory (not in config store)
+    // Find generated .cagekey file in current directory (not in config store)
     let entries: Vec<_> = fs::read_dir(&work_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "agekey"))
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "cagekey"))
         .collect();
 
     assert_eq!(entries.len(), 1, "expected exactly one exported identity");
@@ -172,7 +172,7 @@ fn test_keygen_custom_output() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let sandbox = TempDir::new()?;
-    let custom_path = sandbox.path().join("custom/my_key.agekey");
+    let custom_path = sandbox.path().join("custom/my_key.cagekey");
 
     let output = Command::new(&cage_bin)
         .arg("keygen")
@@ -203,7 +203,7 @@ fn test_keygen_overwrite_protection() -> Result<(), Box<dyn std::error::Error>> 
     }
 
     let sandbox = TempDir::new()?;
-    let output_path = sandbox.path().join("test.agekey");
+    let output_path = sandbox.path().join("test.cagekey");
 
     // Create existing file
     fs::write(&output_path, "existing content")?;
@@ -297,7 +297,7 @@ fn test_keygen_recipients_only() -> Result<(), Box<dyn std::error::Error>> {
     let sandbox = TempDir::new()?;
     let home_dir = sandbox.path().join("home");
     fs::create_dir_all(&home_dir)?;
-    let identity_path = sandbox.path().join("test.agekey");
+    let identity_path = sandbox.path().join("test.cagekey");
 
     // First generate an identity
     let output = Command::new(&cage_bin)

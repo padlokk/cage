@@ -9,7 +9,7 @@ _Last updated: 2025-10-01_
 
 ## 2. MVP Requirements
 1. **Primary Surface**: `cage keygen` command wrapping `age-keygen`.
-2. **Output Handling**: Default path `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.agekey` with `chmod 0o600` (or Windows equivalent) applied after write.
+2. **Output Handling**: Default path `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.cagekey` with `chmod 0o600` (or Windows equivalent) applied after write.
 3. **Structured Result**: Emit JSON summary (`path`, `public_recipient`, `fingerprint_md5`, `fingerprint_sha256`, `created_at`, `registered_groups`) to stdout and mirror in audit logs.
 4. **Safety Controls**: Refuse overwrite unless `--force`; human-readable error when destination exists.
 5. **Registration Hook**: Optional `--register <group>` flag appends the derived recipient to configured recipient groups via `AgeConfig` helpers.
@@ -37,7 +37,7 @@ _Last updated: 2025-10-01_
 | `--recipients-only` | `-y` | Convert existing identity to recipients. | Accept `--input`/stdin, skip `--register`, skip JSON secret output. |
 | `--input <path>` | *(none upstream)* | Optional helper for specifying identity path in `--recipients-only` mode. | Falls back to stdin if omitted. |
 | `--stdout-only` | *(new)* | Print identity/recipients without writing files. | Mutually exclusive with `--register` and `--output`; still emits JSON summary. |
-| `--export` | *(new)* | Generate keypair to current directory without registry entry. | Write `<timestamp>.agekey` to PWD, skip config store, skip `--register`, useful for testing/one-off needs. |
+| `--export` | *(new)* | Generate keypair to current directory without registry entry. | Write `<timestamp>.cagekey` to PWD, skip config store, skip `--register`, useful for testing/one-off needs. |
 | `--json` | *(default)* | Emit structured JSON (default on). | `--no-json` disables JSON output for scripting compatibility. |
 | `--proxy` | *(new)* | Force passthrough to raw `age-keygen`. | Equivalent to setting `CAGE_KEYGEN_PROXY=age`; bypass Cage wrapping logic. |
 

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Compute the default identity path for a newly generated key.
-/// Uses XDG_CONFIG_HOME/cage/identities/<timestamp>.agekey pattern.
+/// Uses XDG_CONFIG_HOME/cage/identities/<timestamp>.cagekey pattern.
 pub(crate) fn default_identity_path() -> Result<PathBuf, KeygenError> {
     let base = if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
         PathBuf::from(xdg)
@@ -27,7 +27,7 @@ pub(crate) fn default_identity_path() -> Result<PathBuf, KeygenError> {
         .map(|d| d.as_secs())
         .unwrap_or_default();
 
-    Ok(identities_dir.join(format!("{}.agekey", timestamp)))
+    Ok(identities_dir.join(format!("{}.cagekey", timestamp)))
 }
 
 /// Generate export identity path (current directory with timestamp).
@@ -39,7 +39,7 @@ pub(crate) fn export_identity_path() -> Result<PathBuf, KeygenError> {
 
     Ok(env::current_dir()
         .map_err(|e| KeygenError::Io(format!("cannot determine current directory: {}", e)))?
-        .join(format!("{}.agekey", timestamp)))
+        .join(format!("{}.cagekey", timestamp)))
 }
 
 /// Compute MD5 fingerprint of a public key in SSH-style format.
@@ -106,7 +106,7 @@ mod tests {
         let path = default_identity_path().expect("should compute default path");
         assert_eq!(
             path.extension().map(|ext| ext.to_string_lossy()),
-            Some("agekey".into())
+            Some("cagekey".into())
         );
         assert!(path.to_string_lossy().contains("identities"));
     }
@@ -116,7 +116,7 @@ mod tests {
         let path = export_identity_path().expect("should compute export path");
         assert_eq!(
             path.extension().map(|ext| ext.to_string_lossy()),
-            Some("agekey".into())
+            Some("cagekey".into())
         );
         // Should not contain 'identities' directory
         assert!(!path.to_string_lossy().contains("identities"));

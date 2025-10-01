@@ -47,7 +47,7 @@ From KEYGEN_STRATEGY.md, the keygen module implements:
 Configures key generation parameters:
 ```rust
 pub struct KeygenRequest {
-    pub output_path: Option<PathBuf>,        // Default: ${XDG_CONFIG_HOME}/cage/identities/<timestamp>.agekey
+    pub output_path: Option<PathBuf>,        // Default: ${XDG_CONFIG_HOME}/cage/identities/<timestamp>.cagekey
     pub register_groups: Vec<String>,        // Recipient groups to register with
     pub recipients_only: bool,               // -y mode: emit public key only
     pub input_identity: Option<PathBuf>,     // For recipients_only mode
@@ -59,7 +59,7 @@ pub struct KeygenRequest {
 ```
 
 **From KEYGEN_STRATEGY.md §2 (MVP Requirements):**
-- Default output: `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.agekey`
+- Default output: `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.cagekey`
 - Permissions: `chmod 0o600` (Unix) / Windows equivalent after write
 - Overwrite protection: Refuse unless `--force` provided
 - JSON summary: `{path, public_recipient, fingerprint_md5, fingerprint_sha256, created_at, registered_groups}`

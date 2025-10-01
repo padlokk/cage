@@ -69,7 +69,7 @@ mod tests {
         assert!(default_path.is_ok());
         if let Ok(path) = default_path {
             assert!(path.to_string_lossy().contains("identities"));
-            assert_eq!(path.extension().and_then(|s| s.to_str()), Some("agekey"));
+            assert_eq!(path.extension().and_then(|s| s.to_str()), Some("cagekey"));
         }
 
         // Test export path generation
@@ -77,7 +77,7 @@ mod tests {
         assert!(export_path.is_ok());
         if let Ok(path) = export_path {
             assert!(!path.to_string_lossy().contains("identities"));
-            assert_eq!(path.extension().and_then(|s| s.to_str()), Some("agekey"));
+            assert_eq!(path.extension().and_then(|s| s.to_str()), Some("cagekey"));
         }
     }
 

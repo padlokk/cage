@@ -136,7 +136,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 ### CAGE-21: CLI Keypair Generation Workflow [3 pts] ✅
 **Reference:** `docs/ref/cage/KEYGEN_STRATEGY.md` (§2–§3)
 - [x] Implement `cage keygen` that wraps `age-keygen` with opinionated defaults:
-  - Default output: `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.agekey` (resolve via existing config helpers) with `chmod 0o600` (or Windows equivalent) applied after write.
+  - Default output: `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.cagekey` (resolve via existing config helpers) with `chmod 0o600` (or Windows equivalent) applied after write.
   - Capture public key via `age-keygen -y` and emit structured JSON (`path`, `public_recipient`, `fingerprint_md5`, `fingerprint_sha256`, `created_at`) to stdout; mirror details in audit logs.
 - [x] CLI UX rules: refuse to overwrite existing files unless `--force` (short `-f`) is provided; require explicit `--output` for non-default locations; display a summarized next-step hint for adding the recipient to a group.
 - [x] Export mode: implement `--export` flag to generate keypair in current directory without registry entry (useful for testing/one-off needs); skip config store and `--register` when `--export` is used.
