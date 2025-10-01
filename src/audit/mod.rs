@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn test_operation_complete_json() {
-        use crate::cage::forge::OperationResult;
+        use crate::forge::OperationResult;
         use std::fs;
 
         let temp_file = NamedTempFile::new().unwrap();

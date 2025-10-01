@@ -13,7 +13,7 @@ use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
-use crate::cage::error::{AgeError, AgeResult};
+use crate::error::{AgeError, AgeResult};
 
 use rsb::progress::{ProgressManager, ProgressStyle, TerminalConfig, TerminalReporter};
 

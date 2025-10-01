@@ -34,18 +34,38 @@
 //! # }
 //! ```
 
-pub mod cage;
+// Core cage modules - flattened from src/cage/ to src/
+pub mod adp; // Adapter implementations (v1, v2, pipe streaming)
+pub mod audit; // Audit logging and security validation
+pub mod buff; // Chunking and buffer management
+pub mod core; // Core primitives (config, requests, engine, recovery)
+pub mod error;
+pub mod forge; // Repository operations
+pub mod keygen; // Key generation service module
+pub mod mgr; // CageManager lifecycle coordination
+pub mod passphrase; // Secure passphrase management
+pub mod pty; // PTY automation (wrap, tty methods)
+
+// Supporting modules
 pub mod deps;
 pub mod lang;
 pub mod prelude;
 
 // Re-export core types for convenience
-pub use cage::{
-    AdapterFactory, AgeAdapter, AgeAutomator, AgeConfig, AgeError, AgeResult, AuditLogger,
-    CageManager, FileEncryption, LockOptions, Operation, OperationResult, OutputFormat,
-    PassphraseManager, PassphraseMode, RepositoryOperations, RepositoryStatus, SecurityValidator,
-    TtyMethod, UnlockOptions, VerificationResult,
+pub use adp::{AdapterFactory, AgeAdapter};
+pub use audit::{AuditLogger, SecurityValidator};
+pub use buff::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker};
+pub use core::{
+    AgeAutomator, AgeConfig, InPlaceOperation, InPlaceOptions, OutputFormat, RecoveryManager,
+    SafetyValidator, TtyMethod,
 };
+pub use error::{AgeError, AgeResult};
+pub use forge::{
+    FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus,
+};
+pub use keygen::{KeygenError, KeygenRequest, KeygenService, KeygenSummary};
+pub use mgr::{CageManager, LockOptions, UnlockOptions, VerificationResult};
+pub use passphrase::{PassphraseManager, PassphraseMode};
 
 /// Library version - synchronized with Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

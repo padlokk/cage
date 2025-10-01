@@ -8,10 +8,10 @@
 
 use super::file_operations::FileOperationsManager;
 use super::{FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus};
-use crate::cage::adp::v1::AgeAdapter;
-use crate::cage::core::OutputFormat;
-use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::audit::{AuditLogger, SecurityValidator};
+use crate::adp::v1::AgeAdapter;
+use crate::core::OutputFormat;
+use crate::error::{AgeError, AgeResult};
+use crate::audit::{AuditLogger, SecurityValidator};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;

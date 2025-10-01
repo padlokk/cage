@@ -5,12 +5,12 @@
 //!
 //! Security Guardian: Edgar - Production Age automation coordination
 
-use crate::cage::adp::v1::{AdapterFactory, AgeAdapter};
-use crate::cage::core::{AgeConfig, OutputFormat};
-use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::audit::AuditLogger;
+use crate::adp::v1::{AdapterFactory, AgeAdapter};
+use crate::core::{AgeConfig, OutputFormat};
+use crate::error::{AgeError, AgeResult};
+use crate::audit::AuditLogger;
 #[allow(unused_imports)]
-use crate::cage::pty::TtyAutomator;
+use crate::pty::TtyAutomator;
 use std::path::Path;
 
 /// Main Age automation engine coordinating all components
@@ -176,7 +176,7 @@ impl AgeAutomator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cage::adp::v1::AdapterFactory;
+    use crate::adp::v1::AdapterFactory;
 
     #[test]
     fn test_automator_creation() {

@@ -10,7 +10,7 @@
 //! - Layer 4: DANGER_MODE=1 environment variable
 //! - Layer 5: --i-am-sure automation override
 
-use crate::cage::error::{AgeError, AgeResult};
+use crate::error::{AgeError, AgeResult};
 use crate::lang::fmt_warning;
 use chrono::Utc;
 use std::io::{self, Write};

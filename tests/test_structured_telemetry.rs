@@ -1,6 +1,6 @@
 //! Tests for structured audit and telemetry (OBS-01)
 
-use cage::cage::{
+use cage::{
     audit::AuditLogger,
     core::{AgeConfig, TelemetryFormat},
 };

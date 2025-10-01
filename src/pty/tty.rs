@@ -6,8 +6,8 @@
 //!
 //! Security Guardian: Edgar - Production implementation of proven automation patterns
 
-use crate::cage::core::{OutputFormat, TtyMethod};
-use crate::cage::error::{AgeError, AgeResult};
+use crate::core::{OutputFormat, TtyMethod};
+use crate::error::{AgeError, AgeResult};
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};

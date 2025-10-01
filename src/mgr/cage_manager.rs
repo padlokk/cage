@@ -12,19 +12,19 @@ use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
 
-use crate::cage::adp::v1::AgeAdapter;
-use crate::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
-use crate::cage::core::{AgeConfig, OutputFormat, RetentionPolicyConfig};
-use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::forge::{OperationResult, RepositoryStatus};
-use crate::cage::core::{
+use crate::adp::v1::AgeAdapter;
+use crate::adp::v2::{AgeAdapterV2, ShellAdapterV2};
+use crate::core::{AgeConfig, OutputFormat, RetentionPolicyConfig};
+use crate::error::{AgeError, AgeResult};
+use crate::forge::{OperationResult, RepositoryStatus};
+use crate::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamOperation, StreamRequest, UnlockRequest, VerifyRequest,
 };
-use crate::cage::audit::AuditLogger;
+use crate::audit::AuditLogger;
 use crate::lang::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
-use crate::cage::pty::TtyAutomator;
+use crate::pty::TtyAutomator;
 use globset::{Glob, GlobMatcher};
 use rsb::visual::glyphs::glyph_enable;
 use tempfile::NamedTempFile;
@@ -867,7 +867,7 @@ impl CageManager {
 
     /// Create CageManager with default configuration
     pub fn with_defaults() -> AgeResult<Self> {
-        let adapter = crate::cage::adp::v1::AdapterFactory::create_default()?;
+        let adapter = crate::adp::v1::AdapterFactory::create_default()?;
         let config = AgeConfig::load_default()?;
         Self::new(adapter, config)
     }
@@ -1028,7 +1028,7 @@ impl CageManager {
         input: &mut (dyn Read + Send),
         output: &mut (dyn Write + Send),
     ) -> AgeResult<u64> {
-        use crate::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
+        use crate::adp::v2::{AgeAdapterV2, ShellAdapterV2};
 
         let adapter = ShellAdapterV2::with_config(self.config.clone())?;
 
@@ -1070,7 +1070,7 @@ impl CageManager {
                 });
             }
 
-            use crate::cage::adp::v2::ShellAdapterV2;
+            use crate::adp::v2::ShellAdapterV2;
             let adapter = ShellAdapterV2::with_config(self.config.clone())?;
 
             let mut still_verified = Vec::new();
@@ -1607,10 +1607,10 @@ impl CageManager {
         &mut self,
         path: &Path,
         identity: &Identity,
-        multi_config: &crate::cage::core::MultiRecipientConfig,
+        multi_config: &crate::core::MultiRecipientConfig,
         options: LockOptions,
     ) -> AgeResult<OperationResult> {
-        use crate::cage::core::Recipient;
+        use crate::core::Recipient;
 
         let start_time = Instant::now();
         self.audit_logger
@@ -1894,7 +1894,7 @@ impl CageManager {
     pub fn create_recipient_group(
         &mut self,
         group_name: &str,
-        tier: Option<crate::cage::core::AuthorityTier>,
+        tier: Option<crate::core::AuthorityTier>,
     ) -> AgeResult<()> {
         self.audit_logger.log_info(&format!(
             "Creating recipient group '{}'{}",
@@ -1903,7 +1903,7 @@ impl CageManager {
                 .unwrap_or_default()
         ))?;
 
-        let mut group = crate::cage::core::RecipientGroup::new(group_name.to_string());
+        let mut group = crate::core::RecipientGroup::new(group_name.to_string());
         if let Some(t) = tier {
             group.tier = Some(t);
         }
@@ -1953,7 +1953,7 @@ impl CageManager {
     }
 
     /// Get recipient groups by authority tier (for Ignite integration)
-    pub fn get_groups_by_tier(&self, tier: crate::cage::core::AuthorityTier) -> Vec<String> {
+    pub fn get_groups_by_tier(&self, tier: crate::core::AuthorityTier) -> Vec<String> {
         let groups = self.config.get_groups_by_tier(tier);
         groups.iter().map(|g| g.name.clone()).collect()
     }
@@ -1975,7 +1975,7 @@ impl CageManager {
         );
 
         // Add tier-specific counts
-        use crate::cage::core::AuthorityTier;
+        use crate::core::AuthorityTier;
         for tier in [
             AuthorityTier::Skull,
             AuthorityTier::Master,
@@ -2962,7 +2962,7 @@ impl CageManager {
 
     fn deep_verify_file(
         &self,
-        adapter: &crate::cage::adp::v2::ShellAdapterV2,
+        adapter: &crate::adp::v2::ShellAdapterV2,
         file: &Path,
         identity: &Identity,
     ) -> AgeResult<()> {
@@ -3057,7 +3057,7 @@ impl CageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cage::core::OutputFormat;
+    use crate::core::OutputFormat;
     use tempfile::TempDir;
 
     #[test]

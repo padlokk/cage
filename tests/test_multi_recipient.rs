@@ -1,6 +1,6 @@
 //! Tests for multi-recipient lifecycle management (CAGE-16)
 
-use cage::cage::{
+use cage::{
     core::{AgeConfig, AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup},
     mgr::cage_manager::CageManager,
 };

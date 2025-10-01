@@ -2,7 +2,7 @@
 //!
 //! Tests both SSH recipient (public key) and SSH identity (private key) functionality
 
-use cage::cage::{
+use cage::{
     adp::v2::{AgeAdapterV2, ShellAdapterV2},
     core::{AgeConfig, Identity, OutputFormat, Recipient},
 };

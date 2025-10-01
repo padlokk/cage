@@ -3,10 +3,10 @@
 //! Test the new request API (CAGE-11)
 //! Demonstrates that the unified request structs are properly wired into CageManager
 
-use cage::cage::adp::v1::ShellAdapter;
-use cage::cage::core::{AgeConfig, OutputFormat};
-use cage::cage::mgr::cage_manager::CageManager;
-use cage::cage::core::{
+use cage::adp::v1::ShellAdapter;
+use cage::core::{AgeConfig, OutputFormat};
+use cage::mgr::cage_manager::CageManager;
+use cage::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamRequest, UnlockRequest,
 };

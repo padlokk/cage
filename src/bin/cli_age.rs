@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 // Import cage library modules
-use cage::cage::core::{
+use cage::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamRequest, UnlockRequest,
 };
@@ -1083,7 +1083,7 @@ fn execute_in_place_lock_operation(
     i_am_sure: bool,
     show_progress: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use cage::cage::{InPlaceOperation, SafetyValidator};
+    use cage::{InPlaceOperation, SafetyValidator};
 
     if verbose {
         echo!("🔐 Executing in-place lock operation with safety checks...");
@@ -1583,7 +1583,7 @@ fn cmd_proxy(args: Args) -> i32 {
 }
 
 fn execute_proxy_command(args: Args) -> cage::AgeResult<()> {
-    use cage::cage::pty::PtyAgeAutomator;
+    use cage::pty::PtyAgeAutomator;
 
     echo!("🔗 Cage Age Proxy - PTY automation for direct Age commands");
 
@@ -1780,7 +1780,7 @@ fn cmd_version(_args: Args) -> i32 {
 
 /// Config command - show or inspect configuration
 fn cmd_config(args: Args) -> i32 {
-    use cage::cage::core::AgeConfig;
+    use cage::core::AgeConfig;
 
     let subcommand = args.get_or(1, "show");
 
@@ -2144,7 +2144,7 @@ fn stream_decrypt(_args: Args) -> i32 {
 
 /// Adapter command - inspect adapter capabilities and health
 fn cmd_adapter(args: Args) -> i32 {
-    use cage::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
+    use cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
 
     let subcommand = args.get_or(1, "info");
 

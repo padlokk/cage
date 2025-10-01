@@ -19,9 +19,9 @@
 
 use std::io::{Read, Write};
 
-use crate::cage::adp::v2::ShellAdapterV2;
-use crate::cage::core::OutputFormat;
-use crate::cage::error::{AgeError, AgeResult};
+use crate::adp::v2::ShellAdapterV2;
+use crate::core::OutputFormat;
+use crate::error::{AgeError, AgeResult};
 
 impl ShellAdapterV2 {
     /// Encrypt stream using pipes with passphrase (CAGE-12b)

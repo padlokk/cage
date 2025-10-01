@@ -3,10 +3,10 @@
 //! This module extends the adapter pattern to support both file and streaming operations,
 //! providing a unified trait for all encryption backends with enhanced capabilities.
 
-use crate::cage::core::OutputFormat;
-use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::pty::PtyAgeAutomator;
-use crate::cage::core::{Identity, Recipient};
+use crate::core::OutputFormat;
+use crate::error::{AgeError, AgeResult};
+use crate::pty::PtyAgeAutomator;
+use crate::core::{Identity, Recipient};
 use crate::lang;
 use std::env;
 use std::fs::File;
@@ -346,7 +346,7 @@ impl super::v1::AgeAdapter for AdapterV1Compat {
 
 #[derive(Clone)]
 pub struct ShellAdapterV2 {
-    config: Option<crate::cage::core::AgeConfig>,
+    config: Option<crate::core::AgeConfig>,
 }
 
 impl Default for ShellAdapterV2 {
@@ -372,7 +372,7 @@ impl ShellAdapterV2 {
         Ok(Self { config: None })
     }
 
-    pub fn with_config(config: crate::cage::core::AgeConfig) -> AgeResult<Self> {
+    pub fn with_config(config: crate::core::AgeConfig) -> AgeResult<Self> {
         let automator = if let Ok(automator) = PtyAgeAutomator::with_config(&config) {
             automator
         } else {
@@ -817,7 +817,7 @@ impl AgeAdapterV2 for ShellAdapterV2 {
         };
 
         // Check config for default strategy
-        let default_strategy = if let Ok(config) = crate::cage::core::AgeConfig::load_default() {
+        let default_strategy = if let Ok(config) = crate::core::AgeConfig::load_default() {
             if let Some(strategy) = config.streaming_strategy {
                 match strategy.as_str() {
                     "pipe" => StreamingStrategyKind::Pipe,
@@ -861,7 +861,7 @@ impl AgeAdapterV2 for ShellAdapterV2 {
     }
 
     fn adapter_version(&self) -> String {
-        format!("shell-v2-{}", crate::cage::VERSION)
+        format!("shell-v2-{}", crate::VERSION)
     }
 
     fn clone_box(&self) -> Box<dyn AgeAdapterV2> {

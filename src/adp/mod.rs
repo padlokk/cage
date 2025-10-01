@@ -12,7 +12,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use cage::cage::adp::{AdapterFactory, AgeAdapter};
+//! use cage::adp::{AdapterFactory, AgeAdapter};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let adapter = AdapterFactory::create_default()?;

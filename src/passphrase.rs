@@ -6,7 +6,7 @@
 //! - Environment variable fallback
 //! - Command line argument detection and warnings
 
-use crate::cage::error::{AgeError, AgeResult};
+use crate::error::{AgeError, AgeResult};
 use crate::lang::{fmt_info, fmt_warning};
 use rpassword::read_password;
 use rsb::visual::glyphs::glyph;

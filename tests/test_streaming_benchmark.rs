@@ -11,9 +11,9 @@ use std::path::Path;
 use std::time::Instant;
 use tempfile::TempDir;
 
-use cage::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
-use cage::cage::core::OutputFormat;
-use cage::cage::core::{Identity, Recipient};
+use cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
+use cage::core::OutputFormat;
+use cage::core::{Identity, Recipient};
 
 /// Generate a test file of specified size with repeating pattern
 fn create_test_file(path: &Path, size_mb: usize) -> io::Result<()> {

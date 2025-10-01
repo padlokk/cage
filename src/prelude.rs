@@ -19,7 +19,7 @@
 //! - **Progress**: `ProgressManager`, `ProgressReporter` - Progress tracking
 
 // Core types from the cage module
-pub use crate::cage::{
+pub use crate::{
     adp::v2::{AgeAdapterV2, ShellAdapterV2},
 
     // Request API (CAGE-11)

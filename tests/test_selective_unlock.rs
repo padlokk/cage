@@ -4,9 +4,9 @@
 //! Note: These tests require the Age binary to be installed and available in PATH.
 //! Tests will be skipped if Age is not found.
 
-use cage::cage::adp::v1::ShellAdapter;
-use cage::cage::core::{AgeConfig, OutputFormat};
-use cage::cage::mgr::cage_manager::{CageManager, LockOptions, UnlockOptions};
+use cage::adp::v1::ShellAdapter;
+use cage::core::{AgeConfig, OutputFormat};
+use cage::mgr::cage_manager::{CageManager, LockOptions, UnlockOptions};
 use std::fs;
 use tempfile::TempDir;
 
