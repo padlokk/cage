@@ -7,7 +7,7 @@
 //! Security Guardian: Edgar - Adapter pattern for clean backend abstraction
 
 use super::v2::{AdapterV1Compat, ShellAdapterV2};
-use crate::cage::config::OutputFormat;
+use crate::cage::core::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use std::path::Path;
 

@@ -23,7 +23,7 @@ pub use crate::cage::{
     adp::v2::{AgeAdapterV2, ShellAdapterV2},
 
     // Request API (CAGE-11)
-    requests::{LockRequest, RotateRequest, UnlockRequest},
+    core::{LockRequest, RotateRequest, UnlockRequest},
 
     AdapterFactory,
     // Adapters

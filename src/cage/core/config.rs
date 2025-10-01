@@ -5,7 +5,7 @@
 //!
 //! Security Guardian: Edgar - Production-ready configuration management
 
-use super::error::{AgeError, AgeResult};
+use crate::cage::error::{AgeError, AgeResult};
 use serde::Deserialize;
 use std::env;
 use std::fs;
@@ -224,7 +224,7 @@ pub struct AgeConfig {
     pub telemetry_format: TelemetryFormat,
 
     /// Default recipient groups keyed by name
-    pub recipient_groups: std::collections::HashMap<String, crate::cage::requests::RecipientGroup>,
+    pub recipient_groups: std::collections::HashMap<String, crate::cage::core::RecipientGroup>,
 
     /// Support .padlock file extension for Padlock integration
     pub padlock_extension_support: bool,
@@ -509,7 +509,7 @@ impl AgeConfig {
     }
 
     /// Add a recipient group to configuration
-    pub fn add_recipient_group(&mut self, group: crate::cage::requests::RecipientGroup) {
+    pub fn add_recipient_group(&mut self, group: crate::cage::core::RecipientGroup) {
         self.recipient_groups.insert(group.name.clone(), group);
     }
 
@@ -517,7 +517,7 @@ impl AgeConfig {
     pub fn get_recipient_group(
         &self,
         name: &str,
-    ) -> Option<&crate::cage::requests::RecipientGroup> {
+    ) -> Option<&crate::cage::core::RecipientGroup> {
         self.recipient_groups.get(name)
     }
 
@@ -525,7 +525,7 @@ impl AgeConfig {
     pub fn get_recipient_group_mut(
         &mut self,
         name: &str,
-    ) -> Option<&mut crate::cage::requests::RecipientGroup> {
+    ) -> Option<&mut crate::cage::core::RecipientGroup> {
         self.recipient_groups.get_mut(name)
     }
 
@@ -533,7 +533,7 @@ impl AgeConfig {
     pub fn remove_recipient_group(
         &mut self,
         name: &str,
-    ) -> Option<crate::cage::requests::RecipientGroup> {
+    ) -> Option<crate::cage::core::RecipientGroup> {
         self.recipient_groups.remove(name)
     }
 
@@ -582,8 +582,8 @@ impl AgeConfig {
     /// Get recipient groups by authority tier
     pub fn get_groups_by_tier(
         &self,
-        tier: crate::cage::requests::AuthorityTier,
-    ) -> Vec<&crate::cage::requests::RecipientGroup> {
+        tier: crate::cage::core::AuthorityTier,
+    ) -> Vec<&crate::cage::core::RecipientGroup> {
         self.recipient_groups
             .values()
             .filter(|group| group.tier == Some(tier))

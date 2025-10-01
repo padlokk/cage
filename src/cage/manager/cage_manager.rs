@@ -14,10 +14,10 @@ use std::time::{Duration, Instant};
 
 use crate::cage::adp::v1::AgeAdapter;
 use crate::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
-use crate::cage::config::{AgeConfig, OutputFormat, RetentionPolicyConfig};
+use crate::cage::core::{AgeConfig, OutputFormat, RetentionPolicyConfig};
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::operations::{OperationResult, RepositoryStatus};
-use crate::cage::requests::{
+use crate::cage::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamOperation, StreamRequest, UnlockRequest, VerifyRequest,
 };
@@ -1607,10 +1607,10 @@ impl CageManager {
         &mut self,
         path: &Path,
         identity: &Identity,
-        multi_config: &crate::cage::requests::MultiRecipientConfig,
+        multi_config: &crate::cage::core::MultiRecipientConfig,
         options: LockOptions,
     ) -> AgeResult<OperationResult> {
-        use crate::cage::requests::Recipient;
+        use crate::cage::core::Recipient;
 
         let start_time = Instant::now();
         self.audit_logger
@@ -1894,7 +1894,7 @@ impl CageManager {
     pub fn create_recipient_group(
         &mut self,
         group_name: &str,
-        tier: Option<crate::cage::requests::AuthorityTier>,
+        tier: Option<crate::cage::core::AuthorityTier>,
     ) -> AgeResult<()> {
         self.audit_logger.log_info(&format!(
             "Creating recipient group '{}'{}",
@@ -1903,7 +1903,7 @@ impl CageManager {
                 .unwrap_or_default()
         ))?;
 
-        let mut group = crate::cage::requests::RecipientGroup::new(group_name.to_string());
+        let mut group = crate::cage::core::RecipientGroup::new(group_name.to_string());
         if let Some(t) = tier {
             group.tier = Some(t);
         }
@@ -1953,7 +1953,7 @@ impl CageManager {
     }
 
     /// Get recipient groups by authority tier (for Ignite integration)
-    pub fn get_groups_by_tier(&self, tier: crate::cage::requests::AuthorityTier) -> Vec<String> {
+    pub fn get_groups_by_tier(&self, tier: crate::cage::core::AuthorityTier) -> Vec<String> {
         let groups = self.config.get_groups_by_tier(tier);
         groups.iter().map(|g| g.name.clone()).collect()
     }
@@ -1975,7 +1975,7 @@ impl CageManager {
         );
 
         // Add tier-specific counts
-        use crate::cage::requests::AuthorityTier;
+        use crate::cage::core::AuthorityTier;
         for tier in [
             AuthorityTier::Skull,
             AuthorityTier::Master,
@@ -3057,7 +3057,7 @@ impl CageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cage::config::OutputFormat;
+    use crate::cage::core::OutputFormat;
     use tempfile::TempDir;
 
     #[test]

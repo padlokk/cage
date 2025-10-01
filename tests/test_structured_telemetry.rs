@@ -1,8 +1,8 @@
 //! Tests for structured audit and telemetry (OBS-01)
 
 use cage::cage::{
-    config::{AgeConfig, TelemetryFormat},
-    security::AuditLogger,
+    audit::AuditLogger,
+    core::{AgeConfig, TelemetryFormat},
 };
 use serde_json::Value;
 use std::fs;

@@ -11,7 +11,7 @@ use std::time::Duration;
 // Both import styles work per HOWTO_HUB:
 use hub::terminal_ext::portable_pty::*; // Grouped module (preferred for clarity)
                                         // Alternative: use hub::portable_pty::*;  // Top-level re-export
-use crate::cage::config::OutputFormat;
+use crate::cage::core::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use tempfile::TempDir;
 
@@ -25,11 +25,11 @@ pub struct PtyAgeAutomator {
 impl PtyAgeAutomator {
     /// Create new PTY Age automator
     pub fn new() -> AgeResult<Self> {
-        Self::with_config(&crate::cage::config::AgeConfig::load_default().unwrap_or_default())
+        Self::with_config(&crate::cage::core::AgeConfig::load_default().unwrap_or_default())
     }
 
     /// Create PTY automator with custom config
-    pub fn with_config(config: &crate::cage::config::AgeConfig) -> AgeResult<Self> {
+    pub fn with_config(config: &crate::cage::core::AgeConfig) -> AgeResult<Self> {
         let temp_dir = tempfile::tempdir().map_err(|e| AgeError::TemporaryResourceError {
             resource_type: "directory".to_string(),
             operation: "create".to_string(),

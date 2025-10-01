@@ -3,7 +3,7 @@
 //! This module provides typed request structs to unify CLI and library entry points,
 //! enabling a clean API for all encryption operations while maintaining backward compatibility.
 
-use crate::cage::config::{AgeConfig, OutputFormat};
+use crate::cage::core::{AgeConfig, OutputFormat};
 use md5;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

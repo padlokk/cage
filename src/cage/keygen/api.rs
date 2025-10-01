@@ -5,7 +5,7 @@
 //! CAGE-22 (adapter-native identities). See `docs/ref/cage/KEYGEN_STRATEGY.md`
 //! for the authoritative specification.
 
-use crate::cage::config::AgeConfig;
+use crate::cage::core::AgeConfig;
 use crate::cage::keygen::error::KeygenError;
 use std::path::PathBuf;
 

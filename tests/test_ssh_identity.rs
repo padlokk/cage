@@ -3,9 +3,8 @@
 //! Tests both SSH recipient (public key) and SSH identity (private key) functionality
 
 use cage::cage::{
-    adapter_v2::{AgeAdapterV2, ShellAdapterV2},
-    config::{AgeConfig, OutputFormat},
-    requests::{Identity, Recipient},
+    adp::v2::{AgeAdapterV2, ShellAdapterV2},
+    core::{AgeConfig, Identity, OutputFormat, Recipient},
 };
 use std::fs;
 use std::path::Path;

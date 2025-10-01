@@ -8,7 +8,7 @@
 pub mod file_operations;
 pub mod repository_operations;
 
-use super::config::OutputFormat;
+use super::core::OutputFormat;
 use super::error::AgeResult;
 use std::path::Path;
 

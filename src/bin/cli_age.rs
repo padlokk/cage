@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 // Import cage library modules
-use cage::cage::requests::{
+use cage::cage::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamRequest, UnlockRequest,
 };
@@ -1780,7 +1780,7 @@ fn cmd_version(_args: Args) -> i32 {
 
 /// Config command - show or inspect configuration
 fn cmd_config(args: Args) -> i32 {
-    use cage::cage::config::AgeConfig;
+    use cage::cage::core::AgeConfig;
 
     let subcommand = args.get_or(1, "show");
 

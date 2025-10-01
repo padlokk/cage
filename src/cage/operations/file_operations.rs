@@ -7,7 +7,7 @@
 
 use super::{FileEncryption, Operation, OperationResult};
 use crate::cage::adp::v1::AgeAdapter;
-use crate::cage::config::OutputFormat;
+use crate::cage::core::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::audit::{AuditLogger, SecurityValidator};
 use std::fs;

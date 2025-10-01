@@ -6,7 +6,7 @@
 //! Security Guardian: Edgar - Production Age automation coordination
 
 use crate::cage::adp::v1::{AdapterFactory, AgeAdapter};
-use crate::cage::config::{AgeConfig, OutputFormat};
+use crate::cage::core::{AgeConfig, OutputFormat};
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::audit::AuditLogger;
 #[allow(unused_imports)]

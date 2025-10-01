@@ -5,7 +5,7 @@
 //!
 //! Security Guardian: Edgar - Production security and audit framework
 
-use super::config::TelemetryFormat;
+use super::core::TelemetryFormat;
 use super::error::{AgeError, AgeResult};
 use super::operations::{OperationResult, RepositoryStatus};
 #[allow(unused_imports)]

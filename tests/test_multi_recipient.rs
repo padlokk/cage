@@ -1,9 +1,8 @@
 //! Tests for multi-recipient lifecycle management (CAGE-16)
 
 use cage::cage::{
-    config::AgeConfig,
+    core::{AgeConfig, AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup},
     manager::cage_manager::CageManager,
-    requests::{AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup},
 };
 use std::path::PathBuf;
 use tempfile::TempDir;
