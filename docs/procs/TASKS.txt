@@ -75,10 +75,16 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Followed terse naming convention
 - All tests continue passing
 
-### MOD4-06: Lang Module → src/lang.rs [2 pts] 🔴
-**Priority:** After MOD4-05
-**Next Steps:**
-1. Move `src/cage/strings.rs` → `src/lang.rs`
-2. Update all imports from `cage::strings` → `crate::lang`
-3. Update prelude re-exports
-4. Verify tests continue passing
+### MOD4-06: Lang Module → src/lang.rs [2 pts] ✅
+**Status:** COMPLETE
+**Commit:** 3cb371385a1dada7e23cadaa62efaefd7a4b2556
+**Details:**
+- Moved `src/cage/strings.rs` → `src/lang.rs`
+- Updated all imports from `cage::strings` → `crate::lang`
+- Updated prelude re-exports
+- Verified all tests continue passing
+- Completed final MOD4 phase
+
+**Next Project Phase:**
+- Prepare MOD4 migration documentation
+- Begin MOD5 module enhancement series
