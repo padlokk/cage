@@ -1846,6 +1846,7 @@ fn show_help() {
     println!("  rotate         Rotate encryption keys");
     println!("  verify         Verify file integrity");
     println!("  batch          Bulk operations");
+    println!("  keygen         Generate Age identity keypairs");
     println!("  proxy          Direct Age commands with PTY");
     println!("  config         Show/manage configuration");
     println!("  adapter        Inspect adapter capabilities");
@@ -1879,6 +1880,8 @@ fn show_help() {
     println!("  cage unlock secret.txt.cage --progress");
     println!("  cage lock document.pdf --in-place");
     println!("  cage status /encrypted-files --verbose");
+    println!("  cage keygen                              # Generate identity to default path");
+    println!("  cage keygen --export                     # Generate to current directory");
     println!("  cage proxy --age-p --age-a --age-o=output.age input.txt");
     println!();
     println!("For detailed help on a specific command, use:");
