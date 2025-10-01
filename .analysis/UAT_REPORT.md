@@ -1,17 +1,22 @@
 # UAT Report - MOD4 Module Consolidation Series
 
-**Date:** 2025-10-01
+**Date:** 2025-10-01 (Updated after post-MOD4 fixes)
 **Project:** Cage v0.5.0
 **Test Scope:** MOD4-01 through MOD4-06 Module Refactoring
-**Test Status:** ✅ PASSED
+**Test Status:** ✅ PASSED (after corrections)
 
 ---
 
 ## Executive Summary
 
-The MOD4 module consolidation series has been successfully completed and validated through comprehensive UAT. All 6 phases executed without regression, maintaining 100% test pass rate throughout the refactoring process.
+The MOD4 module consolidation series has been successfully completed and validated through comprehensive UAT. All 6 phases executed successfully. **Post-refactor issues were identified and resolved**, resulting in full test suite passing.
 
-**Overall Verdict:** ✅ **APPROVED FOR PRODUCTION**
+**Overall Verdict:** ✅ **APPROVED FOR PRODUCTION** (with fixes applied)
+
+### Post-MOD4 Issues Identified & Resolved:
+1. **Integration test compilation failure** (commit 2df3e99) - Fixed cage::strings imports
+2. **Documentation drift** (commit 94782a8) - Updated module path references
+3. **Test Results:** 153 total passed, 5 ignored (comprehensive validation)
 
 ---
 
@@ -19,19 +24,16 @@ The MOD4 module consolidation series has been successfully completed and validat
 
 ### Automated Test Results
 
-**Unit Tests:**
+**Full Test Suite (After Fixes):**
 ```
-Test Suite: cargo test --lib
-Result: 68 passed, 0 failed, 2 ignored
-Duration: 1.20s
+Test Suite: cargo test (all tests)
+Result: 153 passed, 0 failed, 5 ignored
+Duration: ~11s
 Status: ✅ PASS
-```
-
-**Integration Tests:**
-```
-Test Suite: cargo test --test '*'
-Result: All integration tests passing
-Status: ✅ PASS
+Breakdown:
+- Unit tests: 68 passed, 2 ignored
+- Integration tests: 85 passed, 3 ignored
+- Doc tests: 3 passed
 ```
 
 **Build Verification:**
@@ -298,8 +300,22 @@ src/
 - **Resolution:** Standardized to `crate::cage::error` pattern
 - **Status:** ✅ RESOLVED
 
-**Total Issues:** 3
+### Issue 4: Integration Test Compilation Failure (Post-MOD4-06) **CRITICAL**
+- **Description:** Integration tests in `test_selective_unlock.rs` still referenced `cage::cage::strings::TEST_SKIP_NO_AGE` after lang module migration
+- **Impact:** `cargo test` failed to compile, breaking full test suite
+- **Resolution:** Updated 5 references from `cage::cage::strings` → `cage::lang` (commit 2df3e99)
+- **Status:** ✅ RESOLVED
+- **Validation:** Full test suite now passing (153 passed, 5 ignored)
+
+### Issue 5: Documentation Drift (Post-MOD4)
+- **Description:** Documentation files (PROCESS.txt, AGE_LIBRARY_MIGRATION.md, STREAMING_RESEARCH.md) still referenced old module paths
+- **Impact:** Users would be directed to non-existent files
+- **Resolution:** Updated 3 documentation files with new module structure (commit 94782a8)
+- **Status:** ✅ RESOLVED
+
+**Total Issues:** 5 (3 during refactor, 2 post-completion)
 **Resolution Rate:** 100%
+**Critical Issues:** 1 (test compilation failure)
 
 ---
 
