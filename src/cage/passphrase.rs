@@ -7,7 +7,7 @@
 //! - Command line argument detection and warnings
 
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::strings::{fmt_info, fmt_warning};
+use crate::lang::{fmt_info, fmt_warning};
 use rpassword::read_password;
 use rsb::visual::glyphs::glyph;
 use std::io::{self, Write};

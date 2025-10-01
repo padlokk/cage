@@ -11,7 +11,7 @@
 //! - Layer 5: --i-am-sure automation override
 
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::strings::fmt_warning;
+use crate::lang::fmt_warning;
 use chrono::Utc;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};

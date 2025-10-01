@@ -22,7 +22,7 @@ use crate::cage::core::{
     StreamOperation, StreamRequest, UnlockRequest, VerifyRequest,
 };
 use crate::cage::audit::AuditLogger;
-use crate::cage::strings::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
+use crate::lang::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
 use crate::cage::pty::TtyAutomator;
 use globset::{Glob, GlobMatcher};

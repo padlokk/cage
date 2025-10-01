@@ -7,7 +7,7 @@ use crate::cage::core::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::pty::PtyAgeAutomator;
 use crate::cage::core::{Identity, Recipient};
-use crate::cage::strings;
+use crate::lang;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -577,7 +577,7 @@ impl AgeAdapterV2 for ShellAdapterV2 {
                         if strategy == StreamingStrategy::Pipe {
                             return Err(err);
                         } else {
-                            eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+                            eprintln!("[cage] {} ({err})", lang::WARN_STREAM_PIPE_FALLBACK);
                         }
                     }
                 }
@@ -635,7 +635,7 @@ impl AgeAdapterV2 for ShellAdapterV2 {
                         if strategy == StreamingStrategy::Pipe {
                             return Err(err);
                         } else {
-                            eprintln!("[cage] {} ({err})", strings::WARN_STREAM_PIPE_FALLBACK);
+                            eprintln!("[cage] {} ({err})", lang::WARN_STREAM_PIPE_FALLBACK);
                         }
                     }
                 }

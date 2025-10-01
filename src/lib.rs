@@ -36,6 +36,7 @@
 
 pub mod cage;
 pub mod deps;
+pub mod lang;
 pub mod prelude;
 
 // Re-export core types for convenience
