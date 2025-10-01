@@ -305,9 +305,15 @@ From STREAMING_RESEARCH.md:
   - Detailed performance characteristics and safety considerations
   - Future roadmap aligned with TASKS.txt (CAGE-21)
 
-## References
-- `docs/ref/cage/CHUNKER_STRATEGY.md` — Core chunking strategy and rollout plan
-- `docs/ref/cage/STREAMING_RESEARCH.md` — Streaming performance analysis
+## Reference Documentation
+
+This feature specification is informed by the following design documents:
+
+- [`docs/ref/cage/CHUNKER_STRATEGY.md`](../ref/cage/CHUNKER_STRATEGY.md) — Core chunking strategy and rollout plan
+- [`docs/ref/cage/STREAMING_RESEARCH.md`](../ref/cage/STREAMING_RESEARCH.md) — Streaming performance analysis and benchmarks
+
+### Additional Resources
+
 - `docs/ref/chunker/generic_stream_chunker.rs` — Original research artifact
 - `docs/ref/chunker/streamsweep_whitepaper.md` — Theoretical framework
 

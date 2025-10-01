@@ -402,9 +402,15 @@ From SAFETY_DESIGN.md:
   - Integration points with core recovery infrastructure
   - Performance characteristics and security considerations
 
-## References
-- `docs/ref/cage/SAFETY_DESIGN.md` — Multi-layered safety architecture (TASK-006)
-- `docs/ref/cage/LIBRARY_USAGE.md` — Usage patterns and examples
+## Reference Documentation
+
+This feature specification is informed by the following design documents:
+
+- [`docs/ref/cage/SAFETY_DESIGN.md`](../ref/cage/SAFETY_DESIGN.md) — Multi-layered safety architecture (5-layer protection model)
+- [`docs/ref/cage/LIBRARY_USAGE.md`](../ref/cage/LIBRARY_USAGE.md) — Usage patterns and examples
+
+### Additional Resources
+
 - `src/core/recovery.rs` — In-place operation and safety validation
 - `docs/procs/TASKS.txt` — CAGE-04 (in-place safety implementation)
 

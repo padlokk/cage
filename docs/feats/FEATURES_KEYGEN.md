@@ -350,8 +350,14 @@ src/keygen/
   - Test coverage plan and module architecture (§3)
   - Task mapping to CAGE-21/CAGE-22
 
-## References
-- `docs/ref/cage/KEYGEN_STRATEGY.md` — Complete key generation strategy (CAGE-21/22)
+## Reference Documentation
+
+This feature specification is informed by the following design documents:
+
+- [`docs/ref/cage/KEYGEN_STRATEGY.md`](../ref/cage/KEYGEN_STRATEGY.md) — Complete key generation strategy (CAGE-21/22)
+
+### Additional Resources
+
 - `docs/procs/TASKS.txt` — CAGE-21 (CLI workflow), CAGE-22 (adapter hook)
 - Age Encryption Spec: https://age-encryption.org/
 - `src/core/requests.rs` — Request API patterns

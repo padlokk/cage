@@ -539,10 +539,16 @@ manager.reset(
   - Authority management and repository workflows
   - Performance characteristics and testing coverage
 
-## References
-- `docs/ref/cage/LIBRARY_USAGE.md` — Comprehensive usage examples and patterns
-- `docs/ref/cage/BACKUP_RETENTION_DESIGN.md` — Retention policy design (CAGE-03)
-- `docs/ref/cage/SAFETY_DESIGN.md` — Multi-layered safety architecture (TASK-006)
+## Reference Documentation
+
+This feature specification is informed by the following design documents:
+
+- [`docs/ref/cage/LIBRARY_USAGE.md`](../ref/cage/LIBRARY_USAGE.md) — Comprehensive usage examples and patterns
+- [`docs/ref/cage/BACKUP_RETENTION_DESIGN.md`](../ref/cage/BACKUP_RETENTION_DESIGN.md) — Retention policy design and lifecycle management
+- [`docs/ref/cage/SAFETY_DESIGN.md`](../ref/cage/SAFETY_DESIGN.md) — Multi-layered safety architecture (5-layer protection model)
+
+### Additional Resources
+
 - `docs/procs/TASKS.txt` — CAGE-03, CAGE-16, OBS-01 implementation notes
 
 ## API Surface
