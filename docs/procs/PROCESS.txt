@@ -150,8 +150,14 @@ CRITICAL CONTEXT:
 - 52 tests passing (38 unit + 2 CLI + 4 PTY + 7 integration + 1 doc)
 
 ================================================================================
- 🔧 COMMON WORKFLOWS
+🔧 COMMON WORKFLOWS
 ================================================================================
+
+INSTALL & BOOTSTRAP:
+───────────────
+./bin/deploy.sh                # Install cage binary to ~/.local/bin (use --prefix for system install)
+cage init                      # Hydrate XDG config/data/cache + seed cage.toml
+cage init --force              # Regenerate default config if edits need reset
 
 BUILD & TEST:
 ────────────

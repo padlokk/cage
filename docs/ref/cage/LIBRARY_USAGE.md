@@ -19,6 +19,8 @@ cage = { path = "path/to/cage" }
 # cage = "0.3.1"
 ```
 
+> CLI users can run `cage init` to seed the default XDG directories and `cage.toml`. Re-running the command is idempotent; pass `--force` (or `-f`) to overwrite an existing config. Library consumers (Ignite, Padlock, etc.) typically construct `AgeConfig`/`CageConfig` explicitly and pass it into `CrudManager::new(...)`, so configuration remains under the caller’s control regardless of the host environment.
+
 ### Basic Encryption Example (Request API)
 
 ```rust
@@ -54,7 +56,7 @@ The primary interface now accepts typed request structs that mirror CLI features
 
 ```rust
 use cage::cage::{CrudManager, OutputFormat};
-use cage::cage::requests::{LockRequest, UnlockRequest, Identity};
+use cage::cage::requests::{Identity, LockRequest, RotateRequest, UnlockRequest};
 
 let mut crud_manager = CrudManager::with_defaults()?;
 
@@ -76,6 +78,38 @@ let unlock_request = UnlockRequest::new(
 .preserve_encrypted(true);
 
 let unlock_result = crud_manager.unlock_with_request(&unlock_request)?;
+
+let mut rotate_request = RotateRequest::new(
+    std::path::PathBuf::from("docs/"),
+    Identity::Passphrase("secret123".to_string()),
+    Identity::Passphrase("new-secret-456".to_string()),
+);
+rotate_request.recursive = true;
+
+let rotate_result = crud_manager.rotate_with_request(&rotate_request)?;
+```
+
+### 2. Status & Batch Helpers
+
+```rust
+use cage::cage::requests::{BatchOperation, BatchRequest, Identity, StatusRequest};
+
+// Directory status
+let mut status_request = StatusRequest::new(std::path::PathBuf::from("logs"));
+status_request.recursive = true;
+let status = crud_manager.status_with_request(&status_request)?;
+println!("Encrypted: {} of {}", status.encrypted_files, status.total_files);
+
+// Batch encryption
+let mut batch_lock = BatchRequest::new(
+    std::path::PathBuf::from("logs"),
+    BatchOperation::Lock,
+    Identity::Passphrase("batch-pass".into()),
+)
+.with_pattern("*.txt".to_string());
+batch_lock.common.force = true;
+let batch_result = crud_manager.batch_with_request(&batch_lock)?;
+println!("Processed {} files", batch_result.processed_files.len());
 ```
 
 #### Legacy API (Still Available)
@@ -98,7 +132,7 @@ let legacy_options = LockOptions {
 let result = crud_manager.lock(&std::path::Path::new("legacy.txt"), "pass", legacy_options)?;
 ```
 
-### 2. Streaming Encryption/Decryption
+### 3. Streaming Encryption/Decryption
 
 `ShellAdapterV2` now supports both staged (temp-file) and pipe-based streaming. The adapter selects a strategy at runtime using `CAGE_STREAMING_STRATEGY`, the CLI `--streaming-strategy` flag, or the `[streaming]` section in `cage.toml`.
 
@@ -174,6 +208,33 @@ println!("Recovered: {}", String::from_utf8_lossy(&recovered));
 strategy = "pipe"` in `~/.config/cage/config.toml` (or the path referenced by `CAGE_CONFIG`) to make pipe streaming the default.
 
 > **Requirements:** Streaming helpers expect the `age` binary to be installed and visible on `PATH`. Test suites skip automatically when the binary is absent.
+
+#### High-Level Streaming (CrudManager)
+
+```rust
+use cage::cage::CrudManager;
+use cage::cage::requests::{Identity, StreamRequest};
+use std::io::Cursor;
+
+let mut crud_manager = CrudManager::with_defaults()?;
+
+let mut plaintext = Cursor::new(b"large payload".to_vec());
+let mut ciphertext = Cursor::new(Vec::new());
+
+let mut encrypt = StreamRequest::encrypt(Identity::Passphrase("stream-pass".into()));
+encrypt.buffer_size = 128 * 1024; // Optional tuning
+
+crud_manager.stream_with_request(&encrypt, &mut plaintext, &mut ciphertext)?;
+
+let encrypted = ciphertext.into_inner();
+let mut cipher_cursor = Cursor::new(encrypted);
+let mut recovered = Cursor::new(Vec::new());
+
+let decrypt = StreamRequest::decrypt(Identity::Passphrase("stream-pass".into()));
+crud_manager.stream_with_request(&decrypt, &mut cipher_cursor, &mut recovered)?;
+
+assert_eq!(recovered.into_inner(), b"large payload");
+```
 
 ### 2. Progress Framework
 

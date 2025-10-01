@@ -4,13 +4,20 @@
 //! Provides secure, automated encryption/decryption operations without manual TTY interaction.
 //! Now using RSB framework for enhanced CLI architecture.
 
+use std::env;
+use std::fs::{self, File};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 // Import cage library modules
 use cage::cage::progress::{ProgressManager, ProgressStyle, TerminalReporter};
-use cage::cage::requests::{Identity, LockRequest, Recipient, UnlockRequest};
+use cage::cage::requests::{
+    BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
+    StreamRequest, UnlockRequest,
+};
 use cage::{
-    CrudManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode, UnlockOptions,
+    AgeError, AgeResult, CrudManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode,
+    UnlockOptions,
 };
 
 // Import RSB utilities for enhanced CLI experience
@@ -80,6 +87,7 @@ fn main() {
         "proxy" => cmd_proxy,
         "version" => cmd_version,
         "config" => cmd_config,
+        "stream" => cmd_stream,
         "adapter" => cmd_adapter
     });
 }
@@ -159,12 +167,62 @@ fn apply_streaming_strategy_override() {
 
 /// Initialize cage configuration
 fn cmd_init(_args: Args) -> i32 {
-    echo!("🔧 Initializing Cage configuration...");
-    echo!("Setting up XDG-compliant directories and default configuration");
+    let force = is_true("opt_force") || is_true("opt_f");
 
-    // TODO: Implement configuration initialization
-    echo!("✅ Cage initialization completed");
-    0
+    echo!("🔧 Initializing Cage configuration...");
+    match perform_cage_init(force) {
+        Ok(report) => {
+            let config_created = report.created_paths.iter().any(|p| p == &report.config_dir);
+            let data_created = report.created_paths.iter().any(|p| p == &report.data_dir);
+            let cache_created = report.created_paths.iter().any(|p| p == &report.cache_dir);
+            let backups_created = report.created_paths.iter().any(|p| p == &report.backup_dir);
+
+            echo!(
+                "📁 Config dir: {}{}",
+                report.config_dir.display(),
+                if config_created { " (created)" } else { "" }
+            );
+            echo!(
+                "📦 Data dir: {}{}",
+                report.data_dir.display(),
+                if data_created { " (created)" } else { "" }
+            );
+            echo!(
+                "🗄️  Cache dir: {}{}",
+                report.cache_dir.display(),
+                if cache_created { " (created)" } else { "" }
+            );
+            echo!(
+                "🛟 Backup dir: {}{}",
+                report.backup_dir.display(),
+                if backups_created { " (created)" } else { "" }
+            );
+
+            if report.config_overwritten {
+                echo!(
+                    "✍️  Wrote default config at {} (forced)",
+                    report.config_file.display()
+                );
+            } else if report.config_created {
+                echo!(
+                    "🆕 Created default config at {}",
+                    report.config_file.display()
+                );
+            } else {
+                echo!(
+                    "ℹ️  Existing config retained at {} (use --force to reset)",
+                    report.config_file.display()
+                );
+            }
+
+            echo!("✅ Cage initialization completed");
+            0
+        }
+        Err(err) => {
+            stderr!("❌ Cage initialization failed: {}", err);
+            1
+        }
+    }
 }
 
 /// Install system dependencies
@@ -175,6 +233,167 @@ fn cmd_install(_args: Args) -> i32 {
     // TODO: Implement dependency installation check
     echo!("✅ Dependency check completed");
     0
+}
+
+struct InitReport {
+    config_dir: PathBuf,
+    data_dir: PathBuf,
+    cache_dir: PathBuf,
+    backup_dir: PathBuf,
+    config_file: PathBuf,
+    created_paths: Vec<PathBuf>,
+    config_created: bool,
+    config_overwritten: bool,
+}
+
+fn perform_cage_init(force: bool) -> AgeResult<InitReport> {
+    let target = resolve_config_target()?;
+    let data_dir = resolve_xdg_home("XDG_DATA_HOME", ".local/share")?.join("cage");
+    let cache_dir = resolve_xdg_home("XDG_CACHE_HOME", ".cache")?.join("cage");
+    let backup_dir = data_dir.join("backups");
+
+    let mut created_paths = Vec::new();
+
+    // Ensure directories exist
+    for dir in [
+        target.config_dir.as_path(),
+        data_dir.as_path(),
+        cache_dir.as_path(),
+        backup_dir.as_path(),
+    ] {
+        if !dir.exists() {
+            fs::create_dir_all(dir).map_err(|e| AgeError::FileError {
+                operation: "create_directory".to_string(),
+                path: dir.to_path_buf(),
+                source: e,
+            })?;
+            created_paths.push(dir.to_path_buf());
+        }
+    }
+
+    let mut config_created = false;
+    let mut config_overwritten = false;
+
+    if target.config_file.exists() {
+        if force {
+            write_default_config(&target.config_file, &backup_dir)?;
+            config_overwritten = true;
+        }
+    } else {
+        if let Some(parent) = target.config_file.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).map_err(|e| AgeError::FileError {
+                    operation: "create_directory".to_string(),
+                    path: parent.to_path_buf(),
+                    source: e,
+                })?;
+                created_paths.push(parent.to_path_buf());
+            }
+        }
+        write_default_config(&target.config_file, &backup_dir)?;
+        config_created = true;
+    }
+
+    Ok(InitReport {
+        config_dir: target.config_dir,
+        data_dir,
+        cache_dir,
+        backup_dir,
+        config_file: target.config_file,
+        created_paths,
+        config_created,
+        config_overwritten,
+    })
+}
+
+struct ConfigTarget {
+    config_dir: PathBuf,
+    config_file: PathBuf,
+}
+
+fn resolve_config_target() -> AgeResult<ConfigTarget> {
+    if let Ok(custom) = env::var("CAGE_CONFIG") {
+        let trimmed = custom.trim();
+        if !trimmed.is_empty() {
+            let expanded = expand_home(trimmed);
+            let path = PathBuf::from(expanded);
+            if path.is_dir() {
+                let file = path.join("config.toml");
+                return Ok(ConfigTarget {
+                    config_dir: path,
+                    config_file: file,
+                });
+            }
+
+            if let Some(parent) = path.parent() {
+                return Ok(ConfigTarget {
+                    config_dir: parent.to_path_buf(),
+                    config_file: path,
+                });
+            }
+
+            return Ok(ConfigTarget {
+                config_dir: PathBuf::from("."),
+                config_file: path,
+            });
+        }
+    }
+
+    let base = resolve_xdg_home("XDG_CONFIG_HOME", ".config")?;
+    let config_dir = base.join("cage");
+    let config_file = config_dir.join("config.toml");
+    Ok(ConfigTarget {
+        config_dir,
+        config_file,
+    })
+}
+
+fn resolve_xdg_home(env_key: &str, fallback: &str) -> AgeResult<PathBuf> {
+    if let Ok(value) = env::var(env_key) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(expand_home(trimmed)));
+        }
+    }
+
+    let home = env::var("HOME").map_err(|_| AgeError::ConfigurationError {
+        parameter: env_key.to_string(),
+        value: String::new(),
+        reason: "HOME environment variable not set".to_string(),
+    })?;
+
+    Ok(PathBuf::from(home).join(fallback))
+}
+
+fn expand_home(path: &str) -> PathBuf {
+    if let Some(stripped) = path.strip_prefix("~/") {
+        if let Ok(home) = env::var("HOME") {
+            return PathBuf::from(home).join(stripped);
+        }
+    }
+
+    PathBuf::from(path)
+}
+
+fn write_default_config(path: &Path, backup_dir: &Path) -> AgeResult<()> {
+    let backup_path = backup_dir
+        .canonicalize()
+        .unwrap_or_else(|_| backup_dir.to_path_buf());
+    let content = default_config_contents(&backup_path);
+    fs::write(path, content).map_err(|e| AgeError::FileError {
+        operation: "write_config".to_string(),
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+    Ok(())
+}
+
+fn default_config_contents(backup_dir: &Path) -> String {
+    let backup_str = backup_dir.to_string_lossy();
+    format!(
+        "# Cage configuration generated by `cage init`\n# Adjust paths and policies as needed.\n\n[backup]\ncleanup_on_success = true\ndirectory = \"{}\"\nretention = \"keep_last:5\"\n\n[streaming]\nstrategy = \"auto\"\n",
+        backup_str
+    )
 }
 
 /// Lock (encrypt) files using RSB dispatch
@@ -629,8 +848,20 @@ fn cmd_batch(args: Args) -> i32 {
     };
 
     let verbose = is_true("opt_verbose");
+    let force = is_true("opt_i_am_sure");
+    let backup = is_true("opt_backup");
+    let preserve = is_true("opt_preserve");
 
-    match execute_batch_operation(&directory, &operation, &passphrase, pattern, verbose) {
+    match execute_batch_operation(
+        &directory,
+        &operation,
+        &passphrase,
+        pattern,
+        verbose,
+        force,
+        backup,
+        preserve,
+    ) {
         Ok(_) => {
             if verbose {
                 echo!("✅ Batch operation completed");
@@ -1155,7 +1386,9 @@ fn execute_status_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
     }
 
     let crud_manager = CrudManager::with_defaults()?;
-    let status = crud_manager.status(path)?;
+    let mut status_request = StatusRequest::new(path.to_path_buf());
+    status_request.common.verbose = verbose;
+    let status = crud_manager.status_with_request(&status_request)?;
 
     let status_text = if status.is_fully_encrypted() {
         "🔒 Repository is fully encrypted"
@@ -1194,7 +1427,7 @@ fn execute_rotate_operation(
     repository: &Path,
     old_passphrase: &str,
     new_passphrase: &str,
-    _backup: bool,
+    backup: bool,
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if verbose {
@@ -1202,7 +1435,16 @@ fn execute_rotate_operation(
     }
 
     let mut crud_manager = CrudManager::with_defaults()?;
-    let result = crud_manager.rotate(repository, old_passphrase, new_passphrase)?;
+    let mut rotate_request = RotateRequest::new(
+        repository.to_path_buf(),
+        Identity::Passphrase(old_passphrase.to_string()),
+        Identity::Passphrase(new_passphrase.to_string()),
+    );
+    rotate_request.backup = backup;
+    rotate_request.recursive = true;
+    rotate_request.common.verbose = verbose;
+
+    let result = crud_manager.rotate_with_request(&rotate_request)?;
 
     if verbose {
         echo!("    Processed: {} files", result.processed_files.len());
@@ -1248,6 +1490,9 @@ fn execute_batch_operation(
     passphrase: &str,
     pattern: Option<String>,
     verbose: bool,
+    force: bool,
+    backup: bool,
+    preserve: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if verbose {
         echo!(
@@ -1257,9 +1502,42 @@ fn execute_batch_operation(
         );
     }
 
+    let batch_operation = match operation {
+        "lock" => BatchOperation::Lock,
+        "unlock" => BatchOperation::Unlock,
+        other => {
+            return Err(format!("Unsupported batch operation: {other}").into());
+        }
+    };
+
+    let mut request = BatchRequest::new(
+        directory.to_path_buf(),
+        batch_operation,
+        Identity::Passphrase(passphrase.to_string()),
+    );
+
+    request.common.verbose = verbose;
+    request.common.force = force;
+
+    if let Some(pattern) = pattern {
+        request = request.with_pattern(pattern);
+    }
+
+    if backup {
+        request = request.backup(true);
+    }
+
+    if preserve && matches!(batch_operation, BatchOperation::Unlock) {
+        request = request.preserve_encrypted(true);
+    }
+
     let mut crud_manager = CrudManager::with_defaults()?;
-    let result =
-        crud_manager.batch_process(directory, pattern.as_deref(), operation, passphrase)?;
+    let result = crud_manager.batch_with_request(&request)?;
+
+    let operation_label = match batch_operation {
+        BatchOperation::Lock => "lock",
+        BatchOperation::Unlock => "unlock",
+    };
 
     echo!(
         "📦 Batch Operation Result:
@@ -1268,7 +1546,7 @@ fn execute_batch_operation(
   Failed files: {}
   Success rate: {:.1}%
   Duration: {}ms",
-        operation,
+        operation_label,
         result.processed_files.len(),
         result.failed_files.len(),
         result.success_rate(),
@@ -1574,6 +1852,286 @@ fn cmd_config(args: Args) -> i32 {
     }
 }
 
+/// Streaming command - encrypt/decrypt using streaming adapters
+fn cmd_stream(args: Args) -> i32 {
+    let subcommand = args.get_or(1, "encrypt");
+
+    match subcommand.as_str() {
+        "encrypt" | "enc" => stream_encrypt(args),
+        "decrypt" | "dec" => stream_decrypt(args),
+        "help" | "--help" | "-h" => {
+            print_stream_usage();
+            0
+        }
+        other => {
+            stderr!("❌ Unknown stream subcommand: {}", other);
+            print_stream_usage();
+            1
+        }
+    }
+}
+
+fn print_stream_usage() {
+    echo!(
+        "Usage:
+  cage stream encrypt --input <PATH> --output <PATH> [options]
+  cage stream decrypt --input <PATH> --output <PATH> [options]
+
+Options:
+  --input <PATH>           Source file to read (required)
+  --output <PATH>          Destination file to write (required)
+  --format <binary|ascii>  Output format for encryption (default: binary)
+  --buffer-size <BYTES>    Streaming buffer size (default: 8192)
+  --recipient, --recipients, --recipients-file, --ssh-recipient  Same as lock CLI
+  --identity, --ssh-identity                                Same as unlock CLI
+  --stdin-passphrase / CAGE_PASSPHRASE / --i-am-sure        Same semantics as lock/unlock
+"
+    );
+}
+
+fn resolve_stream_buffer_size() -> usize {
+    let raw = get_var("opt_buffer_size");
+    if raw.is_empty() {
+        return 8192;
+    }
+
+    match raw.parse::<usize>() {
+        Ok(value) if value >= 1024 => value,
+        Ok(_) => {
+            stderr!("⚠️  Buffer size too small (<1024). Using 1024 bytes.");
+            1024
+        }
+        Err(_) => {
+            stderr!(
+                "⚠️  Invalid buffer size '{}'. Using default 8192 bytes.",
+                raw
+            );
+            8192
+        }
+    }
+}
+
+fn open_stream_io(
+    input_path: &str,
+    output_path: &str,
+    buffer_size: usize,
+) -> Result<(BufReader<File>, BufWriter<File>), String> {
+    let input_file = File::open(input_path)
+        .map_err(|e| format!("Failed to open input file '{}': {}", input_path, e))?;
+
+    let output_file = File::create(output_path)
+        .map_err(|e| format!("Failed to create output file '{}': {}", output_path, e))?;
+
+    Ok((
+        BufReader::with_capacity(buffer_size, input_file),
+        BufWriter::with_capacity(buffer_size, output_file),
+    ))
+}
+
+fn stream_encrypt(_args: Args) -> i32 {
+    let input_path = get_var("opt_input");
+    let output_path = get_var("opt_output");
+
+    if input_path.is_empty() || output_path.is_empty() {
+        stderr!("❌ Streaming encryption requires --input and --output paths");
+        print_stream_usage();
+        return 1;
+    }
+
+    apply_streaming_strategy_override();
+
+    let recipients = collect_lock_recipients_from_cli();
+    let using_recipients = !recipients.is_empty();
+    let verbose = is_true("opt_verbose");
+    let buffer_size = resolve_stream_buffer_size();
+
+    let cmd_args: Vec<String> = std::env::args().collect();
+    let passphrase_value = if using_recipients {
+        None
+    } else {
+        if let Some(_insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+            stderr!("⚠️  WARNING: Passphrase detected on command line!");
+            stderr!("   This is insecure and visible in process list.");
+            if !is_true("opt_i_am_sure") {
+                stderr!("   Use interactive prompt instead, or add --i-am-sure to override");
+                return 1;
+            }
+        }
+
+        let passphrase_manager = PassphraseManager::new();
+
+        let passphrase = if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter passphrase",
+                false,
+                PassphraseMode::Stdin,
+            ) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                    return 1;
+                }
+            }
+        } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
+            env_pass
+        } else if let Some(insecure_pass) = PassphraseManager::detect_insecure_usage(&cmd_args) {
+            insecure_pass
+        } else {
+            match passphrase_manager
+                .get_passphrase("Enter passphrase for streaming encryption", false)
+            {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get passphrase: {}", e);
+                    return 1;
+                }
+            }
+        };
+
+        Some(passphrase)
+    };
+
+    let identity = if let Some(pass) = &passphrase_value {
+        Identity::Passphrase(pass.clone())
+    } else {
+        // Recipients-only flows do not need a passphrase identity but the adapter expects a value.
+        Identity::Passphrase(String::new())
+    };
+
+    let mut request = StreamRequest::encrypt(identity);
+    if using_recipients {
+        request.recipients = Some(recipients);
+    }
+
+    request.format = match get_var("opt_format").as_str() {
+        "ascii" => OutputFormat::AsciiArmor,
+        _ => OutputFormat::Binary,
+    };
+    request.buffer_size = buffer_size;
+    request.common.verbose = verbose;
+
+    let (mut reader, mut writer) = match open_stream_io(&input_path, &output_path, buffer_size) {
+        Ok(handles) => handles,
+        Err(err) => {
+            stderr!("❌ {}", err);
+            return 1;
+        }
+    };
+
+    let mut crud_manager = match CrudManager::with_defaults() {
+        Ok(manager) => manager,
+        Err(e) => {
+            stderr!("❌ Failed to create CrudManager: {}", e);
+            return 1;
+        }
+    };
+
+    match crud_manager.stream_with_request(&request, &mut reader, &mut writer) {
+        Ok(bytes) => {
+            if let Err(e) = writer.flush() {
+                stderr!("❌ Failed to flush output: {}", e);
+                return 1;
+            }
+
+            if verbose {
+                echo!("✅ Stream encryption completed ({} bytes)", bytes);
+            }
+            0
+        }
+        Err(e) => {
+            stderr!("❌ Stream encryption failed: {}", e);
+            1
+        }
+    }
+}
+
+fn stream_decrypt(_args: Args) -> i32 {
+    let input_path = get_var("opt_input");
+    let output_path = get_var("opt_output");
+
+    if input_path.is_empty() || output_path.is_empty() {
+        stderr!("❌ Streaming decryption requires --input and --output paths");
+        print_stream_usage();
+        return 1;
+    }
+
+    apply_streaming_strategy_override();
+
+    let buffer_size = resolve_stream_buffer_size();
+    let verbose = is_true("opt_verbose");
+    let identity = if let Some(identity) = parse_unlock_identity_from_cli() {
+        identity
+    } else {
+        let passphrase_manager = PassphraseManager::new();
+
+        let passphrase = if is_true("opt_stdin_passphrase") {
+            match passphrase_manager.get_passphrase_with_mode(
+                "Enter passphrase",
+                false,
+                PassphraseMode::Stdin,
+            ) {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to read passphrase from stdin: {}", e);
+                    return 1;
+                }
+            }
+        } else if let Ok(env_pass) = std::env::var("CAGE_PASSPHRASE") {
+            env_pass
+        } else {
+            match passphrase_manager
+                .get_passphrase("Enter passphrase for streaming decryption", false)
+            {
+                Ok(pass) => pass,
+                Err(e) => {
+                    stderr!("❌ Failed to get passphrase: {}", e);
+                    return 1;
+                }
+            }
+        };
+
+        Identity::Passphrase(passphrase)
+    };
+
+    let mut request = StreamRequest::decrypt(identity);
+    request.buffer_size = buffer_size;
+    request.common.verbose = verbose;
+
+    let (mut reader, mut writer) = match open_stream_io(&input_path, &output_path, buffer_size) {
+        Ok(handles) => handles,
+        Err(err) => {
+            stderr!("❌ {}", err);
+            return 1;
+        }
+    };
+
+    let mut crud_manager = match CrudManager::with_defaults() {
+        Ok(manager) => manager,
+        Err(e) => {
+            stderr!("❌ Failed to create CrudManager: {}", e);
+            return 1;
+        }
+    };
+
+    match crud_manager.stream_with_request(&request, &mut reader, &mut writer) {
+        Ok(bytes) => {
+            if let Err(e) = writer.flush() {
+                stderr!("❌ Failed to flush output: {}", e);
+                return 1;
+            }
+
+            if verbose {
+                echo!("✅ Stream decryption completed ({} bytes)", bytes);
+            }
+            0
+        }
+        Err(e) => {
+            stderr!("❌ Stream decryption failed: {}", e);
+            1
+        }
+    }
+}
+
 /// Adapter command - inspect adapter capabilities and health
 fn cmd_adapter(args: Args) -> i32 {
     use cage::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
@@ -1598,14 +2156,41 @@ fn cmd_adapter(args: Args) -> i32 {
                     echo!("Health Status:");
                     match adapter.health_check() {
                         Ok(health) => {
-                            echo!("  ✓ Overall: {}", if health.healthy { "Healthy" } else { "Unhealthy" });
-                            echo!("  ✓ Age binary: {}", if health.age_binary { "Available" } else { "Not found" });
+                            echo!(
+                                "  ✓ Overall: {}",
+                                if health.healthy {
+                                    "Healthy"
+                                } else {
+                                    "Unhealthy"
+                                }
+                            );
+                            echo!(
+                                "  ✓ Age binary: {}",
+                                if health.age_binary {
+                                    "Available"
+                                } else {
+                                    "Not found"
+                                }
+                            );
                             if let Some(version) = health.age_version {
                                 echo!("  ✓ Age version: {}", version);
                             }
-                            echo!("  ✓ Can encrypt: {}", if health.can_encrypt { "Yes" } else { "No" });
-                            echo!("  ✓ Can decrypt: {}", if health.can_decrypt { "Yes" } else { "No" });
-                            echo!("  ✓ Streaming: {}", if health.streaming_available { "Available" } else { "Not available" });
+                            echo!(
+                                "  ✓ Can encrypt: {}",
+                                if health.can_encrypt { "Yes" } else { "No" }
+                            );
+                            echo!(
+                                "  ✓ Can decrypt: {}",
+                                if health.can_decrypt { "Yes" } else { "No" }
+                            );
+                            echo!(
+                                "  ✓ Streaming: {}",
+                                if health.streaming_available {
+                                    "Available"
+                                } else {
+                                    "Not available"
+                                }
+                            );
 
                             if !health.errors.is_empty() {
                                 echo!("");
@@ -1625,10 +2210,22 @@ fn cmd_adapter(args: Args) -> i32 {
                     let caps = adapter.capabilities();
                     echo!("Capabilities:");
                     echo!("  Encryption Methods:");
-                    echo!("    • Passphrase: {}", if caps.passphrase { "✓" } else { "✗" });
-                    echo!("    • Public key: {}", if caps.public_key { "✓" } else { "✗" });
-                    echo!("    • Identity files: {}", if caps.identity_files { "✓" } else { "✗" });
-                    echo!("    • SSH recipients: {}", if caps.ssh_recipients { "✓" } else { "✗" });
+                    echo!(
+                        "    • Passphrase: {}",
+                        if caps.passphrase { "✓" } else { "✗" }
+                    );
+                    echo!(
+                        "    • Public key: {}",
+                        if caps.public_key { "✓" } else { "✗" }
+                    );
+                    echo!(
+                        "    • Identity files: {}",
+                        if caps.identity_files { "✓" } else { "✗" }
+                    );
+                    echo!(
+                        "    • SSH recipients: {}",
+                        if caps.ssh_recipients { "✓" } else { "✗" }
+                    );
                     echo!("");
 
                     echo!("  Streaming Strategies:");
@@ -1638,25 +2235,77 @@ fn cmd_adapter(args: Args) -> i32 {
                     if let Some(env_override) = &strategies.env_override {
                         echo!("    • Environment override: {:?}", env_override);
                     }
-                    echo!("    • Temp file support: {}", if strategies.supports_tempfile { "✓" } else { "✗" });
-                    echo!("    • Pipe support: {}", if strategies.supports_pipe { "✓" } else { "✗" });
-                    echo!("    • Auto fallback: {}", if strategies.auto_fallback { "✓" } else { "✗" });
+                    echo!(
+                        "    • Temp file support: {}",
+                        if strategies.supports_tempfile {
+                            "✓"
+                        } else {
+                            "✗"
+                        }
+                    );
+                    echo!(
+                        "    • Pipe support: {}",
+                        if strategies.supports_pipe {
+                            "✓"
+                        } else {
+                            "✗"
+                        }
+                    );
+                    echo!(
+                        "    • Auto fallback: {}",
+                        if strategies.auto_fallback {
+                            "✓"
+                        } else {
+                            "✗"
+                        }
+                    );
                     echo!("");
 
                     echo!("  Streaming Requirements:");
-                    echo!("    • Pipe encryption needs recipients: {}",
-                        if strategies.pipe_requires_recipients { "Yes" } else { "No" });
-                    echo!("    • Pipe decryption needs identity file: {}",
-                        if strategies.pipe_requires_identity { "Yes" } else { "No" });
+                    echo!(
+                        "    • Pipe encryption needs recipients: {}",
+                        if strategies.pipe_requires_recipients {
+                            "Yes"
+                        } else {
+                            "No"
+                        }
+                    );
+                    echo!(
+                        "    • Pipe decryption needs identity file: {}",
+                        if strategies.pipe_requires_identity {
+                            "Yes"
+                        } else {
+                            "No"
+                        }
+                    );
                     echo!("");
 
+                    if caps.streaming {
+                        echo!(
+                            "  ➜ Use 'cage stream encrypt|decrypt' or CrudManager::stream_with_request() for streaming workflows"
+                        );
+                        echo!("");
+                    }
+
                     echo!("  Additional Features:");
-                    echo!("    • ASCII armor: {}", if caps.ascii_armor { "✓" } else { "✗" });
-                    echo!("    • Hardware keys: {}", if caps.hardware_keys { "✓" } else { "✗" });
-                    echo!("    • Key derivation: {}", if caps.key_derivation { "✓" } else { "✗" });
+                    echo!(
+                        "    • ASCII armor: {}",
+                        if caps.ascii_armor { "✓" } else { "✗" }
+                    );
+                    echo!(
+                        "    • Hardware keys: {}",
+                        if caps.hardware_keys { "✓" } else { "✗" }
+                    );
+                    echo!(
+                        "    • Key derivation: {}",
+                        if caps.key_derivation { "✓" } else { "✗" }
+                    );
 
                     if let Some(max_size) = caps.max_file_size {
-                        echo!("    • Max file size: {} GB", max_size / (1024 * 1024 * 1024));
+                        echo!(
+                            "    • Max file size: {} GB",
+                            max_size / (1024 * 1024 * 1024)
+                        );
                     } else {
                         echo!("    • Max file size: Unlimited");
                     }
@@ -1680,26 +2329,24 @@ fn cmd_adapter(args: Args) -> i32 {
         "health" => {
             // Quick health check only
             match ShellAdapterV2::new() {
-                Ok(adapter) => {
-                    match adapter.health_check() {
-                        Ok(health) => {
-                            if health.healthy {
-                                echo!("✓ Adapter is healthy");
-                                0
-                            } else {
-                                echo!("✗ Adapter is unhealthy");
-                                for error in &health.errors {
-                                    echo!("  - {}", error);
-                                }
-                                1
+                Ok(adapter) => match adapter.health_check() {
+                    Ok(health) => {
+                        if health.healthy {
+                            echo!("✓ Adapter is healthy");
+                            0
+                        } else {
+                            echo!("✗ Adapter is unhealthy");
+                            for error in &health.errors {
+                                echo!("  - {}", error);
                             }
-                        }
-                        Err(e) => {
-                            echo!("✗ Health check failed: {}", e);
                             1
                         }
                     }
-                }
+                    Err(e) => {
+                        echo!("✗ Health check failed: {}", e);
+                        1
+                    }
+                },
                 Err(e) => {
                     echo!("✗ Failed to create adapter: {}", e);
                     1

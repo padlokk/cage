@@ -19,7 +19,8 @@ Those documents track current workstreams, handoffs, and priorities.
 - **Surfaces**: CLI binary (`cage`) + library API (`cage::cage::*`)
 - **Frameworks**: RSB for CLI orchestrations; PTY automation via `hub::portable_pty`
 - **Config**: `AgeConfig` now loads from XDG/config paths (`cage.toml`) with
-  backup/streaming settings.
+  backup/streaming settings; run `cage init` to scaffold directories and defaults
+  (`--force` regenerates the file).
 - **Testing**: `cargo test --all` + targeted integration/UAT suites
 
 --------------------------------------------------------------------------------
@@ -79,16 +80,17 @@ Those documents track current workstreams, handoffs, and priorities.
 --------------------------------------------------------------------------------
  Useful References
 --------------------------------------------------------------------------------
-- `docs/LIBRARY_USAGE.md` – Library integration examples (request API & streaming).
-- `docs/procs/BACKUP_RETENTION_DESIGN.md` – Design notes for backup registry & retention.
+- `docs/ref/cage/LIBRARY_USAGE.md` – Library integration examples (request API & streaming).
+- `docs/ref/cage/BACKUP_RETENTION_DESIGN.md` – Design notes for backup registry & retention.
 - `docs/procs/PROCESS.txt` – Workflow rules & priority context.
-- `docs/ref/ROADMAP.md` – Long-term roadmap & milestones.
+- `docs/procs/ROADMAP.md` – Long-term roadmap & milestones.
 - `src/cage/` – Core library modules (adapter, lifecycle, config, etc.).
 - `tests/` – Unit, integration, PTY, and regression suites.
 - Quick toggles: `CAGE_STREAMING_STRATEGY=temp|pipe|auto` (or `--streaming-strategy`) and
   backup settings via `cage.toml` (`backup.cleanup_on_success`, `backup.directory`,
   `backup.retention`).
 - New CLI helpers: `cage config show|path|paths`, `cage adapter info`, `cage adapter health`.
+- Streaming CLI entry point: `cage stream encrypt|decrypt` (wraps `CrudManager::stream_with_request()`).
 - Streaming guidance: README and `docs/ref/cage/LIBRARY_USAGE.md` include performance tables
   comparing passphrase vs recipient streaming (CAGE-12a/12b).
 

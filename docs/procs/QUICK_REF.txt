@@ -16,6 +16,7 @@
 - **Tests**: Run `cargo test --all` + `./bin/test.sh run smoke`
 
 📋 **Immediate Checklist** (see docs/procs/TASKS.txt):
+0. _(Fresh clone)_ Run `./bin/deploy.sh` then `cage init` (`--force` to reset config).
 1. **OBS-01** – Structured telemetry (JSON logs, redaction) for Padlock ingest.
 2. **QA-02** – Restore CLI smoke + regression suite (BUG-01..05, PTY skips).
 3. **CAGE-16** – Multi-recipient lifecycle (recipient groups for Ignite rotations).

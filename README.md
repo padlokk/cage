@@ -203,6 +203,16 @@ retention = "keep-last-5"
 
 #### Quick Configuration Setup
 
+Run the built-in initializer to hydrate the standard XDG layout:
+
+```bash
+# Creates ~/.config/cage/config.toml and backing directories if missing
+cage init
+
+# Reset the config to defaults (overwrites existing file)
+cage init --force
+```
+
 ```bash
 # Ensure the config directory exists
 mkdir -p ~/.config/cage
@@ -259,12 +269,21 @@ cd cage
 # Build with automatic age installation
 ./bin/build.sh
 
-# Deploy to ~/.local/bin/cage
+# Install the CLI (copies the binary to ~/.local/bin by default)
 ./bin/deploy.sh
+
+# Optional: choose a different prefix
+./bin/deploy.sh --prefix /usr/local
+
+# Prepare XDG config/data directories and default cage.toml
+cage init
 
 # Run tests
 cargo test
 ```
+
+> `cage init` is intentionally separate from installation. The binary can live anywhere (for example when shipped with Ignite/Padlock), but the init step prepares the user’s XDG configuration/data folders and seeds a baseline `cage.toml`. Downstream systems that manage their own configuration can skip the command and provide explicit `AgeConfig` instances instead.
+> Run `./bin/deploy.sh --help` to see additional flags such as `--profile debug`, `--skip-build`, and custom `--lib-dir`/`--bin-dir` locations.
 
 ### Manual Installation
 

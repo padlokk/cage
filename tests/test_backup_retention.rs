@@ -6,7 +6,10 @@
 //! - Generation tracking
 //! - Discovery helpers (list/restore)
 
-use cage::cage::lifecycle::crud_manager::{BackupEntry, BackupManager, BackupRegistry, RetentionPolicy};
+use cage::cage::lifecycle::crud_manager::{
+    BackupEntry, BackupManager, BackupRegistry, RetentionPolicy,
+};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -115,7 +118,9 @@ fn test_retention_policy_keep_last() {
 
     // Verify oldest backups are marked for deletion (generations 1 and 2)
     for path in &to_delete {
-        assert!(path.to_string_lossy().contains("bak.1") || path.to_string_lossy().contains("bak.2"));
+        assert!(
+            path.to_string_lossy().contains("bak.1") || path.to_string_lossy().contains("bak.2")
+        );
     }
 }
 
@@ -163,7 +168,6 @@ fn test_retention_policy_keep_days() {
 }
 
 #[test]
-#[ignore] // TODO: Conflict resolution path handling needs to be fixed - registry stores wrong paths
 fn test_backup_manager_with_retention() {
     let temp_dir = TempDir::new().unwrap();
     let backup_dir = temp_dir.path().to_path_buf();
@@ -177,30 +181,49 @@ fn test_backup_manager_with_retention() {
         .with_retention(RetentionPolicy::KeepLast(2));
 
     // Create 3 backups
-    let backup1 = manager.create_backup_with_retention(&test_file).unwrap();
+    let _backup1 = manager.create_backup_with_retention(&test_file).unwrap();
     std::thread::sleep(Duration::from_millis(10)); // Ensure distinct timestamps
     fs::write(&test_file, "modified content 1").unwrap();
 
-    let backup2 = manager.create_backup_with_retention(&test_file).unwrap();
+    let _backup2 = manager.create_backup_with_retention(&test_file).unwrap();
     std::thread::sleep(Duration::from_millis(10)); // Ensure distinct timestamps
     fs::write(&test_file, "modified content 2").unwrap();
 
-    let backup3 = manager.create_backup_with_retention(&test_file).unwrap();
+    let _backup3 = manager.create_backup_with_retention(&test_file).unwrap();
 
     // After 3rd backup, only last 2 should remain
     let backups = manager.list_backups(&test_file);
-    assert_eq!(backups.len(), 2, "Should have 2 backups after retention enforcement");
+    assert_eq!(
+        backups.len(),
+        2,
+        "Should have 2 backups after retention enforcement"
+    );
+
+    // Ensure registry paths are unique and reference existing files
+    let mut seen_paths = HashSet::new();
+    for backup in &backups {
+        assert!(
+            backup.backup_path.exists(),
+            "Registry path should exist: {:?}",
+            backup.backup_path
+        );
+        assert!(
+            seen_paths.insert(backup.backup_path.clone()),
+            "Registry contained duplicate backup path entries"
+        );
+    }
 
     // Verify oldest backup was deleted by checking generations
     // (Note: all backups have the same base path with conflict resolution, so we check generations)
     let generations: Vec<u32> = backups.iter().map(|b| b.generation).collect();
-    assert!(!generations.contains(&1), "Generation 1 (oldest) should have been deleted");
-    assert!(generations.contains(&2) && generations.contains(&3), "Generations 2 and 3 should remain");
-
-    // Verify the actual backup files exist on disk
-    for backup in &backups {
-        assert!(backup.backup_path.exists(), "Backup file should exist: {:?}", backup.backup_path);
-    }
+    assert!(
+        !generations.contains(&1),
+        "Generation 1 (oldest) should have been deleted"
+    );
+    assert!(
+        generations.contains(&2) && generations.contains(&3),
+        "Generations 2 and 3 should remain"
+    );
 
     // Verify registry was persisted
     let registry = BackupRegistry::load(&backup_dir).unwrap();
@@ -217,8 +240,8 @@ fn test_backup_restore_by_generation() {
     let test_file = temp_dir.path().join("test.txt");
     fs::write(&test_file, "original").unwrap();
 
-    let mut manager = BackupManager::with_backup_dir(backup_dir.clone())
-        .with_retention(RetentionPolicy::KeepAll);
+    let mut manager =
+        BackupManager::with_backup_dir(backup_dir.clone()).with_retention(RetentionPolicy::KeepAll);
 
     // Create backups with different content
     manager.create_backup_with_retention(&test_file).unwrap();
@@ -309,8 +332,12 @@ fn test_retention_keep_last_and_days() {
     // Should delete 2 old backups (generations 1 and 2)
     assert_eq!(to_delete.len(), 2, "Should delete 2 old backups");
     assert!(
-        to_delete.iter().any(|p| p.to_string_lossy().contains("bak.1")) &&
-        to_delete.iter().any(|p| p.to_string_lossy().contains("bak.2")),
+        to_delete
+            .iter()
+            .any(|p| p.to_string_lossy().contains("bak.1"))
+            && to_delete
+                .iter()
+                .any(|p| p.to_string_lossy().contains("bak.2")),
         "Should delete backups 1 and 2 (oldest, outside retention window)"
     );
 }

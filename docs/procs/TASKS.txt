@@ -45,6 +45,12 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Document the reference snippet in QA notes (docs/qa/AGE_CLI_REFERENCE.md) so deviations are easy to spot during upgrades.
 - [x] Gate the test to skip when the `age` binary is unavailable (consistent with other CLI-dependent checks).
 
+### CAGE-17: Rotate Request Integration [3 pts] ✅
+- [x] Implemented `CrudManager::rotate_with_request` with passphrase validation and feature gating for future enhancements.
+- [x] Updated CLI `cmd_rotate` to construct `RotateRequest` builders so both surfaces share the same pipeline.
+- [x] Added request API regression coverage (`test_rotate_with_request_api`) exercising passphrase rotation flows.
+- [x] Refreshed library docs with request-based rotation examples (see `docs/ref/cage/LIBRARY_USAGE.md`).
+
 ---
 
 ## Phase 2 – Advanced Encryption Capabilities
@@ -92,6 +98,12 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Wire strategy selection into requests + capability reporting.
 - [x] Extend CLI help/README with streaming workflow guidance.
 
+### CAGE-18: Streaming API Parity [5 pts] ✅
+- [x] Exposed streaming encrypt/decrypt helpers on `CrudManager::stream_with_request` backed by `ShellAdapterV2`.
+- [x] Added `cage stream encrypt|decrypt` CLI surface and refreshed README guidance.
+- [x] Highlighted streaming availability in adapter inspection output.
+- [x] Added request API regression coverage for streaming flows (passphrase fallback).
+
 ---
 
 ## Phase 3 – Hardening & Tooling
@@ -108,6 +120,20 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/lifecycle/crud_manager.rs`).
 - Document ASCII-safe toggle behaviour; Padlock UI will eventually need plain-text mode for logs.
 - Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CrudManager).
+
+### CAGE-19: Deployment Script Hardening [2 pts] ✅
+- [x] Update `bin/deploy.sh` to validate build artifacts, support `--prefix` overrides, and emit clear success/error messaging.
+- [x] Support release/debug deployment via `--profile` (default: release).
+- [x] Document usage in README and script help output.
+
+### CAGE-20: CLI Init Workflow [3 pts] ✅
+- [x] Implement full `cage init` behaviour: create required XDG config/data/cache directories and seed a default `cage.toml`.
+- [x] Add idempotent checks so rerunning the command keeps user edits intact (offer `--force` when needed).
+- [x] Provide smoke tests (or scripted checks) for the init command and capture usage in README/process docs.
+**Notes:**
+- New helper writes defaults via shared `perform_cage_init()` and respects `CAGE_CONFIG`, `XDG_*` overrides.
+- `--force` and `-f` flags reset config content via RSB global context (`opt_force` / `opt_f`).
+- Integration test `test_cage_init_creates_xdg_structure` verifies directory hydration and idempotence.
 
 ### CAGE-03: Backup Retention Lifecycle [5 pts] ✅
 **Reference:** `docs/ref/cage/BACKUP_RETENTION_DESIGN.md`
@@ -145,6 +171,17 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Telemetry format wired from `AgeConfig` to `CrudManager`.
 - Documentation updated: README + `docs/ref/cage/LIBRARY_USAGE.md` with JSON examples.
 - 4 new tests covering JSON telemetry output (total: 87 library tests passing).
+
+### DOC-04: Library Usage Feature Sync [1 pt] 🔴
+- [ ] Update `docs/ref/cage/LIBRARY_USAGE.md` feature matrix to reflect completed multi-recipient lifecycle and other shipped items.
+- [ ] Cross-check README badges/sections to ensure status indicators match current implementation.
+- [ ] Add note that deterministic key derivation remains deferred pending upstream age support (reference CAGE-15).
+
+### DOC-05: Install & Config Guidance [1 pt] ✅
+- [x] Clarify the `deploy.sh` + `cage init` workflow in README, PROCESS docs, and quick start materials.
+- [x] Document expectations for library consumers (e.g., supplying `AgeConfig` manually) so downstream services understand the separation of concerns.
+- [x] Ensure `docs/procs/CODEX_WARMUP.txt` and quick-reference materials stay in sync with the clarified guidance.
+**Notes:** README build steps now call out `cage init`, PROCESS/QUICK_REF include bootstrap commands, and CODEX warmup highlights when to rerun `cage init --force`.
 
 ### QA-02: End-to-End Test Coverage [3 pts] ✅
 (Retires legacy TEST-01/02/03/04 entries; replans under single umbrella.)
@@ -255,25 +292,15 @@ cargo test --test test_backup_retention test_retention_keep_last_and_days
 **Location:** `src/cage/lifecycle/crud_manager.rs:106-156, 532, 636-640`
 **Test Files:** `tests/test_backup_retention.rs` (9/9 passing, 1 ignored)
 
-### BUG-08: Backup Registry Path Tracking with Conflict Resolution [3 pts] 🔴
-**Status:** Path tracking issue discovered during BUG-07 fix
-**Symptoms:**
-- Registry stores original backup path (`test.txt.bak`) even when conflicts occur
-- Actual files renamed to `.conflict.XXX` during conflict resolution
-- Registry paths don't match actual filesystem paths after conflicts
-- `test_backup_manager_with_retention` ignor ed due to this issue
-**Root Cause:**
-- `create_backup()` returns `backup_info.backup_path` before conflict handling
-- `generate_conflict_path()` renames files but registry keeps original path
-- Retention policy deletes wrong files when paths don't match
-**Impact:** Moderate - affects backup deletion accuracy when conflicts occur
-**Priority:** Medium - rare in production (backups typically have unique timestamps)
-**Fix Required:**
-- Update backup path tracking after conflict resolution
-- OR: Generate unique backup filenames (timestamp/generation-based) to avoid conflicts
-- Update registry to store actual filesystem paths
-**Location:** `src/cage/lifecycle/crud_manager.rs:246-260` (conflict handling)
-**Test:** `tests/test_backup_retention.rs:167` (currently ignored)
+### BUG-08: Backup Registry Path Tracking with Conflict Resolution [3 pts] ✅
+**Status:** Resolved – registry stays consistent after conflict renames (2025-09-30)
+**Fixes:**
+- Added `create_backup_internal()` so conflict relocations are surfaced before registration
+- Updated registry via `update_backup_path()` when legacy backups shift paths
+- Ensured conflict filenames include high-resolution timestamps with retry fallback
+- Re-enabled `test_backup_manager_with_retention` with on-disk parity assertions
+**Location:** `src/cage/lifecycle/crud_manager.rs` (backup creation, conflict path generator, registry helpers)
+**Test:** `cargo test test_backup_manager_with_retention`
 
 ---
 
@@ -324,6 +351,11 @@ cargo test --test test_backup_retention test_retention_keep_last_and_days
 - [x] Verified all CLI flags work with request structs (lock/unlock operations validated).
 - [x] All QA-02 smoke tests now passing with correct flag format.
 **Notes:** Completed. Tests now use `--recipient=value` instead of `--opt-recipient value`. All BUG-01/04 regression tests re-enabled and passing.
+
+### CLI-02: Setup Command Implementation [2 pts] 🔴
+- [ ] Implement real behaviour for `cage init` (create config directories, scaffold `cage.toml`, report active path).
+- [ ] Implement dependency checks for `cage install` (verify `age`, `age-keygen`, PTY prerequisites) with actionable output.
+- [ ] Add smoke tests covering both commands and document workflows in `docs/procs/PROCESS.txt` / README.
 
 ## Phase 3 – Optional Enhancements (Backlog)
 

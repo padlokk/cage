@@ -7,6 +7,7 @@
 //! Security Guardian: Edgar - Production CRUD coordination with authority integration
 
 use std::collections::{HashMap, HashSet};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
@@ -16,13 +17,17 @@ use crate::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
 use crate::cage::config::{AgeConfig, OutputFormat, RetentionPolicyConfig};
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::operations::{OperationResult, RepositoryStatus};
-use crate::cage::requests::{Identity, LockRequest, Recipient, UnlockRequest, VerifyRequest};
+use crate::cage::requests::{
+    BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
+    StreamOperation, StreamRequest, UnlockRequest, VerifyRequest,
+};
 use crate::cage::security::AuditLogger;
 use crate::cage::strings::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
 use crate::cage::tty_automation::TtyAutomator;
 use globset::{Glob, GlobMatcher};
 use rsb::visual::glyphs::glyph_enable;
+use tempfile::NamedTempFile;
 
 /// Options for lock operations
 #[derive(Debug, Clone)]
@@ -235,6 +240,11 @@ impl BackupManager {
 
     /// Create backup of a file
     pub fn create_backup(&self, file_path: &Path) -> AgeResult<BackupInfo> {
+        let outcome = self.create_backup_internal(file_path)?;
+        Ok(outcome.info)
+    }
+
+    fn create_backup_internal(&self, file_path: &Path) -> AgeResult<BackupCreationOutcome> {
         if !file_path.exists() {
             return Err(AgeError::file_error(
                 "backup",
@@ -244,6 +254,7 @@ impl BackupManager {
         }
 
         let backup_path = self.generate_backup_path(file_path)?;
+        let mut relocated_backups = Vec::new();
 
         // Handle backup conflicts
         if backup_path.exists() {
@@ -251,6 +262,7 @@ impl BackupManager {
             std::fs::rename(&backup_path, &conflict_path).map_err(|e| {
                 AgeError::file_error("move_existing_backup", backup_path.clone(), e)
             })?;
+            relocated_backups.push((backup_path.clone(), conflict_path));
         }
 
         // Create backup directory if needed
@@ -266,11 +278,16 @@ impl BackupManager {
         std::fs::copy(file_path, &backup_path)
             .map_err(|e| AgeError::file_error("create_backup", backup_path.clone(), e))?;
 
-        Ok(BackupInfo {
+        let info = BackupInfo {
             original_path: file_path.to_path_buf(),
             backup_path,
             created_at: std::time::SystemTime::now(),
             size_bytes: std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0),
+        };
+
+        Ok(BackupCreationOutcome {
+            info,
+            relocated_backups,
         })
     }
 
@@ -303,8 +320,15 @@ impl BackupManager {
 
     /// Create backup with retention policy enforcement
     pub fn create_backup_with_retention(&mut self, file_path: &Path) -> AgeResult<BackupInfo> {
-        // 1. Create the backup
-        let backup_info = self.create_backup(file_path)?;
+        // 1. Create the backup (and capture any previous backup relocations)
+        let outcome = self.create_backup_internal(file_path)?;
+
+        for (old_path, new_path) in &outcome.relocated_backups {
+            self.registry
+                .update_backup_path(file_path, old_path, new_path.clone());
+        }
+
+        let backup_info = outcome.info.clone();
 
         // 2. Register in registry
         let generation = self.registry.next_generation(file_path);
@@ -498,13 +522,37 @@ impl BackupManager {
 
     /// Generate conflict resolution path
     fn generate_conflict_path(&self, backup_path: &Path) -> AgeResult<PathBuf> {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let mut attempt = 0u32;
 
-        let conflict_name = format!("{}.conflict.{}", backup_path.to_string_lossy(), timestamp);
-        Ok(PathBuf::from(conflict_name))
+        loop {
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+
+            let suffix = if attempt == 0 {
+                format!(".conflict.{}", timestamp)
+            } else {
+                format!(".conflict.{}.{}", timestamp, attempt)
+            };
+
+            let candidate = PathBuf::from(format!("{}{}", backup_path.to_string_lossy(), suffix));
+
+            if !candidate.exists() {
+                return Ok(candidate);
+            }
+
+            attempt += 1;
+            if attempt > 10 {
+                return Err(AgeError::ConfigurationError {
+                    parameter: "backup_conflict".to_string(),
+                    value: backup_path.display().to_string(),
+                    reason: "Unable to generate unique backup conflict path".to_string(),
+                });
+            }
+
+            std::thread::sleep(std::time::Duration::from_micros(100));
+        }
     }
 }
 
@@ -521,6 +569,12 @@ impl BackupInfo {
     pub fn age_seconds(&self) -> u64 {
         self.created_at.elapsed().unwrap_or_default().as_secs()
     }
+}
+
+/// Result of creating a backup, including any relocated paths from conflict resolution
+struct BackupCreationOutcome {
+    info: BackupInfo,
+    relocated_backups: Vec<(PathBuf, PathBuf)>,
 }
 
 /// Backup entry with generation tracking for registry
@@ -570,8 +624,8 @@ impl BackupRegistry {
         let contents = std::fs::read_to_string(&registry_path)
             .map_err(|e| AgeError::file_error("read_registry", registry_path.clone(), e))?;
 
-        let registry: BackupRegistry = serde_json::from_str(&contents)
-            .map_err(|e| AgeError::ConfigurationError {
+        let registry: BackupRegistry =
+            serde_json::from_str(&contents).map_err(|e| AgeError::ConfigurationError {
                 parameter: "backup_registry".to_string(),
                 value: registry_path.display().to_string(),
                 reason: format!("Invalid JSON: {}", e),
@@ -584,16 +638,17 @@ impl BackupRegistry {
     pub fn save(&self, backup_dir: &Path) -> AgeResult<()> {
         // Ensure backup directory exists
         if !backup_dir.exists() {
-            std::fs::create_dir_all(backup_dir)
-                .map_err(|e| AgeError::file_error("create_backup_dir", backup_dir.to_path_buf(), e))?;
+            std::fs::create_dir_all(backup_dir).map_err(|e| {
+                AgeError::file_error("create_backup_dir", backup_dir.to_path_buf(), e)
+            })?;
         }
 
         let registry_path = backup_dir.join(".cage_backups.json");
         let temp_path = registry_path.with_extension("json.tmp");
 
         // Serialize to temp file first (atomic write)
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| AgeError::ConfigurationError {
+        let json =
+            serde_json::to_string_pretty(self).map_err(|e| AgeError::ConfigurationError {
                 parameter: "backup_registry".to_string(),
                 value: "serialize".to_string(),
                 reason: format!("JSON serialization failed: {}", e),
@@ -618,6 +673,17 @@ impl BackupRegistry {
         entries.sort_by(|a, b| a.generation.cmp(&b.generation));
     }
 
+    /// Update stored backup path after a conflict rename
+    pub fn update_backup_path(&mut self, original: &Path, old_path: &Path, new_path: PathBuf) {
+        if let Some(entries) = self.backups.get_mut(original) {
+            for entry in entries.iter_mut() {
+                if entry.backup_path == old_path {
+                    entry.backup_path = new_path.clone();
+                }
+            }
+        }
+    }
+
     /// Get next generation number for a file
     pub fn next_generation(&self, file: &Path) -> u32 {
         self.backups
@@ -635,7 +701,8 @@ impl BackupRegistry {
             // Sort entries by created_at (oldest first), with generation as tiebreaker
             // Generation increments (1, 2, 3...) so higher generation = newer backup
             entries.sort_by(|a, b| {
-                a.created_at.cmp(&b.created_at)
+                a.created_at
+                    .cmp(&b.created_at)
                     .then_with(|| a.generation.cmp(&b.generation))
             });
 
@@ -787,7 +854,7 @@ impl CrudManager {
 
         let audit_logger = AuditLogger::with_format(
             config.audit_log_path.clone().map(PathBuf::from),
-            config.telemetry_format
+            config.telemetry_format,
         )?;
 
         Ok(Self {
@@ -877,22 +944,158 @@ impl CrudManager {
         }
     }
 
+    /// Rotate operation using request struct (CAGE-17)
+    pub fn rotate_with_request(&mut self, request: &RotateRequest) -> AgeResult<OperationResult> {
+        if request.pattern.is_some() {
+            return Err(AgeError::InvalidOperation {
+                operation: "rotate".to_string(),
+                reason: "Pattern-filtered rotation is not supported yet".to_string(),
+            });
+        }
+
+        if let Some(recipients) = &request.new_recipients {
+            if !recipients.is_empty() {
+                return Err(AgeError::InvalidOperation {
+                    operation: "rotate".to_string(),
+                    reason: "Recipient-based rotation is not implemented yet".to_string(),
+                });
+            }
+        }
+
+        if !request.atomic {
+            return Err(AgeError::InvalidOperation {
+                operation: "rotate".to_string(),
+                reason: "Non-atomic rotation is not supported".to_string(),
+            });
+        }
+
+        let (old_pass, new_pass) = match (&request.current_identity, &request.new_identity) {
+            (Identity::Passphrase(old), Identity::Passphrase(new)) => (old.as_str(), new.as_str()),
+            _ => {
+                return Err(AgeError::InvalidOperation {
+                    operation: "rotate".to_string(),
+                    reason: "Rotation currently supports passphrase identities only".to_string(),
+                })
+            }
+        };
+
+        self.rotate(&request.target, old_pass, new_pass)
+    }
+
+    /// Status operation using request struct (CAGE-18 follow-up)
+    pub fn status_with_request(&self, request: &StatusRequest) -> AgeResult<RepositoryStatus> {
+        self.audit_logger
+            .log_operation_start_single("status", &request.target)?;
+
+        if !request.target.exists() {
+            return Err(AgeError::file_error(
+                "read",
+                request.target.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            ));
+        }
+
+        let status = if request.target.is_file() {
+            self.get_file_status(&request.target)?
+        } else {
+            let files = if request.recursive {
+                self.collect_files_with_pattern(&request.target, request.pattern.as_deref())?
+            } else {
+                self.collect_directory_files_shallow(&request.target, request.pattern.as_deref())?
+            };
+
+            let mut status = RepositoryStatus::new();
+            for file in files {
+                status.total_files += 1;
+                if self.config.is_encrypted_file(&file) {
+                    status.encrypted_files += 1;
+                } else {
+                    status.unencrypted_files += 1;
+                }
+            }
+            status
+        };
+
+        self.audit_logger
+            .log_status_check(&request.target, &status)?;
+        Ok(status)
+    }
+
+    /// Streaming operation using request struct (CAGE-18)
+    pub fn stream_with_request(
+        &mut self,
+        request: &StreamRequest,
+        input: &mut (dyn Read + Send),
+        output: &mut (dyn Write + Send),
+    ) -> AgeResult<u64> {
+        use crate::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+
+        let adapter = ShellAdapterV2::with_config(self.config.clone())?;
+
+        match request.operation {
+            StreamOperation::Encrypt => {
+                let recipients_slice = request.recipients.as_ref().map(|list| list.as_slice());
+                adapter.encrypt_stream(
+                    input,
+                    output,
+                    &request.identity,
+                    recipients_slice,
+                    request.format,
+                )
+            }
+            StreamOperation::Decrypt => adapter.decrypt_stream(input, output, &request.identity),
+        }
+    }
+
     /// Verify operation using request struct (CAGE-11)
     pub fn verify_with_request(
         &mut self,
         request: &VerifyRequest,
     ) -> AgeResult<VerificationResult> {
-        // Current verify method doesn't support passphrase parameter
-        // TODO: Extend verify to support deep verification with passphrase
-        if request.deep_verify && request.identity.is_some() {
-            // For now, just warn that deep verify is not yet implemented
-            eprintln!(
-                "{}",
-                fmt_warning("Deep verification with passphrase not yet implemented")
-            );
+        let mut result = self.verify(&request.target)?;
+
+        if request.deep_verify {
+            let identity = request
+                .identity
+                .as_ref()
+                .ok_or_else(|| AgeError::InvalidOperation {
+                    operation: "verify".to_string(),
+                    reason: "Deep verification requires an identity or passphrase".to_string(),
+                })?;
+
+            if matches!(identity, Identity::Passphrase(pass) if pass.is_empty()) {
+                return Err(AgeError::InvalidOperation {
+                    operation: "verify".to_string(),
+                    reason: "Deep verification requires a non-empty passphrase".to_string(),
+                });
+            }
+
+            use crate::cage::adapter_v2::ShellAdapterV2;
+            let adapter = ShellAdapterV2::with_config(self.config.clone())?;
+
+            let mut still_verified = Vec::new();
+            for entry in result.verified_files.drain(..) {
+                let path = PathBuf::from(&entry);
+                match self.deep_verify_file(&adapter, &path, identity) {
+                    Ok(_) => still_verified.push(entry),
+                    Err(err) => {
+                        result
+                            .failed_files
+                            .push(format!("{}: {}", path.display(), err));
+                    }
+                }
+            }
+
+            if result.failed_files.is_empty() {
+                result.overall_status = "Deep verification completed".to_string();
+            } else {
+                result.overall_status = "Deep verification encountered failures".to_string();
+            }
+
+            result.verified_files = still_verified;
         }
 
-        self.verify(&request.target)
+        Ok(result)
     }
 
     // ========================================================================================
@@ -1410,7 +1613,8 @@ impl CrudManager {
         use crate::cage::requests::Recipient;
 
         let start_time = Instant::now();
-        self.audit_logger.log_operation_start_single("lock_multi_recipient", path)?;
+        self.audit_logger
+            .log_operation_start_single("lock_multi_recipient", path)?;
 
         let mut result = OperationResult::new();
 
@@ -1453,13 +1657,15 @@ impl CrudManager {
 
         // Authority validation if enabled
         if multi_config.validate_authority {
-            self.audit_logger.log_info("Authority validation enabled - verifying recipient proofs")?;
+            self.audit_logger
+                .log_info("Authority validation enabled - verifying recipient proofs")?;
             // TODO: Implement authority proof validation when Ignite integration is ready
         }
 
         // Hierarchy enforcement if enabled
         if multi_config.enforce_hierarchy {
-            self.audit_logger.log_info("Hierarchy enforcement enabled - checking tier compliance")?;
+            self.audit_logger
+                .log_info("Hierarchy enforcement enabled - checking tier compliance")?;
             // TODO: Implement tier hierarchy validation when Ignite integration is ready
         }
 
@@ -1606,11 +1812,18 @@ impl CrudManager {
         let groups = self.config.list_recipient_groups();
         for group_name in &groups {
             if let Some(group) = self.config.get_recipient_group(group_name) {
-                let tier_info = group.tier.map(|t| format!(" [tier:{}]", t.as_str())).unwrap_or_default();
-                self.audit_logger.log_info(&format!(
-                    "Group '{}': {} recipients{}",
-                    group_name, group.len(), tier_info
-                )).unwrap_or_default();
+                let tier_info = group
+                    .tier
+                    .map(|t| format!(" [tier:{}]", t.as_str()))
+                    .unwrap_or_default();
+                self.audit_logger
+                    .log_info(&format!(
+                        "Group '{}': {} recipients{}",
+                        group_name,
+                        group.len(),
+                        tier_info
+                    ))
+                    .unwrap_or_default();
             }
         }
         groups
@@ -1620,8 +1833,7 @@ impl CrudManager {
     pub fn add_recipient_to_group(&mut self, group_name: &str, recipient: &str) -> AgeResult<()> {
         self.audit_logger.log_info(&format!(
             "Adding recipient to group '{}': {}",
-            group_name,
-            recipient
+            group_name, recipient
         ))?;
 
         if let Some(group) = self.config.get_recipient_group_mut(group_name) {
@@ -1630,7 +1842,8 @@ impl CrudManager {
 
             self.audit_logger.log_info(&format!(
                 "Recipient added to group '{}'. Group now has {} recipients",
-                group_name, group.len()
+                group_name,
+                group.len()
             ))?;
 
             Ok(())
@@ -1643,11 +1856,14 @@ impl CrudManager {
     }
 
     /// Remove recipient from a specific group
-    pub fn remove_recipient_from_group(&mut self, group_name: &str, recipient: &str) -> AgeResult<bool> {
+    pub fn remove_recipient_from_group(
+        &mut self,
+        group_name: &str,
+        recipient: &str,
+    ) -> AgeResult<bool> {
         self.audit_logger.log_info(&format!(
             "Removing recipient from group '{}': {}",
-            group_name,
-            recipient
+            group_name, recipient
         ))?;
 
         if let Some(group) = self.config.get_recipient_group_mut(group_name) {
@@ -1656,7 +1872,8 @@ impl CrudManager {
                 group.set_metadata("last_modified".to_string(), chrono::Utc::now().to_rfc3339());
                 self.audit_logger.log_info(&format!(
                     "Recipient removed from group '{}'. Group now has {} recipients",
-                    group_name, group.len()
+                    group_name,
+                    group.len()
                 ))?;
             } else {
                 self.audit_logger.log_warning(&format!(
@@ -1682,7 +1899,8 @@ impl CrudManager {
         self.audit_logger.log_info(&format!(
             "Creating recipient group '{}'{}",
             group_name,
-            tier.map(|t| format!(" with tier {}", t.as_str())).unwrap_or_default()
+            tier.map(|t| format!(" with tier {}", t.as_str()))
+                .unwrap_or_default()
         ))?;
 
         let mut group = crate::cage::requests::RecipientGroup::new(group_name.to_string());
@@ -1704,7 +1922,8 @@ impl CrudManager {
 
     /// Audit recipient group metadata and access patterns
     pub fn audit_recipient_groups(&self) -> AgeResult<Vec<String>> {
-        self.audit_logger.log_info("Starting recipient group audit")?;
+        self.audit_logger
+            .log_info("Starting recipient group audit")?;
 
         let mut audit_report = Vec::new();
         let groups = self.config.list_recipient_groups();
@@ -1719,7 +1938,8 @@ impl CrudManager {
                     group.group_hash()
                 );
                 audit_report.push(report_line.clone());
-                self.audit_logger.log_info(&format!("AUDIT: {}", report_line))?;
+                self.audit_logger
+                    .log_info(&format!("AUDIT: {}", report_line))?;
             }
         }
 
@@ -1733,10 +1953,7 @@ impl CrudManager {
     }
 
     /// Get recipient groups by authority tier (for Ignite integration)
-    pub fn get_groups_by_tier(
-        &self,
-        tier: crate::cage::requests::AuthorityTier,
-    ) -> Vec<String> {
+    pub fn get_groups_by_tier(&self, tier: crate::cage::requests::AuthorityTier) -> Vec<String> {
         let groups = self.config.get_groups_by_tier(tier);
         groups.iter().map(|g| g.name.clone()).collect()
     }
@@ -1744,18 +1961,32 @@ impl CrudManager {
     /// Get adapter info with recipient group counts (for Ignite validation)
     pub fn get_adapter_info_with_groups(&self) -> std::collections::HashMap<String, String> {
         let mut info = std::collections::HashMap::new();
-        info.insert("total_groups".to_string(), self.config.get_recipient_group_count().to_string());
-        info.insert("total_recipients".to_string(), self.config.get_total_recipients_count().to_string());
-        info.insert("padlock_support".to_string(), self.config.padlock_extension_support.to_string());
+        info.insert(
+            "total_groups".to_string(),
+            self.config.get_recipient_group_count().to_string(),
+        );
+        info.insert(
+            "total_recipients".to_string(),
+            self.config.get_total_recipients_count().to_string(),
+        );
+        info.insert(
+            "padlock_support".to_string(),
+            self.config.padlock_extension_support.to_string(),
+        );
 
         // Add tier-specific counts
         use crate::cage::requests::AuthorityTier;
-        for tier in [AuthorityTier::Skull, AuthorityTier::Master, AuthorityTier::Repository,
-                     AuthorityTier::Ignition, AuthorityTier::Distro] {
+        for tier in [
+            AuthorityTier::Skull,
+            AuthorityTier::Master,
+            AuthorityTier::Repository,
+            AuthorityTier::Ignition,
+            AuthorityTier::Distro,
+        ] {
             let tier_groups = self.config.get_groups_by_tier(tier);
             info.insert(
                 format!("{}_groups", tier.as_str().to_lowercase()),
-                tier_groups.len().to_string()
+                tier_groups.len().to_string(),
             );
         }
 
@@ -1846,6 +2077,101 @@ impl CrudManager {
             recovery_actions: vec!["Emergency unlock procedures initiated".to_string()],
             security_events: vec!["Emergency access authorized".to_string()],
         })
+    }
+
+    /// BATCH: Bulk operations using request API (CAGE-20)
+    pub fn batch_with_request(&mut self, request: &BatchRequest) -> AgeResult<OperationResult> {
+        let op_label = match request.operation {
+            BatchOperation::Lock => "batch_lock",
+            BatchOperation::Unlock => "batch_unlock",
+        };
+
+        self.audit_logger
+            .log_operation_start_single(op_label, &request.target)?;
+
+        if !request.target.exists() || !request.target.is_dir() {
+            return Err(AgeError::InvalidOperation {
+                operation: "batch".to_string(),
+                reason: "Directory path required".to_string(),
+            });
+        }
+
+        let files = if request.recursive {
+            self.collect_files_with_pattern(&request.target, request.pattern.as_deref())?
+        } else {
+            self.collect_directory_files_shallow(&request.target, request.pattern.as_deref())?
+        };
+
+        let start_time = Instant::now();
+        let mut result = OperationResult::new();
+
+        match request.operation {
+            BatchOperation::Lock => {
+                for file in files {
+                    let mut lock_request = LockRequest::new(file.clone(), request.identity.clone())
+                        .with_format(request.format);
+
+                    if let Some(ref recipients) = request.recipients {
+                        lock_request = lock_request.with_recipients(recipients.clone());
+                    }
+
+                    lock_request.backup = request.backup;
+                    lock_request.recursive = false;
+                    lock_request.common = request.common.clone();
+
+                    match self.lock_with_request(&lock_request) {
+                        Ok(operation) => {
+                            for success in operation.processed_files {
+                                result.add_success(success);
+                            }
+                            for failure in operation.failed_files {
+                                result.add_failure(failure);
+                            }
+                        }
+                        Err(err) => {
+                            result.add_failure(format!("{}: {}", file.display(), err));
+                        }
+                    }
+                }
+            }
+            BatchOperation::Unlock => {
+                for file in files {
+                    let mut unlock_request =
+                        UnlockRequest::new(file.clone(), request.identity.clone())
+                            .selective(request.common.force)
+                            .preserve_encrypted(request.preserve_encrypted);
+                    unlock_request.verify_first = request.verify_before_unlock;
+                    unlock_request.recursive = false;
+                    unlock_request.common = request.common.clone();
+
+                    match self.unlock_with_request(&unlock_request) {
+                        Ok(operation) => {
+                            for success in operation.processed_files {
+                                result.add_success(success);
+                            }
+                            for failure in operation.failed_files {
+                                result.add_failure(failure);
+                            }
+                        }
+                        Err(err) => {
+                            result.add_failure(format!("{}: {}", file.display(), err));
+                        }
+                    }
+                }
+            }
+        }
+
+        result.finalize(start_time);
+
+        self.record_operation(
+            op_label,
+            &request.target,
+            result.failed_files.is_empty(),
+            &result,
+        );
+        self.audit_logger
+            .log_operation_complete(op_label, &request.target, &result)?;
+        Ok(result)
     }
 
     /// BATCH: Bulk operations for directories/repositories
@@ -2600,6 +2926,62 @@ impl CrudManager {
         )?;
 
         Ok(files)
+    }
+
+    fn collect_directory_files_shallow(
+        &self,
+        directory: &Path,
+        pattern: Option<&str>,
+    ) -> AgeResult<Vec<PathBuf>> {
+        let matcher = pattern.map(|p| self.create_glob_matcher(p)).transpose()?;
+        let entries = std::fs::read_dir(directory)
+            .map_err(|e| AgeError::file_error("read_dir", directory.to_path_buf(), e))?;
+
+        let mut files = Vec::new();
+        for entry in entries {
+            let entry = entry
+                .map_err(|e| AgeError::file_error("read_entry", directory.to_path_buf(), e))?;
+            let path = entry.path();
+
+            if path.is_file() {
+                if let Some(ref matcher) = matcher {
+                    if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                        if !matcher.is_match(filename) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                files.push(path);
+            }
+        }
+
+        Ok(files)
+    }
+
+    fn deep_verify_file(
+        &self,
+        adapter: &crate::cage::adapter_v2::ShellAdapterV2,
+        file: &Path,
+        identity: &Identity,
+    ) -> AgeResult<()> {
+        if !file.exists() {
+            return Err(AgeError::file_error(
+                "verify",
+                file.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"),
+            ));
+        }
+
+        let temp = NamedTempFile::new().map_err(|e| AgeError::TemporaryResourceError {
+            resource_type: "file".to_string(),
+            operation: "deep_verify".to_string(),
+            reason: format!("{e}"),
+        })?;
+
+        adapter.decrypt_file(file, temp.path(), identity)?;
+        Ok(())
     }
 
     /// Collect encrypted files matching pattern
