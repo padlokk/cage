@@ -24,7 +24,7 @@ Padlock and Ignite unblocked.
 ### Stakeholder MVP Requirements
 1. ✅ Cage is fully usable as both a CLI and a library with parity across surfaces (shared request API + adapters).
 2. ✅ A comprehensive configuration surface (`AgeConfig`/`CageConfig`) captures operational knobs and is consumed by both surfaces.
-3. ✅ Streaming encrypt/decrypt flows are first-class (`CrudManager::stream_with_request`, `cage stream`).
+3. ✅ Streaming encrypt/decrypt flows are first-class (`CageManager::stream_with_request`, `cage stream`).
 4. ✅ SSH identities are supported for encrypt/decrypt workflows.
 5. ✅ ASCII armor output remains available for applicable environments.
 6. ⏸ Deterministic/derived key workflows (`age --derive`) remain deferred pending upstream `age` crate support.
@@ -42,7 +42,7 @@ structured configuration and operation requests.
 - Replace ad-hoc CLI flag plumbing with typed structs (e.g. `LockRequest`,
   `UnlockRequest`, `KeyRotateRequest`). These structs become the single source
   for both library calls and CLI dispatch.
-- Update `CrudManager` methods to accept request structs instead of primitive
+- Update `CageManager` methods to accept request structs instead of primitive
   parameter lists.
 - Maintain backwards compatibility via helper constructors in the CLI module.
 
@@ -67,7 +67,7 @@ structured configuration and operation requests.
 SSH identities, deterministic keys, and multi-recipient lifecycle features.
 
 ### Milestone 2.1 – Streaming Encryption & Decryption
-*Status:* ✅ Completed. Streaming runs through shared adapters (`CrudManager::stream_with_request` / `cage stream`) with regressions covering passphrase fallbacks and pipe capability reporting.
+*Status:* ✅ Completed. Streaming runs through shared adapters (`CageManager::stream_with_request` / `cage stream`) with regressions covering passphrase fallbacks and pipe capability reporting.
 
 ### Milestone 2.2 – SSH Identity Support
 *Strategy*
@@ -88,7 +88,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 *Status:* Deferred until Phase 4 (library adapter). No immediate Padlock/Ignite dependency; revisit when AGE-01 lands.
 
 ### Milestone 2.4 – Multi-Recipient Lifecycle
-*Status:* ✅ Completed. Request structs, CrudManager helpers, and docs/tests cover recipient group flows aligned with Ignite/Padlock expectations.
+*Status:* ✅ Completed. Request structs, CageManager helpers, and docs/tests cover recipient group flows aligned with Ignite/Padlock expectations.
 
 ## Phase 3 – Hardening & Tooling
 
@@ -132,7 +132,7 @@ SSH identities, deterministic keys, and multi-recipient lifecycle features.
 
 ### Milestone 4.1 – Library Adapter Parity
 - Implement a new adapter that wraps `age::Encryptor` / `age::Decryptor` for both file and streaming operations.
-- Maintain request/response semantics so CrudManager and existing request structs stay unchanged.
+- Maintain request/response semantics so CageManager and existing request structs stay unchanged.
 - Keep the shell-based adapter available as a configurable fallback until parity is validated.
 
 ### Milestone 4.2 – Passphrase & Plugin Integration

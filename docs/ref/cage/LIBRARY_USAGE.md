@@ -19,16 +19,16 @@ cage = { path = "path/to/cage" }
 # cage = "0.3.1"
 ```
 
-> CLI users can run `cage init` to seed the default XDG directories and `cage.toml`. Re-running the command is idempotent; pass `--force` (or `-f`) to overwrite an existing config. Library consumers (Ignite, Padlock, etc.) typically construct `AgeConfig`/`CageConfig` explicitly and pass it into `CrudManager::new(...)`, so configuration remains under the caller’s control regardless of the host environment.
+> CLI users can run `cage init` to seed the default XDG directories and `cage.toml`. Re-running the command is idempotent; pass `--force` (or `-f`) to overwrite an existing config. Library consumers (Ignite, Padlock, etc.) typically construct `AgeConfig`/`CageConfig` explicitly and pass it into `CageManager::new(...)`, so configuration remains under the caller’s control regardless of the host environment.
 
 ### Basic Encryption Example (Request API)
 
 ```rust
-use cage::cage::{CrudManager, OutputFormat};
+use cage::cage::{CageManager, OutputFormat};
 use cage::cage::requests::{LockRequest, Identity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
 
     let request = LockRequest::new(
         std::path::PathBuf::from("secret.txt"),
@@ -50,15 +50,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🏗️ Core Modules
 
-### 1. CrudManager + Request API
+### 1. CageManager + Request API
 
 The primary interface now accepts typed request structs that mirror CLI features.
 
 ```rust
-use cage::cage::{CrudManager, OutputFormat};
+use cage::cage::{CageManager, OutputFormat};
 use cage::cage::requests::{Identity, LockRequest, RotateRequest, UnlockRequest};
 
-let mut crud_manager = CrudManager::with_defaults()?;
+let mut crud_manager = CageManager::with_defaults()?;
 
 let lock_request = LockRequest::new(
     std::path::PathBuf::from("docs/"),
@@ -118,9 +118,9 @@ For existing integrations you can continue using `lock(&path, passphrase, LockOp
 `unlock(&path, passphrase, UnlockOptions)`. Those internally delegate to the same logic used by request structs.
 
 ```rust
-use cage::cage::{CrudManager, LockOptions, OutputFormat};
+use cage::cage::{CageManager, LockOptions, OutputFormat};
 
-let mut crud_manager = CrudManager::with_defaults()?;
+let mut crud_manager = CageManager::with_defaults()?;
 
 let legacy_options = LockOptions {
     recursive: false,
@@ -209,14 +209,14 @@ strategy = "pipe"` in `~/.config/cage/config.toml` (or the path referenced by `C
 
 > **Requirements:** Streaming helpers expect the `age` binary to be installed and visible on `PATH`. Test suites skip automatically when the binary is absent.
 
-#### High-Level Streaming (CrudManager)
+#### High-Level Streaming (CageManager)
 
 ```rust
-use cage::cage::CrudManager;
+use cage::cage::CageManager;
 use cage::cage::requests::{Identity, StreamRequest};
 use std::io::Cursor;
 
-let mut crud_manager = CrudManager::with_defaults()?;
+let mut crud_manager = CageManager::with_defaults()?;
 
 let mut plaintext = Cursor::new(b"large payload".to_vec());
 let mut ciphertext = Cursor::new(Vec::new());
@@ -424,7 +424,7 @@ fn encrypt_with_progress(files: Vec<PathBuf>) -> Result<(), Box<dyn std::error::
         ProgressStyle::Bar { total: files.len() as u64 }
     );
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
     let options = LockOptions::default();
 
     for (i, file) in files.iter().enumerate() {
@@ -443,13 +443,13 @@ fn encrypt_with_progress(files: Vec<PathBuf>) -> Result<(), Box<dyn std::error::
 ### 2. Batch Operations with Error Handling
 
 ```rust
-use cage::cage::{CrudManager, LockOptions};
+use cage::cage::{CageManager, LockOptions};
 
 fn batch_encrypt_with_recovery(
     files: Vec<PathBuf>,
     passphrase: &str
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
     let options = LockOptions::default();
     let mut errors = Vec::new();
 
@@ -551,7 +551,7 @@ let mut config = AgeConfig::default();
 config.telemetry_format = TelemetryFormat::Json;
 config.audit_log_path = Some("/var/log/cage/audit.json".to_string());
 
-let mut crud_manager = CrudManager::with_config(config)?;
+let mut crud_manager = CageManager::with_config(config)?;
 ```
 
 **Telemetry Formats:**
@@ -618,7 +618,7 @@ fn encrypt_from_config(config_path: &str, target: &str) -> Result<(), Box<dyn st
     let config_str = std::fs::read_to_string(config_path)?;
     let config: EncryptionConfig = serde_json::from_str(&config_str)?;
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
     let options = LockOptions {
         recursive: config.recursive,
         backup: config.backup,
@@ -698,7 +698,7 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         std::fs::write(&test_file, "secret content")?;
 
-        let mut crud_manager = CrudManager::with_defaults()?;
+        let mut crud_manager = CageManager::with_defaults()?;
         let options = LockOptions::default();
 
         let result = crud_manager.lock(&test_file, "testpassword", options)?;
@@ -797,7 +797,7 @@ async fn encrypt_endpoint(
     std::fs::write(&temp_file, &file_data)
         .map_err(|_| warp::reject::custom(ServerError))?;
 
-    let mut crud_manager = CrudManager::with_defaults()
+    let mut crud_manager = CageManager::with_defaults()
         .map_err(|_| warp::reject::custom(ServerError))?;
 
     let options = LockOptions::default();
@@ -836,13 +836,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let task = manager.start_task("Encrypting", ProgressStyle::Spinner);
 
         // Perform encryption with progress
-        let mut crud_manager = CrudManager::with_defaults()?;
+        let mut crud_manager = CageManager::with_defaults()?;
         crud_manager.lock(&PathBuf::from(file), "password", LockOptions::default())?;
 
         task.complete("Encryption finished");
     } else {
         // Perform encryption without progress
-        let mut crud_manager = CrudManager::with_defaults()?;
+        let mut crud_manager = CageManager::with_defaults()?;
         crud_manager.lock(&PathBuf::from(file), "password", LockOptions::default())?;
     }
 

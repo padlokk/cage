@@ -313,13 +313,13 @@ cage = { path = "path/to/cage" }
 
 ```rust
 use cage::cage::{
-    CrudManager, LockOptions, UnlockOptions,
+    CageManager, LockOptions, UnlockOptions,
     OutputFormat, PassphraseManager, PassphraseMode
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize CRUD manager
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
 
     // Create lock options
     let options = LockOptions {
@@ -399,7 +399,7 @@ let result = automator.execute_age_command(
 
 ### Available Modules
 
-- **`cage::cage::CrudManager`** - Core file encryption/decryption operations
+- **`cage::cage::CageManager`** - Core file encryption/decryption operations
 - **`rsb::progress`** - Progress reporting framework (used by Cage)
 - **`cage::cage::pty_wrap`** - PTY automation for Age binary
 - **`cage::cage::SafetyValidator`** - In-place operation safety checks

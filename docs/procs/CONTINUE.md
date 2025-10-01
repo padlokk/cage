@@ -137,7 +137,7 @@
 ### Phase: Validation & backlog reconciliation
 
 ### Completed:
-- ✅ Verified BUG-01/02/03/05 landed in `CrudManager` & proxy pipeline (extension suffix, recursion, globbing, PTY proxy).
+- ✅ Verified BUG-01/02/03/05 landed in `CageManager` & proxy pipeline (extension suffix, recursion, globbing, PTY proxy).
 - ✅ Documented outstanding work in TASKS/PROCESS/QUICK_REF (selective unlock, backup retention, config loader, recipient/identity backlog).
 - ✅ Added CAGE-10 ticket for identity-key support and adjusted priority queue.
 

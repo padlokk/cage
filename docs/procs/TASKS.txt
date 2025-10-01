@@ -46,7 +46,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Gate the test to skip when the `age` binary is unavailable (consistent with other CLI-dependent checks).
 
 ### CAGE-17: Rotate Request Integration [3 pts] ✅
-- [x] Implemented `CrudManager::rotate_with_request` with passphrase validation and feature gating for future enhancements.
+- [x] Implemented `CageManager::rotate_with_request` with passphrase validation and feature gating for future enhancements.
 - [x] Updated CLI `cmd_rotate` to construct `RotateRequest` builders so both surfaces share the same pipeline.
 - [x] Added request API regression coverage (`test_rotate_with_request_api`) exercising passphrase rotation flows.
 - [x] Refreshed library docs with request-based rotation examples (see `docs/ref/cage/LIBRARY_USAGE.md`).
@@ -101,7 +101,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ### CAGE-16: Multi-Recipient Lifecycle [8 pts] ✅ **COMPLETED**
 - [x] Formalize recipient group model (struct/enums) for request API + config.
-- [x] Update adapters/CrudManager to accept recipient vectors for all encrypt ops.
+- [x] Update adapters/CageManager to accept recipient vectors for all encrypt ops.
 - [x] Provide lifecycle helpers (list/add/remove recipients, audit metadata).
 - [x] Tests ensuring each recipient can decrypt; include rotation scenarios.
 **Priority:** 🔺 Required for Ignite → Padlock rotations (repo & distro keys).
@@ -117,7 +117,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Extend CLI help/README with streaming workflow guidance.
 
 ### CAGE-18: Streaming API Parity [5 pts] ✅
-- [x] Exposed streaming encrypt/decrypt helpers on `CrudManager::stream_with_request` backed by `ShellAdapterV2`.
+- [x] Exposed streaming encrypt/decrypt helpers on `CageManager::stream_with_request` backed by `ShellAdapterV2`.
 - [x] Added `cage stream encrypt|decrypt` CLI surface and refreshed README guidance.
 - [x] Highlighted streaming availability in adapter inspection output.
 - [x] Added request API regression coverage for streaming flows (passphrase fallback).
@@ -137,7 +137,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 **Implementation Notes:**
 - Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/lifecycle/crud_manager.rs`).
 - Document ASCII-safe toggle behaviour; Padlock UI will eventually need plain-text mode for logs.
-- Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CrudManager).
+- Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CageManager).
 
 ### CAGE-19: Deployment Script Hardening [2 pts] ✅
 - [x] Update `bin/deploy.sh` to validate build artifacts, support `--prefix` overrides, and emit clear success/error messaging.
@@ -186,7 +186,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Added `log_encryption_event_extended()` and `log_decryption_event_extended()` with streaming/authority tier metadata.
 - All log methods now support both Text and JSON formats via `TelemetryFormat` enum.
 - Sensitive fields automatically redacted (recipient public keys hashed with MD5 for audit trail).
-- Telemetry format wired from `AgeConfig` to `CrudManager`.
+- Telemetry format wired from `AgeConfig` to `CageManager`.
 - Documentation updated: README + `docs/ref/cage/LIBRARY_USAGE.md` with JSON examples.
 - 4 new tests covering JSON telemetry output (total: 87 library tests passing).
 
@@ -202,7 +202,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 **Notes:** README build steps now call out `cage init`, PROCESS/QUICK_REF include bootstrap commands, and CODEX warmup highlights when to rerun `cage init --force`.
 
 ### DOC-06: CageManager Terminology Refresh [1 pt] 🔴
-- [ ] Update README, Library Usage, Padlock integration docs, and roadmap/task references from `CrudManager` to `CageManager`.
+- [ ] Update README, Library Usage, Padlock integration docs, and roadmap/task references from `CageManager` to `CageManager`.
 - [ ] Refresh warmup/process docs and feature matrices to reflect the new manager naming.
 - [ ] Double-check helper scripts, examples, and code snippets so user-facing guidance stays consistent.
 
@@ -237,7 +237,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ### MOD3-01: Establish Project Prelude [2 pts] ✅
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md`
-- [x] Create `src/prelude.rs` that curates the public surface (CrudManager, requests, adapter traits, helpers).
+- [x] Create `src/prelude.rs` that curates the public surface (CageManager, requests, adapter traits, helpers).
 - [x] Update `lib.rs` to re-export via `pub mod prelude` and document usage in README/Library Usage docs.
 - [x] Verified crate consumers can compile simple examples via `use cage::prelude::*`.
 
@@ -256,6 +256,60 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Improve prompt detection (case-insensitive / regex) and capture age stderr for debugging.
 - [x] Audit error surfaces so PTY/TTY permission issues return actionable messages.
 - [x] Evaluate non-blocking read strategy to remove busy-wait sleeps.
+
+---
+
+## Module Spec Refactor (MOD4 Series)
+
+### MOD4-01: Reorganize Adapter Module [5 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
+- [ ] Create `src/cage/adapter/` directory with `mod.rs` orchestrator
+- [ ] Move `adapter.rs` → `src/cage/adapter/v1.rs`
+- [ ] Move `adapter_v2.rs` → `src/cage/adapter/v2.rs`
+- [ ] Move `adapter_v2_pipe_passphrase.rs` → `src/cage/adapter/pipe_passphrase.rs`
+- [ ] Create `src/cage/adapter/error.rs` for adapter-specific errors
+- [ ] Update `src/cage/mod.rs` to reference new structure
+- [ ] Verify all tests pass after reorganization
+**Rationale:** Multiple adapter files should be organized under a single module directory per MODULE_SPEC
+
+### MOD4-02: Reorganize Security & Automation [3 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
+- [ ] Create `src/cage/security/` directory with `mod.rs`
+- [ ] Move `security.rs` → `src/cage/security/audit.rs`
+- [ ] Move `passphrase.rs` → `src/cage/security/passphrase.rs`
+- [ ] Move `pty_wrap.rs` → `src/cage/security/pty.rs`
+- [ ] Move `tty_automation.rs` → `src/cage/security/tty.rs`
+- [ ] Create `src/cage/security/error.rs` for security-specific errors
+- [ ] Update imports across codebase
+**Rationale:** Security-related files scattered; should be cohesive module
+
+### MOD4-03: Reorganize Core Primitives [3 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
+- [ ] Create `src/cage/core/` directory with `mod.rs`
+- [ ] Move `age_engine.rs` → `src/cage/core/engine.rs`
+- [ ] Move `config.rs` → `src/cage/core/config.rs`
+- [ ] Move `requests.rs` → `src/cage/core/requests.rs`
+- [ ] Move `in_place.rs` → `src/cage/core/recovery.rs`
+- [ ] Create `src/cage/core/error.rs` for core errors
+- [ ] Update imports and re-exports
+**Rationale:** Core primitives should be grouped for clarity
+
+### MOD4-04: Create Standard Module Files [2 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Module Layout"
+- [ ] Create `src/cage/utils.rs` - curated low-level helpers
+- [ ] Create `src/cage/helpers.rs` - internal implementations
+- [ ] Create `src/cage/macros.rs` - module-owned macros
+- [ ] Update `src/cage/mod.rs` to expose utils appropriately
+- [ ] Document helper usage in module docs
+**Rationale:** MODULE_SPEC requires standard helper/macro files
+
+### MOD4-05: Move Strings to Lang Module [2 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Standard Src Specification"
+- [ ] Move `src/cage/strings.rs` → `src/lang.rs`
+- [ ] Update all imports from `crate::cage::strings` to `crate::lang`
+- [ ] Re-export via prelude if needed
+- [ ] Verify SEC-01 string management patterns still work
+**Rationale:** Per MODULE_SPEC, `src/lang.rs` is standard location for string constants
 
 ---
 
@@ -339,7 +393,7 @@ cargo test --test test_backup_retention test_retention_keep_last_and_days
 
 ### AGE-01: Library Adapter Implementation [5 pts] 🔴
 - [ ] Build a new adapter implementation that wraps `age::Encryptor` / `age::Decryptor` APIs for file and streaming workflows.
-- [ ] Preserve request/response semantics so CrudManager and request structs remain unchanged.
+- [ ] Preserve request/response semantics so CageManager and request structs remain unchanged.
 - [ ] Keep the existing shell-based adapter available as a fallback strategy until feature parity is validated.
 **Implementation Notes:**
 - Start with passphrase + recipient flows; reuse streaming helpers from `ShellAdapterV2`.
