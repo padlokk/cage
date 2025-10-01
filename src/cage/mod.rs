@@ -21,7 +21,8 @@ pub mod chunker;
 pub mod config;
 pub mod error;
 pub mod in_place;
-pub mod lifecycle;
+pub mod keygen; // Key generation service module (CAGE-21)
+pub mod manager; // CageManager lifecycle coordination
 pub mod operations;
 pub mod passphrase;
 pub mod pty_wrap; // New PTY automation module
@@ -37,7 +38,8 @@ pub use chunker::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker}
 pub use config::{AgeConfig, OutputFormat, TtyMethod};
 pub use error::{AgeError, AgeResult};
 pub use in_place::{InPlaceOperation, InPlaceOptions, RecoveryManager, SafetyValidator};
-pub use lifecycle::{CrudManager, LockOptions, UnlockOptions, VerificationResult};
+pub use keygen::{KeygenError, KeygenRequest, KeygenService, KeygenSummary};
+pub use manager::{CageManager, LockOptions, UnlockOptions, VerificationResult};
 pub use operations::{
     FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus,
 };

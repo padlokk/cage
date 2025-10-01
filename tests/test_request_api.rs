@@ -1,11 +1,11 @@
 #![allow(unused_mut)]
 
 //! Test the new request API (CAGE-11)
-//! Demonstrates that the unified request structs are properly wired into CrudManager
+//! Demonstrates that the unified request structs are properly wired into CageManager
 
 use cage::cage::adapter::ShellAdapter;
 use cage::cage::config::{AgeConfig, OutputFormat};
-use cage::cage::lifecycle::crud_manager::CrudManager;
+use cage::cage::manager::cage_manager::CageManager;
 use cage::cage::requests::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamRequest, UnlockRequest,
@@ -22,7 +22,7 @@ fn age_keygen_available() -> bool {
     which::which("age-keygen").is_ok()
 }
 
-fn setup_test_manager(temp_dir: &TempDir) -> Option<CrudManager> {
+fn setup_test_manager(temp_dir: &TempDir) -> Option<CageManager> {
     let adapter = match ShellAdapter::new() {
         Ok(adapter) => Box::new(adapter),
         Err(err) => {
@@ -34,10 +34,10 @@ fn setup_test_manager(temp_dir: &TempDir) -> Option<CrudManager> {
     let mut config = AgeConfig::default();
     config.audit_log_path = Some(temp_dir.path().join("audit.log").display().to_string());
 
-    match CrudManager::new(adapter, config) {
+    match CageManager::new(adapter, config) {
         Ok(manager) => Some(manager),
         Err(err) => {
-            println!("SKIPPED: CrudManager unavailable (environment restrictions): {err}");
+            println!("SKIPPED: CageManager unavailable (environment restrictions): {err}");
             None
         }
     }
@@ -612,7 +612,7 @@ fn test_unlock_with_identity_file_request() -> Result<(), Box<dyn std::error::Er
     // Remove original plaintext so unlock must restore it
     std::fs::remove_file(&plaintext)?;
 
-    let mut manager = match CrudManager::with_defaults() {
+    let mut manager = match CageManager::with_defaults() {
         Ok(manager) => manager,
         Err(err) => {
             let msg = err.to_string();
@@ -699,7 +699,7 @@ fn test_lock_with_recipients_request() -> Result<(), Box<dyn std::error::Error>>
     let plaintext = temp_dir.path().join("recipient_test.txt");
     std::fs::write(&plaintext, b"recipient encrypted secret")?;
 
-    let mut manager = match CrudManager::with_defaults() {
+    let mut manager = match CageManager::with_defaults() {
         Ok(manager) => manager,
         Err(err) => {
             let msg = err.to_string();

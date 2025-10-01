@@ -1,0 +1,23 @@
+# Cage Support Matrix for age Features
+
+## Major Features
+- **X25519 recipient encryption** — Supported via shell adapter using `age -r`; request structs map `Recipient::PublicKey` and multi-recipient configs into CLI arguments (`src/cage/adapter_v2.rs:406-449`, `src/cage/lifecycle/crud_manager.rs:1605-1683`).
+- **Passphrase encryption (`age --passphrase`)** — Supported; Cage uses PTY automation for interactive CLI flows and temp-file staging when streaming (`src/cage/adapter_v2.rs:485-515`, `src/cage/adapter_v2.rs:532-603`).
+- **ASCII armor output (`-a`)** — Supported; exposed through `OutputFormat::AsciiArmor` in config/request APIs and forwarded to CLI (`src/cage/adapter_v2.rs:427-449`).
+- **Recipient files (`age -R recipients.txt`)** — Supported through `Recipient::RecipientsFile` which validates paths and passes them through unchanged (`src/cage/adapter_v2.rs:413-449`).
+- **SSH recipients / identities (`age --encrypt --recipient-file` with SSH keys)** — Supported; Cage accepts SSH recipients and identity files and forwards them to `age`, with validation helpers and streaming parity (`src/cage/adapter_v2.rs:413-449`, `src/cage/adapter_v2.rs:660-693`).
+- **Streaming (stdin/stdout pipes)** — Partially supported. Recipient/identity flows can use true pipes when `CAGE_STREAMING_STRATEGY=pipe`; passphrase mode falls back to temp files unless `CAGE_PASSPHRASE_PIPE=1`, and even then depends on PTY reliability (`src/cage/adapter_v2.rs:532-603`, `src/cage/adapter_v2.rs:607-662`).
+- **Multiple recipients per file** — Supported via `MultiRecipientConfig`, which flattens groups and forwards unique recipients to the CLI (`src/cage/lifecycle/crud_manager.rs:1605-1719`).
+- **Decrypt with identities (`age -d -i identity.txt`)** — Supported for file and streaming flows; Cage validates identity paths and delegates to CLI (`src/cage/adapter_v2.rs:517-549`, `src/cage/adapter_v2.rs:607-662`).
+
+## Minor / Advanced Features
+- **`age-keygen` identity generation** — Not yet integrated. Cage currently returns "not implemented" for `generate_identity` and expects users to run `age-keygen` themselves (`src/cage/adapter_v2.rs:706-709`).
+- **Deterministic key derivation (`age --derive`)** — Not supported; deferred to CAGE-15 pending upstream stability (`docs/procs/TASKS.txt`, `docs/ref/cage/AGE_LIBRARY_MIGRATION.md:70-75`).
+- **Plugin recipients (e.g., `age-plugin-yubikey`)** — Effectively pass-through; Cage does not probe or configure plugins but the CLI invocation will use them if present. Capability reporting for plugins is still TODO (`src/cage/adapter_v2.rs:751-804`, `docs/procs/TASKS.txt` AGE-03).
+- **Custom scrypt parameters (`-i`, `-t`, `-m`)** — Not exposed via Cage request APIs today; users relying on passphrase mode get the default age CLI settings.
+- **Armor / binary autodetection** — Supported through `OutputFormat::detect_from_path`, though CLI still dictates final behavior (`src/cage/config.rs:17-48`).
+- **Pipe + passphrase parity** — Experimental; requires env opt-in and may still fall back to temp files for security/error handling (`src/cage/adapter_v2.rs:555-599`).
+- **Audit / telemetry for age operations** — Cage adds structured logging before/after CLI calls, independent of core age functionality (`src/cage/lifecycle/crud_manager.rs:1105-1149`, `src/cage/age_engine.rs:26-116`).
+
+## Summary
+Cage currently mirrors most `age` CLI capabilities by forwarding request metadata through the shell adapter. Core encryption, decryption, multi-recipient, SSH, and ASCII armor paths are fully supported. Advanced features such as built-in keypair generation, deterministic key derivation, plugin introspection, and fine-grained passphrase tuning remain pending.

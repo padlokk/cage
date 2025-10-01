@@ -2,7 +2,7 @@
 
 use cage::cage::{
     config::AgeConfig,
-    lifecycle::crud_manager::CrudManager,
+    manager::cage_manager::CageManager,
     requests::{AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup},
 };
 use std::path::PathBuf;
@@ -209,8 +209,8 @@ fn test_lock_request_with_multi_recipient_config() {
 }
 
 #[test]
-fn test_crud_manager_recipient_lifecycle() {
-    if let Ok(mut crud_manager) = CrudManager::with_defaults() {
+fn test_cage_manager_recipient_lifecycle() {
+    if let Ok(mut crud_manager) = CageManager::with_defaults() {
         // Test creating a recipient group
         let result =
             crud_manager.create_recipient_group("test_group", Some(AuthorityTier::Repository));
@@ -252,7 +252,7 @@ fn test_crud_manager_recipient_lifecycle() {
         assert!(info.contains_key("padlock_support"));
         assert!(info.contains_key("r_groups")); // Repository tier is "R"
     } else {
-        println!("Skipping CrudManager lifecycle test - Age not available");
+        println!("Skipping CageManager lifecycle test - Age not available");
     }
 }
 

@@ -1,10 +1,10 @@
-//! CRUD Manager - Central Lifecycle Coordinator for Age Automation
+//! Cage Manager - Central Coordinator for Age Automation
 //!
-//! The CrudManager provides comprehensive lifecycle coordination for all Age encryption
+//! The CageManager provides comprehensive lifecycle coordination for all Age encryption
 //! operations, integrating TTY automation, authority management, and operational validation
-//! into a unified interface that supports the complete padlock command set.
+//! into a unified interface that supports the complete Padlock command set.
 //!
-//! Security Guardian: Edgar - Production CRUD coordination with authority integration
+//! Security Guardian: Edgar - Production coordination with authority integration
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
@@ -799,7 +799,7 @@ pub struct EmergencyResult {
 }
 
 /// Central CRUD manager coordinating all Age automation lifecycle operations
-pub struct CrudManager {
+pub struct CageManager {
     adapter: Box<dyn AgeAdapter>,
     audit_logger: AuditLogger,
     config: AgeConfig,
@@ -822,7 +822,7 @@ pub struct OperationRecord {
     details: HashMap<String, String>,
 }
 
-impl CrudManager {
+impl CageManager {
     fn build_backup_manager(&self, options: &LockOptions) -> BackupManager {
         let mut manager = if let Some(dir) = options
             .backup_dir
@@ -841,7 +841,7 @@ impl CrudManager {
         manager
     }
 
-    /// Create new CrudManager with specified adapter and configuration
+    /// Create new CageManager with specified adapter and configuration
     pub fn new(adapter: Box<dyn AgeAdapter>, config: AgeConfig) -> AgeResult<Self> {
         // Enable RSB glyph output for legacy UI strings
         glyph_enable();
@@ -865,7 +865,7 @@ impl CrudManager {
         })
     }
 
-    /// Create CrudManager with default configuration
+    /// Create CageManager with default configuration
     pub fn with_defaults() -> AgeResult<Self> {
         let adapter = super::super::adapter::AdapterFactory::create_default()?;
         let config = AgeConfig::load_default()?;
@@ -1908,7 +1908,7 @@ impl CrudManager {
             group.tier = Some(t);
         }
         group.set_metadata("created_at".to_string(), chrono::Utc::now().to_rfc3339());
-        group.set_metadata("created_by".to_string(), "cage_crud_manager".to_string());
+        group.set_metadata("created_by".to_string(), "cage_manager".to_string());
 
         self.config.add_recipient_group(group);
 
@@ -3061,12 +3061,12 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_crud_manager_creation() {
-        match CrudManager::with_defaults() {
+    fn test_cage_manager_creation() {
+        match CageManager::with_defaults() {
             Ok(_) => {}
             Err(e) => {
                 println!(
-                    "CrudManager creation test skipped: PTY unavailable or age binary missing ({e})"
+                    "CageManager creation test skipped: PTY unavailable or age binary missing ({e})"
                 );
             }
         }
@@ -3074,7 +3074,7 @@ mod tests {
 
     #[test]
     fn test_passphrase_validation() {
-        let crud_manager = match CrudManager::with_defaults() {
+        let crud_manager = match CageManager::with_defaults() {
             Ok(cm) => cm,
             Err(e) => {
                 println!(
@@ -3116,7 +3116,7 @@ mod tests {
     #[test]
     fn test_key_rotation_validation() {
         // Test basic validation logic
-        if let Ok(mut crud_manager) = CrudManager::with_defaults() {
+        if let Ok(mut crud_manager) = CageManager::with_defaults() {
             // Test same passphrase rejection
             let temp_dir = TempDir::new().unwrap();
             let result = crud_manager.rotate(temp_dir.path(), "same_pass", "same_pass");
@@ -3133,7 +3133,7 @@ mod tests {
 
     #[test]
     fn test_encrypted_file_detection() {
-        if let Ok(crud_manager) = CrudManager::with_defaults() {
+        if let Ok(crud_manager) = CageManager::with_defaults() {
             // Test with non-existent file
             let fake_path = std::path::Path::new("/non/existent/file");
             let result = crud_manager.is_encrypted_file(fake_path).unwrap();
@@ -3151,7 +3151,7 @@ mod tests {
 
     #[test]
     fn test_file_verification_system() {
-        if let Ok(crud_manager) = CrudManager::with_defaults() {
+        if let Ok(crud_manager) = CageManager::with_defaults() {
             // Test verification of non-encrypted file
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             std::fs::write(temp_file.path(), b"plain text content").unwrap();
@@ -3196,7 +3196,7 @@ mod tests {
 
     #[test]
     fn test_verification_result_creation() {
-        if let Ok(crud_manager) = CrudManager::with_defaults() {
+        if let Ok(crud_manager) = CageManager::with_defaults() {
             // Test verification of non-existent path
             let fake_path = std::path::Path::new("/non/existent/path");
             let result = crud_manager.verify(fake_path);

@@ -23,7 +23,7 @@ NC='\033[0m' # No Color
 # Directories to scan (critical modules)
 CRITICAL_DIRS=(
     "src/cage/adapter_v2.rs"
-    "src/cage/lifecycle/crud_manager.rs"
+    "src/cage/manager/cage_manager.rs"
     "src/cage/pty_wrap.rs"
     "src/cage/error.rs"
     "src/bin/cli_age.rs"

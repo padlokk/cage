@@ -21,7 +21,7 @@
 //!
 //! # fn main() -> AgeResult<()> {
 //! // Create CRUD manager with defaults
-//! let mut crud_manager = CrudManager::with_defaults()?;
+//! let mut crud_manager = CageManager::with_defaults()?;
 //!
 //! // Lock (encrypt) a file
 //! let options = LockOptions::default();
@@ -41,7 +41,7 @@ pub mod prelude;
 // Re-export core types for convenience
 pub use cage::{
     AdapterFactory, AgeAdapter, AgeAutomator, AgeConfig, AgeError, AgeResult, AuditLogger,
-    CrudManager, FileEncryption, LockOptions, Operation, OperationResult, OutputFormat,
+    CageManager, FileEncryption, LockOptions, Operation, OperationResult, OutputFormat,
     PassphraseManager, PassphraseMode, RepositoryOperations, RepositoryStatus, SecurityValidator,
     TtyMethod, UnlockOptions, VerificationResult,
 };

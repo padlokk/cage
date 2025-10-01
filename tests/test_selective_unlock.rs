@@ -6,7 +6,7 @@
 
 use cage::cage::adapter::ShellAdapter;
 use cage::cage::config::{AgeConfig, OutputFormat};
-use cage::cage::lifecycle::crud_manager::{CrudManager, LockOptions, UnlockOptions};
+use cage::cage::manager::cage_manager::{CageManager, LockOptions, UnlockOptions};
 use std::fs;
 use tempfile::TempDir;
 
@@ -14,7 +14,7 @@ fn age_available() -> bool {
     which::which("age").is_ok()
 }
 
-fn setup_test_manager(temp_dir: &TempDir) -> Option<CrudManager> {
+fn setup_test_manager(temp_dir: &TempDir) -> Option<CageManager> {
     if which::which("age").is_err() {
         println!("{}", cage::cage::strings::TEST_SKIP_NO_AGE);
         return None;
@@ -31,10 +31,10 @@ fn setup_test_manager(temp_dir: &TempDir) -> Option<CrudManager> {
     let mut config = AgeConfig::default();
     config.audit_log_path = Some(temp_dir.path().join("audit.log").display().to_string());
 
-    match CrudManager::new(adapter, config) {
+    match CageManager::new(adapter, config) {
         Ok(manager) => Some(manager),
         Err(err) => {
-            println!("SKIPPED: CrudManager unavailable (environment restrictions): {err}");
+            println!("SKIPPED: CageManager unavailable (environment restrictions): {err}");
             None
         }
     }

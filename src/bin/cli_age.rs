@@ -16,7 +16,7 @@ use cage::cage::requests::{
     StreamRequest, UnlockRequest,
 };
 use cage::{
-    AgeError, AgeResult, CrudManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode,
+    AgeError, AgeResult, CageManager, LockOptions, OutputFormat, PassphraseManager, PassphraseMode,
     UnlockOptions,
 };
 
@@ -975,7 +975,7 @@ fn execute_lock_operation(
         backup_dir: None,
     };
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
@@ -1109,7 +1109,7 @@ fn execute_in_place_lock_operation(
         backup_dir: None,
     };
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
@@ -1224,7 +1224,7 @@ fn execute_in_place_lock_operation(
 
             // 3. Execute with atomic replacement
             if let Err(e) = in_place_op.execute_lock(passphrase, danger_mode, |src, dst, pass| {
-                // Use the CrudManager's encrypt_to_path method
+                // Use the CageManager's encrypt_to_path method
                 match crud_manager.encrypt_to_path(src, dst, pass, format) {
                     Ok(_) => {
                         if verbose {
@@ -1308,7 +1308,7 @@ fn execute_unlock_operation(
         preserve_encrypted: preserve,
     };
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
 
     // Setup progress reporting if requested
     let progress_manager = if show_progress {
@@ -1395,7 +1395,7 @@ fn execute_status_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
         echo!("📊 Checking status: {}", path.display());
     }
 
-    let crud_manager = CrudManager::with_defaults()?;
+    let crud_manager = CageManager::with_defaults()?;
     let mut status_request = StatusRequest::new(path.to_path_buf());
     status_request.common.verbose = verbose;
     let status = crud_manager.status_with_request(&status_request)?;
@@ -1444,7 +1444,7 @@ fn execute_rotate_operation(
         echo!("🔄 Rotating keys for: {}", repository.display());
     }
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
     let mut rotate_request = RotateRequest::new(
         repository.to_path_buf(),
         Identity::Passphrase(old_passphrase.to_string()),
@@ -1470,7 +1470,7 @@ fn execute_verify_operation(path: &Path, verbose: bool) -> Result<(), Box<dyn st
         echo!("🔍 Verifying integrity: {}", path.display());
     }
 
-    let crud_manager = CrudManager::with_defaults()?;
+    let crud_manager = CageManager::with_defaults()?;
     let result = crud_manager.verify(path)?;
 
     echo!(
@@ -1541,7 +1541,7 @@ fn execute_batch_operation(
         request = request.preserve_encrypted(true);
     }
 
-    let mut crud_manager = CrudManager::with_defaults()?;
+    let mut crud_manager = CageManager::with_defaults()?;
     let result = crud_manager.batch_with_request(&request)?;
 
     let operation_label = match batch_operation {
@@ -2028,10 +2028,10 @@ fn stream_encrypt(_args: Args) -> i32 {
         }
     };
 
-    let mut crud_manager = match CrudManager::with_defaults() {
+    let mut crud_manager = match CageManager::with_defaults() {
         Ok(manager) => manager,
         Err(e) => {
-            stderr!("❌ Failed to create CrudManager: {}", e);
+            stderr!("❌ Failed to create CageManager: {}", e);
             return 1;
         }
     };
@@ -2115,10 +2115,10 @@ fn stream_decrypt(_args: Args) -> i32 {
         }
     };
 
-    let mut crud_manager = match CrudManager::with_defaults() {
+    let mut crud_manager = match CageManager::with_defaults() {
         Ok(manager) => manager,
         Err(e) => {
-            stderr!("❌ Failed to create CrudManager: {}", e);
+            stderr!("❌ Failed to create CageManager: {}", e);
             return 1;
         }
     };
@@ -2292,7 +2292,7 @@ fn cmd_adapter(args: Args) -> i32 {
 
                     if caps.streaming {
                         echo!(
-                            "  ➜ Use 'cage stream encrypt|decrypt' or CrudManager::stream_with_request() for streaming workflows"
+                            "  ➜ Use 'cage stream encrypt|decrypt' or CageManager::stream_with_request() for streaming workflows"
                         );
                         echo!("");
                     }

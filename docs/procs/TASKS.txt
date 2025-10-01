@@ -74,6 +74,24 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Regression tests with generated SSH keypairs.
 - [x] Documentation + security callouts.
 
+### CAGE-21: CLI Keypair Generation Workflow [3 pts] 🔴
+**Reference:** `docs/ref/cage/KEYGEN_STRATEGY.md` (§2–§3)
+- [ ] Implement `cage keygen` that wraps `age-keygen` with opinionated defaults:
+  - Default output: `${XDG_CONFIG_HOME}/cage/identities/<timestamp>.agekey` (resolve via existing config helpers) with `chmod 0o600` (or Windows equivalent) applied after write.
+  - Capture public key via `age-keygen -y` and emit structured JSON (`path`, `public_recipient`, `fingerprint_md5`, `fingerprint_sha256`, `created_at`) to stdout; mirror details in audit logs.
+- [ ] CLI UX rules: refuse to overwrite existing files unless `--force` (short `-f`) is provided; require explicit `--output` for non-default locations; display a summarized next-step hint for adding the recipient to a group.
+- [ ] Error handling: detect missing `age-keygen` binary with actionable guidance; surface stderr from the subprocess in failure cases while ensuring secrets are not echoed back.
+- [ ] Tests: add CLI integration coverage (`tests/cli/test_keygen.rs`) covering success, overwrite prevention, forced overwrite, custom output paths, and missing `age-keygen` scenarios; verify log entries land in audit log.
+- [ ] Config integration: extend `AgeConfig` helpers to register the generated identity (optional `--register <group>` flag) by appending the derived recipient to the selected recipient group.
+- [ ] Module layout: create `src/cage/keygen/{mod.rs,api.rs,error.rs,helpers.rs}` following `MODULE_SPEC.md`; ensure the CLI command uses this module rather than ad-hoc logic, and add unit tests within the module.
+
+### CAGE-22: Adapter Identity Generation Hook [3 pts] ⏸
+**Reference:** `docs/ref/cage/KEYGEN_STRATEGY.md` (§4–§7)
+- [ ] When the library backend (AGE-01) lands, implement `AgeAdapterV2::generate_identity` using `age::x25519::Identity::generate()`, returning zeroizable secret material.
+- [ ] Update `cage keygen` to detect adapter support and skip the external `age-keygen` process, while still honouring the same CLI flags, output layout, and logging.
+- [ ] Provide a library-level helper that returns an in-memory `GeneratedIdentity { private: String, public: String }` without touching disk, and add doc examples (`docs/ref/cage/LIBRARY_USAGE.md`).
+- [ ] Document downstream migration guidance (Padlock/Ignite) so services know when to switch from CLI-based keygen to the in-process path and what feature flags/config keys gate the behaviour.
+
 ### CAGE-15: Deterministic Key Derivation [5 pts] ⏸
 - [ ] Extend config/request structs with derive parameters (salt/context).
 - [ ] Wire derive support once the `age` crate backend lands (AGE-01). CLI-only implementation is deferred.
@@ -182,6 +200,11 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Document expectations for library consumers (e.g., supplying `AgeConfig` manually) so downstream services understand the separation of concerns.
 - [x] Ensure `docs/procs/CODEX_WARMUP.txt` and quick-reference materials stay in sync with the clarified guidance.
 **Notes:** README build steps now call out `cage init`, PROCESS/QUICK_REF include bootstrap commands, and CODEX warmup highlights when to rerun `cage init --force`.
+
+### DOC-06: CageManager Terminology Refresh [1 pt] 🔴
+- [ ] Update README, Library Usage, Padlock integration docs, and roadmap/task references from `CrudManager` to `CageManager`.
+- [ ] Refresh warmup/process docs and feature matrices to reflect the new manager naming.
+- [ ] Double-check helper scripts, examples, and code snippets so user-facing guidance stays consistent.
 
 ### QA-02: End-to-End Test Coverage [3 pts] ✅
 (Retires legacy TEST-01/02/03/04 entries; replans under single umbrella.)

@@ -6,7 +6,7 @@
 //! - Generation tracking
 //! - Discovery helpers (list/restore)
 
-use cage::cage::lifecycle::crud_manager::{
+use cage::cage::manager::cage_manager::{
     BackupEntry, BackupManager, BackupRegistry, RetentionPolicy,
 };
 use std::collections::HashSet;

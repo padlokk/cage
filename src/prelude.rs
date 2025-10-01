@@ -9,7 +9,7 @@
 //!
 //! # Included Types
 //!
-//! - **Core Management**: `CrudManager` - Main entry point for encryption operations
+//! - **Core Management**: `CageManager` - Main entry point for encryption operations
 //! - **Request API**: `LockRequest`, `UnlockRequest`, `RotateRequest` - Typed operation builders
 //! - **Configuration**: `AgeConfig`, `OutputFormat`, `TtyMethod` - Runtime configuration
 //! - **Options**: `LockOptions`, `UnlockOptions` - Operation-specific settings
@@ -36,7 +36,7 @@ pub use crate::cage::{
     AuditLogger,
 
     // Management
-    CrudManager,
+    CageManager,
 
     FileEncryption,
     // Options
