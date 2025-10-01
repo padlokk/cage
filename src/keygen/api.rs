@@ -28,6 +28,8 @@ pub struct KeygenRequest {
     pub json_output: bool,
     /// Force proxy mode (direct passthrough to `age-keygen`).
     pub proxy_mode: bool,
+    /// Export mode: generate keypair to current directory without registry entry.
+    pub export_mode: bool,
 }
 
 /// Result summary returned by the key generation workflow.

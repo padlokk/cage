@@ -7,6 +7,7 @@
 
 pub mod api;
 pub mod error;
+mod audit;
 mod helpers;
 
 pub use api::{KeygenRequest, KeygenService, KeygenSummary};
