@@ -892,6 +892,216 @@ git commit -m "docs: complete MOD4 documentation sync (DOC-07 series)"
 
 ---
 
+## Feature Documentation (DOC-08 Series)
+
+**Purpose:** Create FEATURES_<MODULE>.md for each module following RSB documentation pattern
+**Template:** `docs/feats/FEATURES_TEMPLATE.md`
+**Dependency:** Execute after MOD4 refactor completes
+**Total Points:** 16 pts (2 pts per module)
+**Owner:** China (summary chicken)
+
+**Modules Requiring Feature Docs (Post-MOD4):**
+1. `adp/` - Adapter implementations (v1, v2, pipe streaming)
+2. `pty/` - PTY/TTY automation and passphrase management
+3. `audit/` - Audit logging and security validation
+4. `core/` - Core primitives (config, requests, engine, recovery)
+5. `mgr/` - CageManager lifecycle coordination
+6. `forge/` - File and repository operations
+7. `keygen/` - Key generation service
+8. `buff/` - Buffer processing with progress tracking
+
+---
+
+### DOC-08a: FEATURES_ADP.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-01 complete
+**Template:** `docs/feats/FEATURES_TEMPLATE.md`
+**Output:** `docs/feats/FEATURES_ADP.md`
+
+**Module Info:**
+- **Path:** `src/cage/adp/`
+- **Files:** `mod.rs`, `v1.rs`, `v2.rs`, `pipe.rs`
+- **Purpose:** Adapter pattern for age CLI and library backends
+- **Key Types:** `AgeAdapter`, `AdapterFactory`, `AgeAdapterV2`, `ShellAdapterV2`, `StreamingStrategy`
+- **Key Traits:** `AgeAdapter` trait
+- **Patterns:** Factory pattern, versioned adapters, streaming strategies
+
+**Documentation Requirements:**
+- Explain adapter pattern and why multiple versions exist
+- Document streaming strategies (temp file vs pipe)
+- Show CLI vs library backend selection
+- Integration with `CageManager` and request APIs
+- Performance characteristics for each strategy
+- Testing patterns for adapters
+
+**China's Task:**
+1. Read `src/cage/adp/` module files (post-MOD4)
+2. Study adapter implementations and public APIs
+3. Fill out FEATURES_TEMPLATE.md with adp/ specifics
+4. Include practical examples for v1 vs v2 usage
+5. Document when to use temp file vs pipe streaming
+6. Save to `docs/feats/FEATURES_ADP.md`
+
+---
+
+### DOC-08b: FEATURES_PTY.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-02 complete
+**Output:** `docs/feats/FEATURES_PTY.md`
+
+**Module Info:**
+- **Path:** `src/cage/pty/`
+- **Files:** `mod.rs`, `wrap.rs`, `tty.rs`, `pass.rs`
+- **Purpose:** PTY/TTY automation for age CLI passphrase interactions
+- **Key Types:** `PtyAgeAutomator`, `PtyConfig`, `TtyAutomation`, `PassphraseManager`, `PassphraseMode`
+- **Patterns:** PTY automation, passphrase security, terminal interaction
+
+**Documentation Requirements:**
+- Explain PTY automation necessity for age CLI
+- Document passphrase security practices
+- Show TTY detection and fallback strategies
+- Integration with adapters
+- Testing with mock terminals
+- Security considerations for passphrase handling
+
+---
+
+### DOC-08c: FEATURES_AUDIT.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-03 complete
+**Output:** `docs/feats/FEATURES_AUDIT.md`
+
+**Module Info:**
+- **Path:** `src/cage/audit/`
+- **Files:** `mod.rs` (formerly security.rs)
+- **Purpose:** Audit logging and security validation
+- **Key Types:** `AuditLogger`, `SecurityValidator`, `TelemetryFormat`
+- **Patterns:** Structured logging, JSON telemetry, security validation
+
+**Documentation Requirements:**
+- Explain audit trail requirements
+- Document JSON vs Text telemetry formats
+- Show recipient redaction (MD5 hashing)
+- Integration with OBS-01 requirements
+- Padlock/Ignite audit expectations
+- Testing audit output validation
+
+---
+
+### DOC-08d: FEATURES_CORE.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-04 complete
+**Output:** `docs/feats/FEATURES_CORE.md`
+
+**Module Info:**
+- **Path:** `src/cage/core/`
+- **Files:** `mod.rs`, `config.rs`, `requests.rs`, `engine.rs`, `recovery.rs`
+- **Purpose:** Core primitives and configuration
+- **Key Types:** `AgeConfig`, `OutputFormat`, `TtyMethod`, `LockRequest`, `UnlockRequest`, `RotateRequest`, `AgeAutomator`, `RecoveryManager`
+- **Patterns:** Request/response pattern, configuration management, in-place operations
+
+**Documentation Requirements:**
+- Explain request API pattern (CAGE-11)
+- Document AgeConfig and XDG compliance
+- Show request builders for lock/unlock/rotate
+- Recovery manager safety patterns
+- Integration with CLI and library APIs
+- Testing request validation
+
+---
+
+### DOC-08e: FEATURES_MGR.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-05 complete
+**Output:** `docs/feats/FEATURES_MGR.md`
+
+**Module Info:**
+- **Path:** `src/cage/mgr/`
+- **Files:** `mod.rs`, `cage_manager.rs`
+- **Purpose:** CageManager lifecycle coordination and CRUD operations
+- **Key Types:** `CageManager`, `LockOptions`, `UnlockOptions`, `VerificationResult`, `BackupManager`, `RetentionPolicy`
+- **Patterns:** CRUD lifecycle, backup retention, request API integration
+
+**Documentation Requirements:**
+- Explain CageManager as primary API surface
+- Document backup retention policies (CAGE-03)
+- Show lifecycle workflows (lock/unlock/rotate/verify)
+- Integration with adapters and requests
+- Multi-recipient encryption patterns
+- Testing lifecycle scenarios
+
+---
+
+### DOC-08f: FEATURES_FORGE.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-05 complete
+**Output:** `docs/feats/FEATURES_FORGE.md`
+
+**Module Info:**
+- **Path:** `src/cage/forge/`
+- **Files:** `mod.rs`, `file_operations.rs`, `repository_operations.rs`
+- **Purpose:** File and repository-level operations
+- **Key Types:** `FileEncryption`, `FileOperationsManager`, `RepositoryOperations`, `RepositoryOperationsManager`, `RepositoryStatus`
+- **Patterns:** Batch operations, recursive traversal, glob patterns
+
+**Documentation Requirements:**
+- Explain forge vs manager distinction
+- Document batch operation patterns
+- Show recursive directory traversal (BUG-02)
+- Glob pattern support (BUG-03)
+- Repository-level operations
+- Testing with mock filesystems
+
+---
+
+### DOC-08g: FEATURES_KEYGEN.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** Already compliant (no MOD4 changes)
+**Output:** `docs/feats/FEATURES_KEYGEN.md`
+
+**Module Info:**
+- **Path:** `src/cage/keygen/`
+- **Files:** `mod.rs`, `api.rs`, `error.rs`, `helpers.rs`
+- **Purpose:** Key generation service wrapping age-keygen
+- **Key Types:** `KeygenService`, `KeygenRequest`, `KeygenSummary`, `KeygenError`
+- **Patterns:** Service pattern, structured output, identity management
+
+**Documentation Requirements:**
+- Explain keygen workflow (CAGE-21)
+- Document identity file management
+- Show public key derivation
+- Integration with age-keygen binary
+- Future library backend migration (CAGE-22)
+- Testing without age-keygen present
+
+**Reference:** `docs/ref/cage/KEYGEN_STRATEGY.md`
+
+---
+
+### DOC-08h: FEATURES_BUFF.md [2 pts] 🔴
+**Owner:** China
+**Execute After:** MOD4-05 complete
+**Output:** `docs/feats/FEATURES_BUFF.md`
+
+**Module Info:**
+- **Path:** `src/cage/buff/`
+- **Files:** `mod.rs` (single-file module)
+- **Purpose:** Progress-aware buffer/chunk processing
+- **Key Types:** `FileChunker`, `ChunkerConfig`, `ChunkSpec`, `ChunkProcessingSummary`
+- **Patterns:** Streaming buffer management, progress callbacks
+
+**Documentation Requirements:**
+- Explain chunk processing use cases
+- Document progress callback patterns
+- Show large file handling strategies
+- Integration with streaming adapters
+- Memory efficiency patterns
+- Testing with various file sizes
+
+**Reference:** `docs/ref/cage/CHUNKER_STRATEGY.md`
+
+---
+
 ## Known Issues & Bug Tracking
 
 ### BUG-06: Flaky Streaming Test (test_shell_adapter_v2_stream_round_trip) [1 pt] 🔴
