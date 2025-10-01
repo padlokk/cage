@@ -54,13 +54,23 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Renamed `manager/` → `mgr/`, `operations/` → `forge/`, `chunker/` → `buff/`
 
 ### MOD4-06: Lang Module → src/lang.rs [2 pts] ✅
-**Status:** COMPLETE  
+**Status:** COMPLETE
 **Commit:** 8ce6c9c
 **Details:**
 - Moved `src/cage/strings.rs` → `src/lang.rs`
 - Updated all imports from `cage::strings` → `crate::lang`
 
-**MOD4 Series Total:** 15/15 pts complete · See `.analysis/MOD4_SIGNOFF.md` for details
+### MOD4-07: Flatten Module Structure [2 pts] ✅
+**Status:** COMPLETE
+**Commit:** a01277f
+**Details:**
+- Moved `src/cage/*` → `src/*` (direct submodules)
+- Eliminated nested `cage::cage::` paths
+- Updated all internal imports from `crate::cage::` → `crate::`
+- Clean external API: `cage::adp::X` instead of `cage::cage::adp::X`
+- 36 files updated, 145+ tests passing
+
+**MOD4 Series Total:** 17/17 pts complete · See `.analysis/MOD4_SIGNOFF.md` for details
 
 ---
 
