@@ -14,9 +14,10 @@ _Last updated: 2025-10-01_
 4. **Safety Controls**: Refuse overwrite unless `--force`; human-readable error when destination exists.
 5. **Registration Hook**: Optional `--register <group>` flag appends the derived recipient to configured recipient groups via `AgeConfig` helpers.
 6. **Recipients Conversion**: Support `--recipients-only`/`-y` mode that accepts an identity path (or stdin) and emits recipients without persisting secrets.
-7. **Fallback Proxy Switch**: A config/env toggle (e.g. `CAGE_KEYGEN_PROXY=age`) forcing direct passthrough to the upstream binary, ensuring coverage if Cage logic regresses.
-8. **Error Reporting**: Detect missing `age-keygen` with actionable guidance; redact secrets from surfaced stderr.
-9. **Testing**: CLI integration tests for success, overwrite guard, forced overwrite, custom output, missing binary, and registration flows.
+7. **Export Mode**: Support `--export` flag to generate keypair in current directory without registry entry, useful for testing and one-off needs.
+8. **Fallback Proxy Switch**: A config/env toggle (e.g. `CAGE_KEYGEN_PROXY=age`) forcing direct passthrough to the upstream binary, ensuring coverage if Cage logic regresses.
+9. **Error Reporting**: Detect missing `age-keygen` with actionable guidance; redact secrets from surfaced stderr.
+10. **Testing**: CLI integration tests for success, overwrite guard, forced overwrite, custom output, missing binary, export mode, and registration flows.
 
 ## 3. Module & Plugin Architecture
 - The keygen logic lives under `src/cage/keygen/` following `MODULE_SPEC.md` guidelines:
@@ -36,6 +37,7 @@ _Last updated: 2025-10-01_
 | `--recipients-only` | `-y` | Convert existing identity to recipients. | Accept `--input`/stdin, skip `--register`, skip JSON secret output. |
 | `--input <path>` | *(none upstream)* | Optional helper for specifying identity path in `--recipients-only` mode. | Falls back to stdin if omitted. |
 | `--stdout-only` | *(new)* | Print identity/recipients without writing files. | Mutually exclusive with `--register` and `--output`; still emits JSON summary. |
+| `--export` | *(new)* | Generate keypair to current directory without registry entry. | Write `<timestamp>.agekey` to PWD, skip config store, skip `--register`, useful for testing/one-off needs. |
 | `--json` | *(default)* | Emit structured JSON (default on). | `--no-json` disables JSON output for scripting compatibility. |
 | `--proxy` | *(new)* | Force passthrough to raw `age-keygen`. | Equivalent to setting `CAGE_KEYGEN_PROXY=age`; bypass Cage wrapping logic. |
 
