@@ -39,3 +39,38 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Created `docs/feats/FEATURES_PTY.md` (7.1 KB)
 - All tests passing (68 passed, 2 ignored)
 - Git detected moves as renames (99% similarity)
+
+### MOD4-03: Audit Module → audit/ [2 pts] ✅
+**Status:** COMPLETE
+**Commit:** 3ccbe76
+**Details:**
+- Created `src/cage/audit/` directory structure
+- Moved `security.rs` → `audit/mod.rs`
+- Updated imports across 5 files (cage::security → cage::audit)
+- Created `docs/feats/FEATURES_AUDIT.md` (221 lines)
+- All tests passing (68 passed, 2 ignored)
+
+### MOD4-04: Core Primitives → core/ [3 pts] 🔴
+**Priority:** Next up
+**Next Steps:**
+1. Create `src/cage/core/` directory
+2. Move config.rs, requests.rs, age_engine.rs, in_place.rs to core/
+3. Update imports and `mod.rs`
+4. Verify tests continue passing
+
+### MOD4-05: Directory Renames [2 pts] 🔴
+**Priority:** After MOD4-04
+**Next Steps:**
+1. Rename `manager/` → `mgr/`
+2. Rename `operations/` → `forge/`
+3. Rename `chunker/` → `buff/`
+4. Update all imports
+5. Verify tests continue passing
+
+### MOD4-06: Lang Module → src/lang.rs [2 pts] 🔴
+**Priority:** After MOD4-05
+**Next Steps:**
+1. Move `src/cage/strings.rs` → `src/lang.rs`
+2. Update all imports from `cage::strings` → `crate::lang`
+3. Update prelude re-exports
+4. Verify tests continue passing
