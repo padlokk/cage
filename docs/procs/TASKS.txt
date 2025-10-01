@@ -28,12 +28,14 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Created `docs/feats/FEATURES_ADP.md`
 - All tests passing (68 passed, 2 ignored)
 
-### MOD4-02: PTY Automation → pty/ [3 pts] 🔴
-**Priority:** Next up
-**Next Steps:**
-1. Create `src/cage/pty/` directory
-2. Move PTY-related files to appropriate submodules
-3. Update imports and `mod.rs`
-4. Verify tests continue passing
-
-[Rest of the file remains unchanged...]
+### MOD4-02: PTY Automation → pty/ [3 pts] ✅
+**Status:** COMPLETE
+**Commit:** e770fd3
+**Details:**
+- Created `src/cage/pty/` directory structure
+- Moved `tty_automation.rs` → `pty/tty.rs`
+- Moved `pty_wrap.rs` → `pty/wrap.rs`
+- Updated imports across 7 files
+- Created `docs/feats/FEATURES_PTY.md` (7.1 KB)
+- All tests passing (68 passed, 2 ignored)
+- Git detected moves as renames (99% similarity)

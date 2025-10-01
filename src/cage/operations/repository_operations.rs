@@ -11,7 +11,7 @@ use super::{FileEncryption, Operation, OperationResult, RepositoryOperations, Re
 use crate::cage::adp::v1::AgeAdapter;
 use crate::cage::config::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::security::{AuditLogger, SecurityValidator};
+use crate::cage::audit::{AuditLogger, SecurityValidator};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;

@@ -8,7 +8,7 @@
 use crate::cage::adp::v1::{AdapterFactory, AgeAdapter};
 use crate::cage::config::{AgeConfig, OutputFormat};
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::security::AuditLogger;
+use crate::cage::audit::AuditLogger;
 #[allow(unused_imports)]
 use crate::cage::pty::TtyAutomator;
 use std::path::Path;

@@ -21,7 +21,7 @@ use crate::cage::requests::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamOperation, StreamRequest, UnlockRequest, VerifyRequest,
 };
-use crate::cage::security::AuditLogger;
+use crate::cage::audit::AuditLogger;
 use crate::cage::strings::{fmt_deleted, fmt_error, fmt_preserved, fmt_warning};
 #[allow(unused_imports)]
 use crate::cage::pty::TtyAutomator;

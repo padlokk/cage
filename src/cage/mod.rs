@@ -15,6 +15,7 @@
 
 pub mod adp; // Adapter implementations (v1, v2, pipe streaming)
 pub mod age_engine;
+pub mod audit; // Audit logging and security validation
 pub mod chunker;
 pub mod config;
 pub mod error;
@@ -25,7 +26,6 @@ pub mod operations;
 pub mod passphrase;
 pub mod pty; // PTY automation (wrap and tty methods)
 pub mod requests;
-pub mod security;
 pub mod strings; // Centralized string constants (SEC-01)
 
 // Re-export core types for convenience
@@ -41,7 +41,7 @@ pub use operations::{
     FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus,
 };
 pub use passphrase::{PassphraseManager, PassphraseMode};
-pub use security::{AuditLogger, SecurityValidator};
+pub use audit::{AuditLogger, SecurityValidator};
 
 /// Module version synchronized with Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
