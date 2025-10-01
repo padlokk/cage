@@ -7,7 +7,7 @@
 
 use super::core::TelemetryFormat;
 use super::error::{AgeError, AgeResult};
-use super::operations::{OperationResult, RepositoryStatus};
+use super::forge::{OperationResult, RepositoryStatus};
 #[allow(unused_imports)]
 use chrono::{DateTime, Utc};
 use serde_json::json;
@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn test_operation_complete_json() {
-        use crate::cage::operations::OperationResult;
+        use crate::cage::forge::OperationResult;
         use std::fs;
 
         let temp_file = NamedTempFile::new().unwrap();

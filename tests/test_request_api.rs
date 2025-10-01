@@ -5,7 +5,7 @@
 
 use cage::cage::adp::v1::ShellAdapter;
 use cage::cage::core::{AgeConfig, OutputFormat};
-use cage::cage::manager::cage_manager::CageManager;
+use cage::cage::mgr::cage_manager::CageManager;
 use cage::cage::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamRequest, UnlockRequest,

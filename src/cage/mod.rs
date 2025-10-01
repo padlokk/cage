@@ -15,12 +15,12 @@
 
 pub mod adp; // Adapter implementations (v1, v2, pipe streaming)
 pub mod audit; // Audit logging and security validation
-pub mod chunker;
+pub mod buff; // Chunking and buffer management (formerly chunker)
 pub mod core; // Core primitives (config, requests, engine, recovery)
 pub mod error;
+pub mod forge; // Repository operations (formerly operations)
 pub mod keygen; // Key generation service module (CAGE-21)
-pub mod manager; // CageManager lifecycle coordination
-pub mod operations;
+pub mod mgr; // CageManager lifecycle coordination (formerly manager)
 pub mod passphrase; // Secure passphrase management
 pub mod pty; // PTY automation (wrap, tty methods)
 pub mod strings; // Centralized string constants (SEC-01)
@@ -28,17 +28,17 @@ pub mod strings; // Centralized string constants (SEC-01)
 // Re-export core types for convenience
 pub use adp::{AdapterFactory, AgeAdapter};
 pub use audit::{AuditLogger, SecurityValidator};
-pub use chunker::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker};
+pub use buff::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker};
 pub use core::{
     AgeAutomator, AgeConfig, InPlaceOperation, InPlaceOptions, OutputFormat, RecoveryManager,
     SafetyValidator, TtyMethod,
 };
 pub use error::{AgeError, AgeResult};
-pub use keygen::{KeygenError, KeygenRequest, KeygenService, KeygenSummary};
-pub use manager::{CageManager, LockOptions, UnlockOptions, VerificationResult};
-pub use operations::{
+pub use forge::{
     FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus,
 };
+pub use keygen::{KeygenError, KeygenRequest, KeygenService, KeygenSummary};
+pub use mgr::{CageManager, LockOptions, UnlockOptions, VerificationResult};
 pub use passphrase::{PassphraseManager, PassphraseMode};
 
 /// Module version synchronized with Cargo.toml

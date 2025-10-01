@@ -16,7 +16,7 @@ use crate::cage::adp::v1::AgeAdapter;
 use crate::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
 use crate::cage::core::{AgeConfig, OutputFormat, RetentionPolicyConfig};
 use crate::cage::error::{AgeError, AgeResult};
-use crate::cage::operations::{OperationResult, RepositoryStatus};
+use crate::cage::forge::{OperationResult, RepositoryStatus};
 use crate::cage::core::{
     BatchOperation, BatchRequest, Identity, LockRequest, Recipient, RotateRequest, StatusRequest,
     StreamOperation, StreamRequest, UnlockRequest, VerifyRequest,

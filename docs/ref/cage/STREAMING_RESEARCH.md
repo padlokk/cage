@@ -90,7 +90,7 @@ Key takeaways:
 
 ## Chunker Integration (CAGE-21)
 
-- The new `cage::chunker::FileChunker` provides chunk planning, resumable checkpoints, and progress reporting
+- The new `cage::buff::FileChunker` provides chunk planning, resumable checkpoints, and progress reporting
   via `rsb::progress`. Streaming, backups, and manifests should layer on this module to cap memory usage and
   support resume-on-failure scenarios.
 - For streaming encrypt/decrypt, wrap the temp-file staging path with chunked reads/writes so each chunk can be

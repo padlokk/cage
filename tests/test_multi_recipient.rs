@@ -2,7 +2,7 @@
 
 use cage::cage::{
     core::{AgeConfig, AuthorityTier, Identity, LockRequest, MultiRecipientConfig, RecipientGroup},
-    manager::cage_manager::CageManager,
+    mgr::cage_manager::CageManager,
 };
 use std::path::PathBuf;
 use tempfile::TempDir;

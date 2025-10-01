@@ -40,8 +40,8 @@ operations and integrate it with our CLI, backups, and forthcoming AGE adapters.
 
 ## High-Level Strategy
 
-1. **Abstract Chunker Core (`cage::chunker` module)**
-   - Embed/port `StreamChunker` (including checkpointing) into Cage, namespaced under `src/cage/chunker/`.
+1. **Abstract Chunker Core (`cage::buff` module)**
+   - Embed/port `StreamChunker` (including checkpointing) into Cage, namespaced under `src/cage/buff/`.
    - Provide a generic trait `ChunkProcessor` so different consumers (backup sync, streaming encryptor,
      manifest generator) can supply their own handlers.
    - Harmonize serialization with Cage’s existing serde usage (e.g., `.cage_backups.json`).
@@ -71,8 +71,8 @@ operations and integrate it with our CLI, backups, and forthcoming AGE adapters.
 ## Detailed Plan
 
 ### Phase 1 – Core Module Extraction ✅
-- Ported `generic_stream_chunker.rs` into `src/cage/chunker/mod.rs` with Cage naming and serde checkpoints.
-- Added unit tests for planning/processing and exposed the API via `cage::chunker::*`.
+- Ported `generic_stream_chunker.rs` into `src/cage/buff/mod.rs` with Cage naming and serde checkpoints.
+- Added unit tests for planning/processing and exposed the API via `cage::buff::*`.
 - Wired RSB’s terminal progress reporters (colors + Unicode) directly into chunk processing and removed Cage’s legacy progress module.
 - Documented the module here and in the streaming research notes.
 
