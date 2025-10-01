@@ -319,7 +319,7 @@ use cage::cage::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize CRUD manager
-    let mut crud_manager = CageManager::with_defaults()?;
+    let mut cage_manager = CageManager::with_defaults()?;
 
     // Create lock options
     let options = LockOptions {
@@ -332,7 +332,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Encrypt a file
-    let result = crud_manager.lock(
+    let result = cage_manager.lock(
         &std::path::Path::new("secret.txt"),
         "mypassword",
         options
@@ -380,7 +380,7 @@ let mut in_place_op = InPlaceOperation::new(&path);
 
 // Execute with recovery
 in_place_op.execute(|| {
-    crud_manager.lock(&path, passphrase, options)
+    cage_manager.lock(&path, passphrase, options)
 })?;
 ```
 

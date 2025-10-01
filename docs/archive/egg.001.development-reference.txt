@@ -37,11 +37,11 @@ Progress Breakdown:
 Critical Bugs (Blocking Production, In Order):
 
 1. BUG-01: Preserve Original Extensions [3 pts]
-   📍 Location: `src/cage/lifecycle/crud_manager.rs:857-907`
+   📍 Location: `src/cage/lifecycle/cage_manager.rs:857-907`
    🎯 Goal: Fix filename handling during lock/unlock
 
 2. BUG-02: Recursive Operations [5 pts]
-   📍 Location: Traversal functions in `crud_manager.rs`
+   📍 Location: Traversal functions in `cage_manager.rs`
    🎯 Goal: Implement proper recursive directory traversal
 
 3. BUG-03: Pattern Filtering [3 pts]
@@ -67,7 +67,7 @@ BEFORE Starting Development:
 5. /docs/ref/RSB_LESSONS.md (Framework patterns)
 
 CODE LOCATIONS TO REVIEW:
-- `src/cage/lifecycle/crud_manager.rs`
+- `src/cage/lifecycle/cage_manager.rs`
 - `src/bin/cli_age.rs`
 - `src/cage/in_place.rs`
 - `src/cage/config.rs`

@@ -12,8 +12,8 @@ characteristics, and constraints inherited from the upstream `age` CLI. It summa
 
 ## Current Implementation
 
-- `CrudManager::stream_with_request()` routes streaming operations through `ShellAdapterV2`
-  (`src/cage/lifecycle/crud_manager.rs:1027`).
+- `CageManager::stream_with_request()` routes streaming operations through `ShellAdapterV2`
+  (`src/cage/lifecycle/cage_manager.rs:1027`).
 - For recipients, `ShellAdapterV2::encrypt_stream()` spawns the `age` CLI and copies data through its
   stdin/stdout (`src/cage/adp/v2.rs:982`). Buffering relies on `std::io::copy` (default 8 KB chunks)
   plus a scoped thread to drain stdout.

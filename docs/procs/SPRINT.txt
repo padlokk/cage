@@ -54,11 +54,11 @@ Status: IN PROGRESS
 ### BUG Slate (Blocking Production)
 
 - **BUG-01: Preserve Original Extensions** (3 pts)
-  - Path: `src/cage/lifecycle/crud_manager.rs`
+  - Path: `src/cage/lifecycle/cage_manager.rs`
   - Goal: Append `.cage` without stripping original suffix; adjust unlock to reverse safely.
 
 - **BUG-02: Recursive Operations Ignore Subdirectories** (5 pts)
-  - Path: traversal helpers in `crud_manager.rs`
+  - Path: traversal helpers in `cage_manager.rs`
   - Goal: Implement shared recursive traversal for lock/unlock/status/verify.
 
 - **BUG-03: Pattern Filters Treat Globs as Literal Substrings** (3 pts)

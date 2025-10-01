@@ -71,7 +71,7 @@
   * Handles `AuthorityTier`
 - `src/cage/config.rs`
   * In-memory `recipient_groups` implementation
-- `src/cage/lifecycle/crud_manager.rs`
+- `src/cage/lifecycle/cage_manager.rs`
   * Multi-recipient helper methods
 
 ## 6. Reference Documentation

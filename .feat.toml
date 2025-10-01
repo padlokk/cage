@@ -1,0 +1,18 @@
+# feat2.py configuration
+# Auto-generated on /home/xnull/repos/code/rust/prods/padlokk/cage
+
+features_root = "src"
+docs_root = "docs/feats"
+doc_pattern = "FEATURES_{FEATURE}.md"
+languages = ["rust"]
+auto_discover = true
+
+exclude = [
+    "**/tests/**",
+    "**/target/**",
+    "**/__pycache__/**",
+]
+
+# Explicit feature mappings (optional, overrides auto-discovery)
+[features]
+# example = ["src/example"]

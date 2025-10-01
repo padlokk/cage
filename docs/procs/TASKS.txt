@@ -105,7 +105,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Gate the test to skip when the `age` binary is unavailable (consistent with other CLI-dependent checks).
 
 ### CAGE-17: Rotate Request Integration [3 pts] ✅
-- [x] Implemented `CrudManager::rotate_with_request` with passphrase validation and feature gating for future enhancements.
+- [x] Implemented `CageManager::rotate_with_request` with passphrase validation and feature gating for future enhancements.
 - [x] Updated CLI `cmd_rotate` to construct `RotateRequest` builders so both surfaces share the same pipeline.
 - [x] Added request API regression coverage (`test_rotate_with_request_api`) exercising passphrase rotation flows.
 - [x] Refreshed library docs with request-based rotation examples (see `docs/ref/cage/LIBRARY_USAGE.md`).
@@ -160,7 +160,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ### CAGE-16: Multi-Recipient Lifecycle [8 pts] ✅ **COMPLETED**
 - [x] Formalize recipient group model (struct/enums) for request API + config.
-- [x] Update adapters/CrudManager to accept recipient vectors for all encrypt ops.
+- [x] Update adapters/CageManager to accept recipient vectors for all encrypt ops.
 - [x] Provide lifecycle helpers (list/add/remove recipients, audit metadata).
 - [x] Tests ensuring each recipient can decrypt; include rotation scenarios.
 **Priority:** 🔺 Required for Ignite → Padlock rotations (repo & distro keys).
@@ -176,7 +176,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [x] Extend CLI help/README with streaming workflow guidance.
 
 ### CAGE-18: Streaming API Parity [5 pts] ✅
-- [x] Exposed streaming encrypt/decrypt helpers on `CrudManager::stream_with_request` backed by `ShellAdapterV2`.
+- [x] Exposed streaming encrypt/decrypt helpers on `CageManager::stream_with_request` backed by `ShellAdapterV2`.
 - [x] Added `cage stream encrypt|decrypt` CLI surface and refreshed README guidance.
 - [x] Highlighted streaming availability in adapter inspection output.
 - [x] Added request API regression coverage for streaming flows (passphrase fallback).
@@ -194,9 +194,9 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Evaluate optional "ASCII-safe" mode without forcing removal of branded glyphs.
 - [ ] Migrate high-priority user-facing strings from audit results.
 **Implementation Notes:**
-- Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/lifecycle/crud_manager.rs`).
+- Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/lifecycle/cage_manager.rs`).
 - Document ASCII-safe toggle behaviour; Padlock UI will eventually need plain-text mode for logs.
-- Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CrudManager).
+- Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CageManager).
 
 ### CAGE-19: Deployment Script Hardening [2 pts] ✅
 - [x] Update `bin/deploy.sh` to validate build artifacts, support `--prefix` overrides, and emit clear success/error messaging.
@@ -227,7 +227,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Generation tracking: auto-increments, sorted by creation time
 - Discovery: `list_backups()` and `restore_backup_generation()` helpers
 - Tests: 8 passing integration tests validate core retention logic
-- File: `src/cage/lifecycle/crud_manager.rs` (lines 447-687)
+- File: `src/cage/lifecycle/cage_manager.rs` (lines 447-687)
 **Implementation Notes:**
 - Ignite manifest audits expect Cage to expose prior generations; design registry structure in line with `docs/ref/cage/BACKUP_RETENTION_DESIGN.md` §3.
 - CLI UX: provide `cage backup list` (even if minimal) so Padlock can surface restore points.
@@ -245,7 +245,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Added `log_encryption_event_extended()` and `log_decryption_event_extended()` with streaming/authority tier metadata.
 - All log methods now support both Text and JSON formats via `TelemetryFormat` enum.
 - Sensitive fields automatically redacted (recipient public keys hashed with MD5 for audit trail).
-- Telemetry format wired from `AgeConfig` to `CrudManager`.
+- Telemetry format wired from `AgeConfig` to `CageManager`.
 - Documentation updated: README + `docs/ref/cage/LIBRARY_USAGE.md` with JSON examples.
 - 4 new tests covering JSON telemetry output (total: 87 library tests passing).
 
@@ -261,7 +261,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 **Notes:** README build steps now call out `cage init`, PROCESS/QUICK_REF include bootstrap commands, and CODEX warmup highlights when to rerun `cage init --force`.
 
 ### DOC-06: CageManager Terminology Refresh [1 pt] 🔴
-- [ ] Update README, Library Usage, Padlock integration docs, and roadmap/task references from `CrudManager` to `CageManager`.
+- [ ] Update README, Library Usage, Padlock integration docs, and roadmap/task references from `CageManager` to `CageManager`.
 - [ ] Refresh warmup/process docs and feature matrices to reflect the new manager naming.
 - [ ] Double-check helper scripts, examples, and code snippets so user-facing guidance stays consistent.
 
@@ -296,7 +296,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ### MOD3-01: Establish Project Prelude [2 pts] ✅
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md`
-- [x] Create `src/prelude.rs` that curates the public surface (CrudManager, requests, adapter traits, helpers).
+- [x] Create `src/prelude.rs` that curates the public surface (CageManager, requests, adapter traits, helpers).
 - [x] Update `lib.rs` to re-export via `pub mod prelude` and document usage in README/Library Usage docs.
 - [x] Verified crate consumers can compile simple examples via `use cage::prelude::*`.
 
@@ -351,7 +351,7 @@ cargo test --lib test_shell_adapter_v2_stream_round_trip  # Passes
 - 8/10 retention tests passing, 2 failing on assertion checks
 **Root Cause:** Retention policy logic assumes **newest-first** ordering but backups are sorted **oldest-first**
 **Details:**
-- In `crud_manager.rs:633`, backups sorted by `created_at` ascending (oldest first)
+- In `cage_manager.rs:633`, backups sorted by `created_at` ascending (oldest first)
 - `KeepLast(n)` at line 136 returns `(keep_count..len)` which deletes **newest** items instead of oldest
 - `KeepLastAndDays` at line 147 keeps `idx < last` which preserves **oldest** items instead of newest
 **Fix Required:**
@@ -371,7 +371,7 @@ cargo test --test test_backup_retention test_retention_keep_last_and_days
 4. Fixed test assertions and incorrect test comments
 5. Corrected misleading BackupEntry generation comment
 **Commit:** (pending)
-**Location:** `src/cage/lifecycle/crud_manager.rs:106-156, 532, 636-640`
+**Location:** `src/cage/lifecycle/cage_manager.rs:106-156, 532, 636-640`
 **Test Files:** `tests/test_backup_retention.rs` (9/9 passing, 1 ignored)
 
 ### BUG-08: Backup Registry Path Tracking with Conflict Resolution [3 pts] ✅
@@ -381,7 +381,7 @@ cargo test --test test_backup_retention test_retention_keep_last_and_days
 - Updated registry via `update_backup_path()` when legacy backups shift paths
 - Ensured conflict filenames include high-resolution timestamps with retry fallback
 - Re-enabled `test_backup_manager_with_retention` with on-disk parity assertions
-**Location:** `src/cage/lifecycle/crud_manager.rs` (backup creation, conflict path generator, registry helpers)
+**Location:** `src/cage/lifecycle/cage_manager.rs` (backup creation, conflict path generator, registry helpers)
 **Test:** `cargo test test_backup_manager_with_retention`
 
 ---
@@ -398,7 +398,7 @@ cargo test --test test_backup_retention test_retention_keep_last_and_days
 
 ### AGE-01: Library Adapter Implementation [5 pts] 🔴
 - [ ] Build a new adapter implementation that wraps `age::Encryptor` / `age::Decryptor` APIs for file and streaming workflows.
-- [ ] Preserve request/response semantics so CrudManager and request structs remain unchanged.
+- [ ] Preserve request/response semantics so CageManager and request structs remain unchanged.
 - [ ] Keep the existing shell-based adapter available as a fallback strategy until feature parity is validated.
 **Implementation Notes:**
 - Start with passphrase + recipient flows; reuse streaming helpers from `ShellAdapterV2`.

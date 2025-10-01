@@ -138,7 +138,7 @@ Ignite never talks to age directly; it always routes operations through Cage, wh
 ### 6.2 Recipient Validation Flow
 1. Command handler requests an operation (e.g., encrypt artifact for automation).
 2. Ignite assembles the required recipient set (baseline repo recipients + scoped distro recipients).
-3. Cage’s `CrudManager` receives the expanded recipient list via its convenience APIs; Cage handles the underlying `age` CLI invocation.
+3. Cage’s `CageManager` receives the expanded recipient list via its convenience APIs; Cage handles the underlying `age` CLI invocation.
 4. Validation engine double-checks that every recipient corresponds to a registered AuthorityKey with active proofs.
 5. Audit log captures the recipient set hash so future investigations can replay who had access.
 

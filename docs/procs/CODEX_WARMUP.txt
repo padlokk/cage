@@ -90,7 +90,7 @@ Those documents track current workstreams, handoffs, and priorities.
   backup settings via `cage.toml` (`backup.cleanup_on_success`, `backup.directory`,
   `backup.retention`).
 - New CLI helpers: `cage config show|path|paths`, `cage adapter info`, `cage adapter health`.
-- Streaming CLI entry point: `cage stream encrypt|decrypt` (wraps `CrudManager::stream_with_request()`).
+- Streaming CLI entry point: `cage stream encrypt|decrypt` (wraps `CageManager::stream_with_request()`).
 - Streaming guidance: README and `docs/ref/cage/LIBRARY_USAGE.md` include performance tables
   comparing passphrase vs recipient streaming (CAGE-12a/12b).
 

@@ -29,7 +29,7 @@
 - ✅ Discovery helpers: list_backups(), restore_backup_generation()
 - ✅ Atomic registry saves
 
-**Files:** `src/cage/lifecycle/crud_manager.rs`, `tests/test_backup_retention.rs`
+**Files:** `src/cage/lifecycle/cage_manager.rs`, `tests/test_backup_retention.rs`
 
 ### CAGE-12: Adapter V2 Streaming [5 pts] ✅ COMPLETE
 **Completed:** 2025-09-29 (Commit 38ebe5e)
@@ -50,7 +50,7 @@
 - ✅ Documentation at docs/dev/STRING_MANAGEMENT.md
 - ❌ Remaining work:
   - Evaluate optional "ASCII-safe" mode
-  - Migrate high-priority user-facing strings (304 in CLI, 182 in CrudManager)
+  - Migrate high-priority user-facing strings (304 in CLI, 182 in CageManager)
 
 **Key References:**
 - 📁 `src/cage/strings.rs`
@@ -94,7 +94,7 @@
   - AgeConfig
   - TelemetryFormat configuration
 
-- **Lifecycle:** `src/cage/lifecycle/crud_manager.rs`
+- **Lifecycle:** `src/cage/lifecycle/cage_manager.rs`
   - Core operation management
   - Telemetry integration
 

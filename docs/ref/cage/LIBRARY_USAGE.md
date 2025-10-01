@@ -28,7 +28,7 @@ use cage::cage::{CageManager, OutputFormat};
 use cage::cage::requests::{LockRequest, Identity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut crud_manager = CageManager::with_defaults()?;
+    let mut cage_manager = CageManager::with_defaults()?;
 
     let request = LockRequest::new(
         std::path::PathBuf::from("secret.txt"),
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_format(OutputFormat::Binary)
     .backup(true);
 
-    let result = crud_manager.lock_with_request(&request)?;
+    let result = cage_manager.lock_with_request(&request)?;
     println!("Encrypted {} files", result.processed_files.len());
     Ok(())
 }
@@ -58,7 +58,7 @@ The primary interface now accepts typed request structs that mirror CLI features
 use cage::cage::{CageManager, OutputFormat};
 use cage::cage::requests::{Identity, LockRequest, RotateRequest, UnlockRequest};
 
-let mut crud_manager = CageManager::with_defaults()?;
+let mut cage_manager = CageManager::with_defaults()?;
 
 let lock_request = LockRequest::new(
     std::path::PathBuf::from("docs/"),
@@ -68,7 +68,7 @@ let lock_request = LockRequest::new(
 .with_format(OutputFormat::AsciiArmor)
 .backup(true);
 
-let lock_result = crud_manager.lock_with_request(&lock_request)?;
+let lock_result = cage_manager.lock_with_request(&lock_request)?;
 
 let unlock_request = UnlockRequest::new(
     std::path::PathBuf::from("docs/"),
@@ -77,7 +77,7 @@ let unlock_request = UnlockRequest::new(
 .selective(true)
 .preserve_encrypted(true);
 
-let unlock_result = crud_manager.unlock_with_request(&unlock_request)?;
+let unlock_result = cage_manager.unlock_with_request(&unlock_request)?;
 
 let mut rotate_request = RotateRequest::new(
     std::path::PathBuf::from("docs/"),
@@ -86,7 +86,7 @@ let mut rotate_request = RotateRequest::new(
 );
 rotate_request.recursive = true;
 
-let rotate_result = crud_manager.rotate_with_request(&rotate_request)?;
+let rotate_result = cage_manager.rotate_with_request(&rotate_request)?;
 ```
 
 ### 2. Status & Batch Helpers
@@ -97,7 +97,7 @@ use cage::cage::requests::{BatchOperation, BatchRequest, Identity, StatusRequest
 // Directory status
 let mut status_request = StatusRequest::new(std::path::PathBuf::from("logs"));
 status_request.recursive = true;
-let status = crud_manager.status_with_request(&status_request)?;
+let status = cage_manager.status_with_request(&status_request)?;
 println!("Encrypted: {} of {}", status.encrypted_files, status.total_files);
 
 // Batch encryption
@@ -108,7 +108,7 @@ let mut batch_lock = BatchRequest::new(
 )
 .with_pattern("*.txt".to_string());
 batch_lock.common.force = true;
-let batch_result = crud_manager.batch_with_request(&batch_lock)?;
+let batch_result = cage_manager.batch_with_request(&batch_lock)?;
 println!("Processed {} files", batch_result.processed_files.len());
 ```
 
@@ -120,7 +120,7 @@ For existing integrations you can continue using `lock(&path, passphrase, LockOp
 ```rust
 use cage::cage::{CageManager, LockOptions, OutputFormat};
 
-let mut crud_manager = CageManager::with_defaults()?;
+let mut cage_manager = CageManager::with_defaults()?;
 
 let legacy_options = LockOptions {
     recursive: false,
@@ -129,7 +129,7 @@ let legacy_options = LockOptions {
     format: OutputFormat::Binary,
 };
 
-let result = crud_manager.lock(&std::path::Path::new("legacy.txt"), "pass", legacy_options)?;
+let result = cage_manager.lock(&std::path::Path::new("legacy.txt"), "pass", legacy_options)?;
 ```
 
 ### 3. Streaming Encryption/Decryption
@@ -216,7 +216,7 @@ use cage::cage::CageManager;
 use cage::cage::requests::{Identity, StreamRequest};
 use std::io::Cursor;
 
-let mut crud_manager = CageManager::with_defaults()?;
+let mut cage_manager = CageManager::with_defaults()?;
 
 let mut plaintext = Cursor::new(b"large payload".to_vec());
 let mut ciphertext = Cursor::new(Vec::new());
@@ -224,14 +224,14 @@ let mut ciphertext = Cursor::new(Vec::new());
 let mut encrypt = StreamRequest::encrypt(Identity::Passphrase("stream-pass".into()));
 encrypt.buffer_size = 128 * 1024; // Optional tuning
 
-crud_manager.stream_with_request(&encrypt, &mut plaintext, &mut ciphertext)?;
+cage_manager.stream_with_request(&encrypt, &mut plaintext, &mut ciphertext)?;
 
 let encrypted = ciphertext.into_inner();
 let mut cipher_cursor = Cursor::new(encrypted);
 let mut recovered = Cursor::new(Vec::new());
 
 let decrypt = StreamRequest::decrypt(Identity::Passphrase("stream-pass".into()));
-crud_manager.stream_with_request(&decrypt, &mut cipher_cursor, &mut recovered)?;
+cage_manager.stream_with_request(&decrypt, &mut cipher_cursor, &mut recovered)?;
 
 assert_eq!(recovered.into_inner(), b"large payload");
 ```
@@ -318,7 +318,7 @@ let mut in_place_op = InPlaceOperation::new(&path);
 
 // Execute with safety and recovery
 let result = in_place_op.execute(|| {
-    crud_manager.lock(&path, passphrase, options)
+    cage_manager.lock(&path, passphrase, options)
 })?;
 
 println!("In-place operation completed: {:?}", result);
@@ -424,13 +424,13 @@ fn encrypt_with_progress(files: Vec<PathBuf>) -> Result<(), Box<dyn std::error::
         ProgressStyle::Bar { total: files.len() as u64 }
     );
 
-    let mut crud_manager = CageManager::with_defaults()?;
+    let mut cage_manager = CageManager::with_defaults()?;
     let options = LockOptions::default();
 
     for (i, file) in files.iter().enumerate() {
         task.update(i as u64 + 1, &format!("Processing {}", file.display()));
 
-        let result = crud_manager.lock(file, "passphrase", options.clone())?;
+        let result = cage_manager.lock(file, "passphrase", options.clone())?;
 
         // Handle result...
     }
@@ -449,12 +449,12 @@ fn batch_encrypt_with_recovery(
     files: Vec<PathBuf>,
     passphrase: &str
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut crud_manager = CageManager::with_defaults()?;
+    let mut cage_manager = CageManager::with_defaults()?;
     let options = LockOptions::default();
     let mut errors = Vec::new();
 
     for file in files {
-        match crud_manager.lock(&file, passphrase, options.clone()) {
+        match cage_manager.lock(&file, passphrase, options.clone()) {
             Ok(result) => {
                 println!("✓ Encrypted: {}", file.display());
             }
@@ -551,7 +551,7 @@ let mut config = AgeConfig::default();
 config.telemetry_format = TelemetryFormat::Json;
 config.audit_log_path = Some("/var/log/cage/audit.json".to_string());
 
-let mut crud_manager = CageManager::with_config(config)?;
+let mut cage_manager = CageManager::with_config(config)?;
 ```
 
 **Telemetry Formats:**
@@ -618,7 +618,7 @@ fn encrypt_from_config(config_path: &str, target: &str) -> Result<(), Box<dyn st
     let config_str = std::fs::read_to_string(config_path)?;
     let config: EncryptionConfig = serde_json::from_str(&config_str)?;
 
-    let mut crud_manager = CageManager::with_defaults()?;
+    let mut cage_manager = CageManager::with_defaults()?;
     let options = LockOptions {
         recursive: config.recursive,
         backup: config.backup,
@@ -638,11 +638,11 @@ fn encrypt_from_config(config_path: &str, target: &str) -> Result<(), Box<dyn st
 
         let mut in_place_op = InPlaceOperation::new(&PathBuf::from(target));
         in_place_op.execute(|| {
-            crud_manager.lock(&PathBuf::from(target), &config.passphrase, options)
+            cage_manager.lock(&PathBuf::from(target), &config.passphrase, options)
         })?;
     } else {
         // Regular operations
-        crud_manager.lock(&PathBuf::from(target), &config.passphrase, options)?;
+        cage_manager.lock(&PathBuf::from(target), &config.passphrase, options)?;
     }
 
     Ok(())
@@ -658,7 +658,7 @@ Cage provides comprehensive error types with detailed context.
 ```rust
 use cage::cage::error::CageError;
 
-match crud_manager.lock(&path, passphrase, options) {
+match cage_manager.lock(&path, passphrase, options) {
     Ok(result) => {
         println!("Success: {} files processed", result.processed_files.len());
     }
@@ -698,10 +698,10 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         std::fs::write(&test_file, "secret content")?;
 
-        let mut crud_manager = CageManager::with_defaults()?;
+        let mut cage_manager = CageManager::with_defaults()?;
         let options = LockOptions::default();
 
-        let result = crud_manager.lock(&test_file, "testpassword", options)?;
+        let result = cage_manager.lock(&test_file, "testpassword", options)?;
         assert_eq!(result.processed_files.len(), 1);
 
         // Verify encrypted file exists
@@ -797,11 +797,11 @@ async fn encrypt_endpoint(
     std::fs::write(&temp_file, &file_data)
         .map_err(|_| warp::reject::custom(ServerError))?;
 
-    let mut crud_manager = CageManager::with_defaults()
+    let mut cage_manager = CageManager::with_defaults()
         .map_err(|_| warp::reject::custom(ServerError))?;
 
     let options = LockOptions::default();
-    let result = crud_manager.lock(temp_file.path(), &passphrase, options)
+    let result = cage_manager.lock(temp_file.path(), &passphrase, options)
         .map_err(|_| warp::reject::custom(ServerError))?;
 
     // Return encrypted data
@@ -836,14 +836,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let task = manager.start_task("Encrypting", ProgressStyle::Spinner);
 
         // Perform encryption with progress
-        let mut crud_manager = CageManager::with_defaults()?;
-        crud_manager.lock(&PathBuf::from(file), "password", LockOptions::default())?;
+        let mut cage_manager = CageManager::with_defaults()?;
+        cage_manager.lock(&PathBuf::from(file), "password", LockOptions::default())?;
 
         task.complete("Encryption finished");
     } else {
         // Perform encryption without progress
-        let mut crud_manager = CageManager::with_defaults()?;
-        crud_manager.lock(&PathBuf::from(file), "password", LockOptions::default())?;
+        let mut cage_manager = CageManager::with_defaults()?;
+        cage_manager.lock(&PathBuf::from(file), "password", LockOptions::default())?;
     }
 
     Ok(())
@@ -967,10 +967,10 @@ Key changes in the 0.3.x series:
 
 ```rust
 // OLD (0.1.x)
-let result = crud_manager.lock(&path, "pass", basic_options)?;
+let result = cage_manager.lock(&path, "pass", basic_options)?;
 
 // NEW (0.3.x) - same interface, enhanced features
-let result = crud_manager.lock(&path, "pass", enhanced_options)?;
+let result = cage_manager.lock(&path, "pass", enhanced_options)?;
 
 // NEW features
 let progress_manager = ProgressManager::new();  // Progress tracking

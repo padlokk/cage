@@ -13,7 +13,7 @@ This file archives completed tasks, milestones, and sprints for historical refer
 ### Completed Tasks
 
 **TASK-001: Key Rotation Logic** [8 pts] - ✅ COMPLETE
-- Location: src/cage/lifecycle/crud_manager.rs:196-310
+- Location: src/cage/lifecycle/cage_manager.rs:196-310
 - Implemented full atomic key rotation with rollback capability
 - Added old/new passphrase validation and comparison
 - Created backup system with automatic rollback on failure
@@ -21,7 +21,7 @@ This file archives completed tasks, milestones, and sprints for historical refer
 - Added comprehensive unit tests for rotation validation
 
 **TASK-002: File Verification System** [5 pts] - ✅ COMPLETE
-- Location: src/cage/lifecycle/crud_manager.rs:543-570
+- Location: src/cage/lifecycle/cage_manager.rs:543-570
 - Implemented Age binary and ASCII armor format verification
 - Added header validation for both Age format types
 - Created detailed FileVerificationStatus with validation checks
@@ -29,7 +29,7 @@ This file archives completed tasks, milestones, and sprints for historical refer
 - Added comprehensive unit tests for all verification scenarios
 
 **TASK-003: Backup System Logic** [5 pts] - ✅ COMPLETE
-- Location: src/cage/lifecycle/crud_manager.rs:80-230
+- Location: src/cage/lifecycle/cage_manager.rs:80-230
 - Implemented BackupManager with configurable backup locations
 - Added backup conflict resolution with timestamp-based naming
 - Integrated backup system into lock/unlock operations

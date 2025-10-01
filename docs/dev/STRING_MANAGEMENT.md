@@ -104,7 +104,7 @@ As of 2025-09-29:
 - Potential candidates for centralization: ~705
 - Critical modules with most inline strings:
   - `src/bin/cli_age.rs` (304 candidates)
-  - `src/cage/lifecycle/crud_manager.rs` (182 candidates)
+  - `src/cage/lifecycle/cage_manager.rs` (182 candidates)
 
 ## ASCII-Safe Mode (Future Enhancement)
 

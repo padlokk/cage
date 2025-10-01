@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Existing Implementation** (`src/cage/lifecycle/crud_manager.rs:83-233`):
+**Existing Implementation** (`src/cage/lifecycle/cage_manager.rs:83-233`):
 - `BackupManager` with basic backup/restore/cleanup operations
 - Conflict handling via timestamped `.conflict.{timestamp}` files
 - Single-file backup on lock operations when `backup_before_lock: true`
@@ -191,7 +191,7 @@ cage config set backup.retention keep-days=30
 ## Implementation Plan
 
 ### Phase 1: Core Retention Logic (2-3 hours)
-- [ ] Add `RetentionPolicy` enum to `crud_manager.rs`
+- [ ] Add `RetentionPolicy` enum to `cage_manager.rs`
 - [ ] Implement retention calculation logic
 - [ ] Add unit tests for retention policies
 

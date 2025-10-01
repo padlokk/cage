@@ -32,7 +32,7 @@ We already route operations through `AgeAdapter`. The strategy is to add a new `
 - Optional: library adapter (flag or config key)
 
 ### 3.2 Configuration hook
-Add a switch (e.g., `backend = "cli" | "library"`) inside `AgeConfig` and command-line flag `--backend`. CrudManager will instantiate the appropriate adapter via `AdapterFactory`.
+Add a switch (e.g., `backend = "cli" | "library"`) inside `AgeConfig` and command-line flag `--backend`. CageManager will instantiate the appropriate adapter via `AdapterFactory`.
 
 ### 3.3 Passphrase delivery
 Reuse existing PassphraseManager/PTY automation to gather passphrases. For the library path we bypass PTY entirely, passing the collected string into the crate APIs. PTY automation remains required when the CLI backend is chosen.
@@ -48,7 +48,7 @@ The CLI path introspects plugins via `age --version` output. For the library pat
 These tasks align with Phase 4 entries (AGE-01..04) in `docs/procs/TASKS.txt`:
 
 1. **AGE-01 – Library Adapter Implementation**
-   - Implement `LibraryAdapter` bridging CrudManager requests to `age::Encryptor`/`Decryptor`
+   - Implement `LibraryAdapter` bridging CageManager requests to `age::Encryptor`/`Decryptor`
    - Support file + streaming workflows
    - Keep CLI adapter available until parity validated
 

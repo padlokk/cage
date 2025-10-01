@@ -10,7 +10,7 @@ This guide provides integration patterns for using Cage as a library within the 
 Padlock App
 ├── Core Application Logic
 ├── cage (library dependency)
-│   ├── CrudManager - Main encryption interface
+│   ├── CageManager - Main encryption interface
 │   ├── AgeConfig - Configuration with .padlock extension
 │   ├── PassphraseManager - Secure input handling
 │   └── PTY Automation - Seamless Age integration
@@ -35,13 +35,13 @@ tokio = { version = "1.0", features = ["full"] }
 
 ```rust
 use cage::{
-    AgeConfig, CrudManager, LockOptions, UnlockOptions,
+    AgeConfig, CageManager, LockOptions, UnlockOptions,
     PassphraseManager, PassphraseMode, OutputFormat
 };
 use std::path::PathBuf;
 
 // Initialize with Padlock-specific configuration
-fn initialize_cage() -> cage::AgeResult<CrudManager> {
+fn initialize_cage() -> cage::AgeResult<CageManager> {
     // Configure for Padlock with .padlock extension
     let config = AgeConfig::for_padlock()
         .with_audit_logging(true)
@@ -49,7 +49,7 @@ fn initialize_cage() -> cage::AgeResult<CrudManager> {
 
     // Create CRUD manager with custom configuration
     let adapter = cage::AdapterFactory::create_default()?;
-    CrudManager::new(adapter, config)
+    CageManager::new(adapter, config)
 }
 ```
 
@@ -88,14 +88,14 @@ let config = AgeConfig::for_padlock();
 ### 2. File Encryption with Padlock Extensions
 
 ```rust
-use cage::{CrudManager, LockOptions, AgeConfig};
+use cage::{CageManager, LockOptions, AgeConfig};
 use std::path::Path;
 
 async fn encrypt_user_file(file_path: &Path, passphrase: &str) -> cage::AgeResult<()> {
     // Initialize with Padlock config
     let config = AgeConfig::for_padlock();
     let adapter = cage::AdapterFactory::create_default()?;
-    let mut crud_manager = CrudManager::new(adapter, config)?;
+    let mut cage_manager = CageManager::new(adapter, config)?;
 
     // Configure encryption options
     let options = LockOptions {
@@ -106,7 +106,7 @@ async fn encrypt_user_file(file_path: &Path, passphrase: &str) -> cage::AgeResul
     };
 
     // Encrypt file - will create file.padlock
-    let result = crud_manager.lock(file_path, passphrase, options)?;
+    let result = cage_manager.lock(file_path, passphrase, options)?;
 
     if result.success {
         println!("✅ Encrypted {} successfully", file_path.display());
@@ -155,7 +155,7 @@ async fn get_gui_passphrase_input(prompt: &str, for_encryption: bool) -> cage::A
 ### 4. Batch Operations for User Libraries
 
 ```rust
-use cage::{CrudManager, LockOptions, UnlockOptions};
+use cage::{CageManager, LockOptions, UnlockOptions};
 use std::path::{Path, PathBuf};
 
 // Encrypt entire user document library
@@ -166,7 +166,7 @@ async fn encrypt_user_library(
 ) -> cage::AgeResult<()> {
     let config = AgeConfig::for_padlock();
     let adapter = cage::AdapterFactory::create_default()?;
-    let mut crud_manager = CrudManager::new(adapter, config)?;
+    let mut cage_manager = CageManager::new(adapter, config)?;
 
     let options = LockOptions {
         recursive: true,
@@ -179,7 +179,7 @@ async fn encrypt_user_library(
     let total_files = files.len();
 
     for (i, file) in files.iter().enumerate() {
-        match crud_manager.lock(file, passphrase, options.clone()) {
+        match cage_manager.lock(file, passphrase, options.clone()) {
             Ok(_) => {
                 progress_callback(i + 1, total_files);
             }
@@ -206,15 +206,15 @@ fn collect_user_files(path: &Path) -> cage::AgeResult<Vec<PathBuf>> {
 ### 5. Repository Status and Management
 
 ```rust
-use cage::{CrudManager, RepositoryStatus};
+use cage::{CageManager, RepositoryStatus};
 
 // Check encryption status of user's files
 async fn check_library_status(library_path: &Path) -> cage::AgeResult<LibraryStatus> {
     let config = AgeConfig::for_padlock();
     let adapter = cage::AdapterFactory::create_default()?;
-    let crud_manager = CrudManager::new(adapter, config)?;
+    let cage_manager = CageManager::new(adapter, config)?;
 
-    let status = crud_manager.status(library_path)?;
+    let status = cage_manager.status(library_path)?;
 
     Ok(LibraryStatus {
         total_files: status.total_files,
@@ -484,9 +484,9 @@ mod integration_tests {
         // Test decryption
         let config = AgeConfig::for_padlock();
         let adapter = cage::AdapterFactory::create_default().unwrap();
-        let mut crud_manager = CrudManager::new(adapter, config).unwrap();
+        let mut cage_manager = CageManager::new(adapter, config).unwrap();
 
-        let unlock_result = crud_manager.unlock(&encrypted_file, "testpassword", UnlockOptions::default()).unwrap();
+        let unlock_result = cage_manager.unlock(&encrypted_file, "testpassword", UnlockOptions::default()).unwrap();
         assert!(unlock_result.success);
     }
 }
@@ -531,7 +531,7 @@ use tokio::sync::Semaphore;
 
 // Parallel file processing for large libraries
 pub struct ParallelEncryptionManager {
-    crud_manager: Arc<CrudManager>,
+    cage_manager: Arc<CageManager>,
     semaphore: Arc<Semaphore>,
 }
 
@@ -539,11 +539,11 @@ impl ParallelEncryptionManager {
     pub fn new(max_concurrent: usize) -> cage::AgeResult<Self> {
         let config = AgeConfig::for_padlock();
         let adapter = cage::AdapterFactory::create_default()?;
-        let crud_manager = Arc::new(CrudManager::new(adapter, config)?);
+        let cage_manager = Arc::new(CageManager::new(adapter, config)?);
         let semaphore = Arc::new(Semaphore::new(max_concurrent));
 
         Ok(Self {
-            crud_manager,
+            cage_manager,
             semaphore,
         })
     }
@@ -556,7 +556,7 @@ impl ParallelEncryptionManager {
         use futures::stream::{FuturesUnordered, StreamExt};
 
         let tasks = files.into_iter().map(|file| {
-            let crud_manager = Arc::clone(&self.crud_manager);
+            let cage_manager = Arc::clone(&self.cage_manager);
             let semaphore = Arc::clone(&self.semaphore);
             let passphrase = passphrase.clone();
 
@@ -564,7 +564,7 @@ impl ParallelEncryptionManager {
                 let _permit = semaphore.acquire().await.unwrap();
 
                 // Clone for thread safety
-                let mut manager = (*crud_manager).clone();  // This would need Clone impl
+                let mut manager = (*cage_manager).clone();  // This would need Clone impl
                 manager.lock(&file, &passphrase, LockOptions::default())
                     .map(|_| ())
             }

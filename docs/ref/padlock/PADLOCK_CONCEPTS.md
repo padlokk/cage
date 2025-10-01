@@ -33,7 +33,7 @@ X (Skull) → M (Master) → R (Repo) → I (Ignition) → D (Distro)
 - PTY-safe Age automation (lock/unlock/status) with zero TTY prompts.
 - Passphrase manager abstractions (environment variables, delegated prompts).
 - Audit logger capturing operation, scope, and recipient hashes.
-- Exposes `CrudManager`, `LockOptions`, `UnlockOptions` for higher-level workflows.
+- Exposes `CageManager`, `LockOptions`, `UnlockOptions` for higher-level workflows.
 
 ### 2.2 Ignite (Authority Layer)
 - Data models for keys, fingerprints, manifests, proofs.
