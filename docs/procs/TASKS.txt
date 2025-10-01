@@ -261,55 +261,373 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 
 ## Module Spec Refactor (MOD4 Series)
 
-### MOD4-01: Reorganize Adapter Module [5 pts] 🔴
+**Reference Plan:** `.analysis/mod_spec_reorg_plan.md`
+**Total Points:** 15 pts over 6 phases
+**Strategy:** Sequential execution with full test verification after each phase
+
+### MOD4-01: Adapter Consolidation → adp/ [3 pts] 🔴
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
-- [ ] Create `src/cage/adapter/` directory with `mod.rs` orchestrator
-- [ ] Move `adapter.rs` → `src/cage/adapter/v1.rs`
-- [ ] Move `adapter_v2.rs` → `src/cage/adapter/v2.rs`
-- [ ] Move `adapter_v2_pipe_passphrase.rs` → `src/cage/adapter/pipe_passphrase.rs`
-- [ ] Create `src/cage/adapter/error.rs` for adapter-specific errors
-- [ ] Update `src/cage/mod.rs` to reference new structure
-- [ ] Verify all tests pass after reorganization
-**Rationale:** Multiple adapter files should be organized under a single module directory per MODULE_SPEC
 
-### MOD4-02: Reorganize Security & Automation [3 pts] 🔴
+**Step 1: Create directory structure**
+```bash
+mkdir -p src/cage/adp
+```
+
+**Step 2: Create mod.rs orchestrator**
+```bash
+cat > src/cage/adp/mod.rs <<'EOF'
+//! Adapter implementations for age CLI and library backends
+//!
+//! This module provides adapter patterns for age encryption operations.
+
+pub mod v1;
+pub mod v2;
+pub mod pipe;
+
+// Re-export primary adapter types
+pub use v1::{AgeAdapter, AdapterFactory};
+pub use v2::{AgeAdapterV2, ShellAdapterV2, AdapterV1Compat, StreamingStrategy};
+EOF
+```
+
+**Step 3: Move and rename adapter files**
+```bash
+git mv src/cage/adapter.rs src/cage/adp/v1.rs
+git mv src/cage/adapter_v2.rs src/cage/adp/v2.rs
+git mv src/cage/adapter_v2_pipe_passphrase.rs src/cage/adp/pipe.rs
+```
+
+**Step 4: Update src/cage/mod.rs**
+- Remove: `pub mod adapter;`, `pub mod adapter_v2;`, `pub mod adapter_v2_pipe_passphrase;`
+- Add: `pub mod adp;`
+- Update re-exports: `pub use adp::{AdapterFactory, AgeAdapter};`
+
+**Step 5: Update imports across codebase**
+```bash
+# Find all import sites
+rg "use.*cage::(adapter|adapter_v2|adapter_v2_pipe)" src/ tests/ --files-with-matches
+
+# Update patterns:
+# cage::adapter:: → cage::adp::v1::
+# cage::adapter_v2:: → cage::adp::v2::
+# cage::adapter_v2_pipe_passphrase:: → cage::adp::pipe::
+```
+
+**Step 6: Update prelude.rs**
+- Check if adapter types are re-exported
+- Update paths to `crate::cage::adp::*`
+
+**Step 7: Verify compilation and tests**
+```bash
+cargo build
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+```
+
+**Step 8: Commit**
+```bash
+git add -A
+git commit -m "refactor: consolidate adapters into adp/ module (MOD4-01)"
+```
+
+---
+
+### MOD4-02: PTY Automation → pty/ [3 pts] 🔴
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
-- [ ] Create `src/cage/security/` directory with `mod.rs`
-- [ ] Move `security.rs` → `src/cage/security/audit.rs`
-- [ ] Move `passphrase.rs` → `src/cage/security/passphrase.rs`
-- [ ] Move `pty_wrap.rs` → `src/cage/security/pty.rs`
-- [ ] Move `tty_automation.rs` → `src/cage/security/tty.rs`
-- [ ] Create `src/cage/security/error.rs` for security-specific errors
-- [ ] Update imports across codebase
-**Rationale:** Security-related files scattered; should be cohesive module
 
-### MOD4-03: Reorganize Core Primitives [3 pts] 🔴
+**Step 1: Create directory structure**
+```bash
+mkdir -p src/cage/pty
+```
+
+**Step 2: Create mod.rs orchestrator**
+```bash
+cat > src/cage/pty/mod.rs <<'EOF'
+//! PTY and TTY automation for age CLI interactions
+//!
+//! This module handles pseudo-terminal automation and passphrase management.
+
+pub mod wrap;
+pub mod tty;
+pub mod pass;
+
+// Re-export primary types
+pub use wrap::{PtyAgeAutomator, PtyConfig};
+pub use tty::TtyAutomation;
+pub use pass::{PassphraseManager, PassphraseMode};
+EOF
+```
+
+**Step 3: Move and rename files**
+```bash
+git mv src/cage/pty_wrap.rs src/cage/pty/wrap.rs
+git mv src/cage/tty_automation.rs src/cage/pty/tty.rs
+git mv src/cage/passphrase.rs src/cage/pty/pass.rs
+```
+
+**Step 4: Update src/cage/mod.rs**
+- Remove: `pub mod passphrase;`, `pub mod pty_wrap;`, `pub mod tty_automation;`
+- Add: `pub mod pty;`
+- Update re-exports: `pub use pty::{PassphraseManager, PassphraseMode};`
+
+**Step 5: Update imports across codebase**
+```bash
+# Find all import sites
+rg "use.*cage::(passphrase|pty_wrap|tty_automation)" src/ tests/ --files-with-matches
+
+# Update patterns:
+# cage::passphrase:: → cage::pty::pass::
+# cage::pty_wrap:: → cage::pty::wrap::
+# cage::tty_automation:: → cage::pty::tty::
+```
+
+**Step 6: Update prelude.rs if needed**
+
+**Step 7: Verify compilation and tests**
+```bash
+cargo build
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+```
+
+**Step 8: Commit**
+```bash
+git add -A
+git commit -m "refactor: consolidate PTY automation into pty/ module (MOD4-02)"
+```
+
+---
+
+### MOD4-03: Audit Module → audit/ [2 pts] 🔴
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
-- [ ] Create `src/cage/core/` directory with `mod.rs`
-- [ ] Move `age_engine.rs` → `src/cage/core/engine.rs`
-- [ ] Move `config.rs` → `src/cage/core/config.rs`
-- [ ] Move `requests.rs` → `src/cage/core/requests.rs`
-- [ ] Move `in_place.rs` → `src/cage/core/recovery.rs`
-- [ ] Create `src/cage/core/error.rs` for core errors
-- [ ] Update imports and re-exports
-**Rationale:** Core primitives should be grouped for clarity
 
-### MOD4-04: Create Standard Module Files [2 pts] 🔴
-**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Module Layout"
-- [ ] Create `src/cage/utils.rs` - curated low-level helpers
-- [ ] Create `src/cage/helpers.rs` - internal implementations
-- [ ] Create `src/cage/macros.rs` - module-owned macros
-- [ ] Update `src/cage/mod.rs` to expose utils appropriately
-- [ ] Document helper usage in module docs
-**Rationale:** MODULE_SPEC requires standard helper/macro files
+**Step 1: Create directory structure**
+```bash
+mkdir -p src/cage/audit
+```
 
-### MOD4-05: Move Strings to Lang Module [2 pts] 🔴
+**Step 2: Move security.rs → audit/mod.rs**
+```bash
+git mv src/cage/security.rs src/cage/audit/mod.rs
+```
+
+**Step 3: Update src/cage/mod.rs**
+- Remove: `pub mod security;`
+- Add: `pub mod audit;`
+- Update re-exports: `pub use audit::{AuditLogger, SecurityValidator};`
+
+**Step 4: Update imports across codebase**
+```bash
+# Find all import sites
+rg "use.*cage::security" src/ tests/ --files-with-matches
+
+# Update pattern:
+# cage::security:: → cage::audit::
+```
+
+**Step 5: Update prelude.rs if needed**
+
+**Step 6: Verify compilation and tests**
+```bash
+cargo build
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+```
+
+**Step 7: Commit**
+```bash
+git add -A
+git commit -m "refactor: move security to audit/ module (MOD4-03)"
+```
+
+---
+
+### MOD4-04: Core Primitives → core/ [3 pts] 🔴
+**Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Sub Module Specification"
+
+**Step 1: Create directory structure**
+```bash
+mkdir -p src/cage/core
+```
+
+**Step 2: Create mod.rs orchestrator**
+```bash
+cat > src/cage/core/mod.rs <<'EOF'
+//! Core primitives for cage operations
+//!
+//! This module provides configuration, requests, engine, and recovery types.
+
+pub mod config;
+pub mod requests;
+pub mod engine;
+pub mod recovery;
+
+// Re-export primary types
+pub use config::{AgeConfig, OutputFormat, TtyMethod};
+pub use requests::{LockRequest, UnlockRequest, RotateRequest};
+pub use engine::AgeAutomator;
+pub use recovery::{InPlaceOperation, InPlaceOptions, RecoveryManager, SafetyValidator};
+EOF
+```
+
+**Step 3: Move and rename files**
+```bash
+git mv src/cage/config.rs src/cage/core/config.rs
+git mv src/cage/requests.rs src/cage/core/requests.rs
+git mv src/cage/age_engine.rs src/cage/core/engine.rs
+git mv src/cage/in_place.rs src/cage/core/recovery.rs
+```
+
+**Step 4: Update src/cage/mod.rs**
+- Remove: `pub mod age_engine;`, `pub mod config;`, `pub mod in_place;`, `pub mod requests;`
+- Add: `pub mod core;`
+- Update re-exports: `pub use core::{AgeConfig, OutputFormat, TtyMethod};`
+- Update re-exports: `pub use core::{InPlaceOperation, InPlaceOptions, RecoveryManager, SafetyValidator};`
+
+**Step 5: Update imports across codebase**
+```bash
+# Find all import sites
+rg "use.*cage::(config|requests|age_engine|in_place)" src/ tests/ --files-with-matches
+
+# Update patterns:
+# cage::config:: → cage::core::config::
+# cage::requests:: → cage::core::requests::
+# cage::age_engine:: → cage::core::engine::
+# cage::in_place:: → cage::core::recovery::
+```
+
+**Step 6: Update prelude.rs**
+- Update all paths from `cage::*` → `cage::core::*`
+
+**Step 7: Verify compilation and tests**
+```bash
+cargo build
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+```
+
+**Step 8: Commit**
+```bash
+git add -A
+git commit -m "refactor: consolidate core primitives into core/ module (MOD4-04)"
+```
+
+---
+
+### MOD4-05: Directory Renames (mgr, forge, buff) [2 pts] 🔴
+**Reference:** `.analysis/mod_spec_reorg_plan.md`
+
+**Step 1: Rename manager/ → mgr/**
+```bash
+git mv src/cage/manager src/cage/mgr
+```
+
+**Step 2: Rename operations/ → forge/**
+```bash
+git mv src/cage/operations src/cage/forge
+```
+
+**Step 3: Rename chunker/ → buff/**
+```bash
+git mv src/cage/chunker src/cage/buff
+```
+
+**Step 4: Update src/cage/mod.rs**
+```bash
+# Replace:
+pub mod manager; → pub mod mgr;
+pub mod operations; → pub mod forge;
+pub mod chunker; → pub mod buff;
+
+# Update re-exports:
+pub use mgr::{CageManager, LockOptions, UnlockOptions, VerificationResult};
+pub use forge::{FileEncryption, Operation, OperationResult, RepositoryOperations, RepositoryStatus};
+pub use buff::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker};
+```
+
+**Step 5: Update imports across codebase**
+```bash
+# Find all import sites
+rg "use.*cage::(manager|operations|chunker)" src/ tests/ --files-with-matches
+
+# Update patterns:
+# cage::manager:: → cage::mgr::
+# cage::operations:: → cage::forge::
+# cage::chunker:: → cage::buff::
+```
+
+**Step 6: Update prelude.rs**
+- Update module references
+
+**Step 7: Verify compilation and tests**
+```bash
+cargo build
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+```
+
+**Step 8: Commit**
+```bash
+git add -A
+git commit -m "refactor: rename modules to terse names (mgr, forge, buff) (MOD4-05)"
+```
+
+---
+
+### MOD4-06: Move Strings to Lang [2 pts] 🔴
 **Reference:** `docs/ref/rsb/MODULE_SPEC.md` §"Standard Src Specification"
-- [ ] Move `src/cage/strings.rs` → `src/lang.rs`
-- [ ] Update all imports from `crate::cage::strings` to `crate::lang`
-- [ ] Re-export via prelude if needed
-- [ ] Verify SEC-01 string management patterns still work
-**Rationale:** Per MODULE_SPEC, `src/lang.rs` is standard location for string constants
+
+**Step 1: Move strings.rs → src/lang.rs**
+```bash
+git mv src/cage/strings.rs src/lang.rs
+```
+
+**Step 2: Update module declaration in src/lib.rs**
+```rust
+// Add near other top-level modules
+pub mod lang;
+```
+
+**Step 3: Update src/cage/mod.rs**
+- Remove: `pub mod strings;`
+
+**Step 4: Update imports across codebase**
+```bash
+# Find all import sites
+rg "use.*cage::strings" src/ tests/ --files-with-matches
+
+# Update pattern:
+# cage::strings:: → crate::lang::
+# crate::cage::strings:: → crate::lang::
+```
+
+**Step 5: Update prelude.rs if strings are re-exported**
+- Change path from `cage::strings::*` → `crate::lang::*`
+
+**Step 6: Verify SEC-01 string management patterns still work**
+```bash
+# Check string references are still valid
+rg "lang::" src/ tests/ | head -20
+```
+
+**Step 7: Verify compilation and tests**
+```bash
+cargo build
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+```
+
+**Step 8: Commit**
+```bash
+git add -A
+git commit -m "refactor: move strings to src/lang.rs per MODULE_SPEC (MOD4-06)"
+```
 
 ---
 
