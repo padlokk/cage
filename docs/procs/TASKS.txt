@@ -194,7 +194,7 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - [ ] Evaluate optional "ASCII-safe" mode without forcing removal of branded glyphs.
 - [ ] Migrate high-priority user-facing strings from audit results.
 **Implementation Notes:**
-- Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/lifecycle/cage_manager.rs`).
+- Focus migrations on CLI messages surfaced in Padlock/Ignite UIs (`src/bin/cli_age.rs`, `src/cage/mgr/cage_manager.rs`).
 - Document ASCII-safe toggle behaviour; Padlock UI will eventually need plain-text mode for logs.
 - Use `scripts/check_inline_strings.sh --verbose` to prioritize the top offenders (304 in CLI, 182 in CageManager).
 

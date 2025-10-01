@@ -16,7 +16,7 @@ Those documents track current workstreams, handoffs, and priorities.
  Project Snapshot
 --------------------------------------------------------------------------------
 - **Product**: Cage – Age encryption automation tool (Rust)
-- **Surfaces**: CLI binary (`cage`) + library API (`cage::cage::*`)
+- **Surfaces**: CLI binary (`cage`) + library API (`cage::*`)
 - **Frameworks**: RSB for CLI orchestrations; PTY automation via `hub::portable_pty`
 - **Config**: `AgeConfig` now loads from XDG/config paths (`cage.toml`) with
   backup/streaming settings; run `cage init` to scaffold directories and defaults
@@ -55,7 +55,7 @@ Those documents track current workstreams, handoffs, and priorities.
  Security & Quality Concerns
 --------------------------------------------------------------------------------
 - **Binary Snooping**: Centralize user-facing strings and sensitive literals to
-  minimize exposure in compiled binaries (dedicated `strings` module or similar).
+  minimize exposure in compiled binaries (now via the top-level `lang` module).
 - **Test Gating**: Age-dependent tests (e.g. selective unlock suite, streaming
   round-trip) must skip gracefully when the `age` binary is unavailable to keep
   CI green.
@@ -84,13 +84,17 @@ Those documents track current workstreams, handoffs, and priorities.
 - `docs/ref/cage/BACKUP_RETENTION_DESIGN.md` – Design notes for backup registry & retention.
 - `docs/procs/PROCESS.txt` – Workflow rules & priority context.
 - `docs/procs/ROADMAP.md` – Long-term roadmap & milestones.
-- `src/cage/` – Core library modules (adapter, lifecycle, config, etc.).
+- `src/` – Core modules organized per MODULE_SPEC: `adp/` (adapters), `pty/`,
+  `audit/`, `core/`, `mgr/`, `forge/`, `buff/`, `keygen/`, plus top-level `lang.rs`.
 - `tests/` – Unit, integration, PTY, and regression suites.
 - Quick toggles: `CAGE_STREAMING_STRATEGY=temp|pipe|auto` (or `--streaming-strategy`) and
   backup settings via `cage.toml` (`backup.cleanup_on_success`, `backup.directory`,
   `backup.retention`).
 - New CLI helpers: `cage config show|path|paths`, `cage adapter info`, `cage adapter health`.
-- Streaming CLI entry point: `cage stream encrypt|decrypt` (wraps `CageManager::stream_with_request()`).
+- Streaming CLI entry point: `cage stream encrypt|decrypt` (wraps `CageManager::stream_with_request()`)
+  with implementations now under `src/mgr/`.
+- Key generation work is tracked under `CAGE-21`/`CAGE-22`; see
+  `docs/ref/cage/KEYGEN_STRATEGY.md` for the pending CLI + adapter deliverables.
 - Streaming guidance: README and `docs/ref/cage/LIBRARY_USAGE.md` include performance tables
   comparing passphrase vs recipient streaming (CAGE-12a/12b).
 
