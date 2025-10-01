@@ -6,7 +6,7 @@
 //! Security Guardian: Edgar - Production file operation framework
 
 use super::{FileEncryption, Operation, OperationResult};
-use crate::cage::adapter::AgeAdapter;
+use crate::cage::adp::v1::AgeAdapter;
 use crate::cage::config::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::security::{AuditLogger, SecurityValidator};

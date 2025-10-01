@@ -19,7 +19,7 @@
 
 use std::io::{Read, Write};
 
-use crate::cage::adapter_v2::ShellAdapterV2;
+use crate::cage::adp::v2::ShellAdapterV2;
 use crate::cage::config::OutputFormat;
 use crate::cage::error::{AgeError, AgeResult};
 

@@ -13,9 +13,7 @@
 //! - **Security Validation**: Comprehensive injection prevention and audit logging
 //! - **Production Ready**: Robust error handling and monitoring integration
 
-pub mod adapter;
-pub mod adapter_v2; // Enhanced adapter with streaming (CAGE-12)
-pub mod adapter_v2_pipe_passphrase; // True pipe streaming for passphrases (CAGE-12b)
+pub mod adp; // Adapter implementations (v1, v2, pipe streaming)
 pub mod age_engine;
 pub mod chunker;
 pub mod config;
@@ -32,7 +30,7 @@ pub mod strings; // Centralized string constants (SEC-01)
 pub mod tty_automation; // Request structs for unified API (CAGE-11)
 
 // Re-export core types for convenience
-pub use adapter::{AdapterFactory, AgeAdapter};
+pub use adp::{AdapterFactory, AgeAdapter};
 pub use age_engine::AgeAutomator;
 pub use chunker::{ChunkProcessingSummary, ChunkSpec, ChunkerConfig, FileChunker};
 pub use config::{AgeConfig, OutputFormat, TtyMethod};

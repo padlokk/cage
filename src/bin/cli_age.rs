@@ -2144,7 +2144,7 @@ fn stream_decrypt(_args: Args) -> i32 {
 
 /// Adapter command - inspect adapter capabilities and health
 fn cmd_adapter(args: Args) -> i32 {
-    use cage::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+    use cage::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
 
     let subcommand = args.get_or(1, "info");
 

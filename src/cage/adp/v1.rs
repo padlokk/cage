@@ -6,9 +6,9 @@
 //!
 //! Security Guardian: Edgar - Adapter pattern for clean backend abstraction
 
-use super::adapter_v2::{AdapterV1Compat, ShellAdapterV2};
-use super::config::OutputFormat;
-use super::error::{AgeError, AgeResult};
+use super::v2::{AdapterV1Compat, ShellAdapterV2};
+use crate::cage::config::OutputFormat;
+use crate::cage::error::{AgeError, AgeResult};
 use std::path::Path;
 
 /// Core Age operations interface that all adapters must implement
@@ -40,15 +40,15 @@ pub trait AgeAdapter {
 
 /// Shell-based Age adapter using PTY automation methods
 pub struct ShellAdapter {
-    pty_automator: super::pty_wrap::PtyAgeAutomator,
-    audit_logger: super::security::AuditLogger,
+    pty_automator: crate::cage::pty_wrap::PtyAgeAutomator,
+    audit_logger: crate::cage::security::AuditLogger,
 }
 
 impl ShellAdapter {
     /// Create new ShellAdapter with PTY automation
     pub fn new() -> AgeResult<Self> {
-        let pty_automator = super::pty_wrap::PtyAgeAutomator::new()?;
-        let audit_logger = super::security::AuditLogger::new(None)?;
+        let pty_automator = crate::cage::pty_wrap::PtyAgeAutomator::new()?;
+        let audit_logger = crate::cage::security::AuditLogger::new(None)?;
 
         Ok(Self {
             pty_automator,
@@ -128,13 +128,13 @@ impl AgeAdapter for ShellAdapter {
     }
 
     fn adapter_version(&self) -> String {
-        format!("pty-v{}-portable-pty", super::VERSION)
+        format!("pty-v{}-portable-pty", crate::cage::VERSION)
     }
 
     fn clone_box(&self) -> Box<dyn AgeAdapter> {
         Box::new(ShellAdapter {
-            pty_automator: super::pty_wrap::PtyAgeAutomator::new().unwrap(),
-            audit_logger: super::security::AuditLogger::new(None).unwrap(),
+            pty_automator: crate::cage::pty_wrap::PtyAgeAutomator::new().unwrap(),
+            audit_logger: crate::cage::security::AuditLogger::new(None).unwrap(),
         })
     }
 }

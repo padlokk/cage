@@ -20,7 +20,7 @@
 
 // Core types from the cage module
 pub use crate::cage::{
-    adapter_v2::{AgeAdapterV2, ShellAdapterV2},
+    adp::v2::{AgeAdapterV2, ShellAdapterV2},
 
     // Request API (CAGE-11)
     requests::{LockRequest, RotateRequest, UnlockRequest},

@@ -12,8 +12,8 @@ use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
 
-use crate::cage::adapter::AgeAdapter;
-use crate::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+use crate::cage::adp::v1::AgeAdapter;
+use crate::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
 use crate::cage::config::{AgeConfig, OutputFormat, RetentionPolicyConfig};
 use crate::cage::error::{AgeError, AgeResult};
 use crate::cage::operations::{OperationResult, RepositoryStatus};
@@ -867,7 +867,7 @@ impl CageManager {
 
     /// Create CageManager with default configuration
     pub fn with_defaults() -> AgeResult<Self> {
-        let adapter = super::super::adapter::AdapterFactory::create_default()?;
+        let adapter = crate::cage::adp::v1::AdapterFactory::create_default()?;
         let config = AgeConfig::load_default()?;
         Self::new(adapter, config)
     }
@@ -1028,7 +1028,7 @@ impl CageManager {
         input: &mut (dyn Read + Send),
         output: &mut (dyn Write + Send),
     ) -> AgeResult<u64> {
-        use crate::cage::adapter_v2::{AgeAdapterV2, ShellAdapterV2};
+        use crate::cage::adp::v2::{AgeAdapterV2, ShellAdapterV2};
 
         let adapter = ShellAdapterV2::with_config(self.config.clone())?;
 
@@ -1070,7 +1070,7 @@ impl CageManager {
                 });
             }
 
-            use crate::cage::adapter_v2::ShellAdapterV2;
+            use crate::cage::adp::v2::ShellAdapterV2;
             let adapter = ShellAdapterV2::with_config(self.config.clone())?;
 
             let mut still_verified = Vec::new();
@@ -2962,7 +2962,7 @@ impl CageManager {
 
     fn deep_verify_file(
         &self,
-        adapter: &crate::cage::adapter_v2::ShellAdapterV2,
+        adapter: &crate::cage::adp::v2::ShellAdapterV2,
         file: &Path,
         identity: &Identity,
     ) -> AgeResult<()> {
