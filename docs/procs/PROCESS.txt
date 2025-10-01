@@ -203,9 +203,11 @@ the RSB (Rebel String-Biased) framework for enhanced CLI and utilities.
 KEY ARCHITECTURE:
 - Core Library: src/cage/ - Main encryption/decryption logic
 - CLI Binary: src/bin/cli_age.rs - Command-line interface
-- PTY Automation: examples/pty_demo.rs - Portable PTY for Age interaction
-- Lifecycle Management: src/cage/lifecycle/ - CRUD operations
-- Adapters: src/cage/adapter.rs - Age binary & rage crate backends
+- PTY Automation: src/cage/pty/ - Portable PTY for Age interaction
+- Lifecycle Management: src/cage/mgr/ - CageManager coordination
+- Adapters: src/cage/adp/ - Age binary & rage crate backends
+- Core Primitives: src/cage/core/ - Config, requests, engine, recovery
+- Language Resources: src/lang.rs - String constants and formatters
 
 WORKFLOW RULES:
 1. ALWAYS update docs/procs/CONTINUE.md at session end

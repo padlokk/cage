@@ -8,21 +8,21 @@ This document captures the current state of Cage's streaming implementation, obs
 characteristics, and constraints inherited from the upstream `age` CLI. It summarizes the findings from:
 - `.analysis/streaming_benchmark_results.md`
 - `tests/test_streaming_benchmark.rs`
-- Source analysis of `src/cage/adapter_v2.rs` and `src/cage/adapter_v2_pipe_passphrase.rs`
+- Source analysis of `src/cage/adp/v2.rs` and `src/cage/adp/v2_pipe_passphrase.rs`
 
 ## Current Implementation
 
 - `CrudManager::stream_with_request()` routes streaming operations through `ShellAdapterV2`
   (`src/cage/lifecycle/crud_manager.rs:1027`).
 - For recipients, `ShellAdapterV2::encrypt_stream()` spawns the `age` CLI and copies data through its
-  stdin/stdout (`src/cage/adapter_v2.rs:982`). Buffering relies on `std::io::copy` (default 8 KB chunks)
+  stdin/stdout (`src/cage/adp/v2.rs:982`). Buffering relies on `std::io::copy` (default 8 KB chunks)
   plus a scoped thread to drain stdout.
 - Passphrase “pipe” support defers to `encrypt_stream_pipe_passphrase`, but that routine intentionally
   returns `InvalidOperation` because `age` demands to read secrets from a controlling TTY. The adapter
   therefore falls back to `encrypt_stream_temp()`, writing the entire payload to disk and running the
-  PTY automator (`src/cage/adapter_v2_pipe_passphrase.rs`).
+  PTY automator (`src/cage/adp/v2_pipe_passphrase.rs`).
 - Streaming strategies are selected via `CAGE_STREAMING_STRATEGY` (`tempfile`, `pipe`, `auto`). For
-  passphrases, `CAGE_PASSPHRASE_PIPE=1` is required even to attempt pipe mode (`src/cage/adapter_v2.rs:557`).
+  passphrases, `CAGE_PASSPHRASE_PIPE=1` is required even to attempt pipe mode (`src/cage/adp/v2.rs:557`).
 
 ## Benchmark Results (1 GB Test)
 
@@ -109,5 +109,5 @@ Key takeaways:
 ## References
 - `.analysis/streaming_benchmark_results.md`
 - `tests/test_streaming_benchmark.rs`
-- `src/cage/adapter_v2.rs`
-- `src/cage/adapter_v2_pipe_passphrase.rs`
+- `src/cage/adp/v2.rs`
+- `src/cage/adp/v2_pipe_passphrase.rs`

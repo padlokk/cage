@@ -102,7 +102,7 @@ These tasks align with Phase 4 entries (AGE-01..04) in `docs/procs/TASKS.txt`:
 
 - `docs/procs/TASKS.txt` (Phase 4 – Age Library Migration)
 - `docs/procs/ROADMAP.md` (Phase 4 milestones)
-- `src/cage/adapter_v2.rs` (current adapter implementation)
+- `src/cage/adp/v2.rs` (current adapter implementation)
 - `age` crate documentation: https://docs.rs/age
 - `rage` repository: https://github.com/str4d/rage
 
