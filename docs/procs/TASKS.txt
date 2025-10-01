@@ -631,6 +631,267 @@ git commit -m "refactor: move strings to src/lang.rs per MODULE_SPEC (MOD4-06)"
 
 ---
 
+## Documentation Sync (DOC-07 Series)
+
+**Purpose:** Ensure all documentation, examples, and tests reflect new module structure after MOD4 refactor
+**Dependency:** Must complete after each MOD4 phase
+**Total Points:** 8 pts
+
+### DOC-07a: Update Library Documentation [2 pts] 🔴
+**Execute After:** MOD4-01 through MOD4-06 complete
+**Files to Update:**
+- `docs/ref/cage/LIBRARY_USAGE.md` - All code examples and import paths
+- `docs/ref/cage/STREAMING_RESEARCH.md` - Adapter references
+- `docs/ref/cage/CHUNKER_STRATEGY.md` - Buffer module references
+- `docs/dev/STRING_MANAGEMENT.md` - String/lang module references
+- `README.md` - Quick start examples and API references
+
+**Step 1: Audit all code examples**
+```bash
+# Find all code blocks with old module paths
+rg "```rust" docs/ -A 10 | rg "use cage::(adapter|manager|operations|chunker|security|passphrase|pty_wrap|tty_automation|config|requests|age_engine|in_place|strings)"
+```
+
+**Step 2: Update import patterns**
+Replace in all documentation:
+- `cage::adapter::` → `cage::adp::v1::`
+- `cage::adapter_v2::` → `cage::adp::v2::`
+- `cage::manager::` → `cage::mgr::`
+- `cage::operations::` → `cage::forge::`
+- `cage::chunker::` → `cage::buff::`
+- `cage::security::` → `cage::audit::`
+- `cage::passphrase::` → `cage::pty::pass::`
+- `cage::pty_wrap::` → `cage::pty::wrap::`
+- `cage::tty_automation::` → `cage::pty::tty::`
+- `cage::config::` → `cage::core::config::`
+- `cage::requests::` → `cage::core::requests::`
+- `cage::age_engine::` → `cage::core::engine::`
+- `cage::in_place::` → `cage::core::recovery::`
+- `cage::strings::` → `crate::lang::`
+
+**Step 3: Update module references in prose**
+```bash
+# Search for textual mentions
+rg -i "(adapter module|manager module|operations module|chunker module|security module)" docs/
+```
+
+**Step 4: Verify all examples compile**
+```bash
+# Extract code examples and test compilation (manual verification)
+# Check each ```rust block in LIBRARY_USAGE.md
+```
+
+**Step 5: Update README badges/sections**
+- Check "Module Structure" section
+- Update any architecture diagrams
+- Verify quick start examples
+
+**Step 6: Commit**
+```bash
+git add docs/ref/cage/ docs/dev/ README.md
+git commit -m "docs: sync library docs with MOD4 module reorganization (DOC-07a)"
+```
+
+---
+
+### DOC-07b: Update Test Files [3 pts] 🔴
+**Execute After:** MOD4-01 through MOD4-06 complete
+**Files to Update:** All 13 test files in `tests/`
+
+**Step 1: Identify test files with old imports**
+```bash
+rg "use cage::(adapter|manager|operations|chunker|security|passphrase|pty_wrap|tty_automation|config|requests|age_engine|in_place|strings)" tests/ -l
+```
+
+**Step 2: Update imports systematically**
+For each test file identified:
+```bash
+# tests/test_backup_retention.rs
+# tests/test_cli_init.rs
+# tests/test_cli_smoke.rs
+# tests/test_multi_recipient.rs
+# tests/test_request_api.rs
+# tests/test_selective_unlock.rs
+# tests/test_ssh_identity.rs
+# tests/test_streaming_benchmark.rs
+# tests/test_structured_telemetry.rs
+# tests/unit_tests.rs
+# tests/pty_test.rs
+# tests/rsb_integration.rs
+# tests/test_age_cli_sanity.rs
+```
+
+Apply the same replacement patterns as DOC-07a.
+
+**Step 3: Update qualified paths in assertions**
+```bash
+# Search for fully qualified paths in test assertions
+rg "cage::(adapter|manager|operations|chunker|security)::" tests/ -n
+```
+
+**Step 4: Run full test suite**
+```bash
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run smoke
+./bin/test.sh run all
+```
+
+**Step 5: Fix any test failures**
+- Check for hardcoded module path strings
+- Update error message assertions if they include module paths
+- Verify mock/fixture file paths
+
+**Step 6: Commit**
+```bash
+git add tests/
+git commit -m "test: update imports for MOD4 module reorganization (DOC-07b)"
+```
+
+---
+
+### DOC-07c: Update Examples and Demos [1 pt] 🔴
+**Execute After:** MOD4-01 through MOD4-06 complete
+**Files to Update:**
+- `examples/pty_demo.rs`
+
+**Step 1: Update example imports**
+```bash
+# Check for old module paths
+rg "use cage::" examples/ -n
+```
+
+**Step 2: Apply replacement patterns**
+Same patterns as DOC-07a/b.
+
+**Step 3: Verify examples compile**
+```bash
+cargo build --examples
+cargo run --example pty_demo -- --help
+```
+
+**Step 4: Commit**
+```bash
+git add examples/
+git commit -m "examples: update imports for MOD4 module reorganization (DOC-07c)"
+```
+
+---
+
+### DOC-07d: Update Process Documentation [1 pt] 🔴
+**Execute After:** MOD4-01 through MOD4-06 complete
+**Files to Update:**
+- `docs/procs/PROCESS.txt`
+- `docs/procs/QUICK_REF.txt`
+- `docs/procs/CODEX_WARMUP.txt`
+- `docs/procs/CONTINUE.md`
+
+**Step 1: Update module references in process docs**
+```bash
+# Find mentions of old module names
+rg -i "(adapter|manager module|operations|chunker|security module)" docs/procs/
+```
+
+**Step 2: Update file path references**
+Example: `src/cage/manager/crud_manager.rs` → `src/cage/mgr/cage_manager.rs`
+
+**Step 3: Update architecture descriptions**
+- Revise "Key Architecture" sections to reflect new structure
+- Update any module hierarchy diagrams
+
+**Step 4: Commit**
+```bash
+git add docs/procs/
+git commit -m "docs: sync process docs with MOD4 module structure (DOC-07d)"
+```
+
+---
+
+### DOC-07e: Verify Binary and CLI Help [1 pt] 🔴
+**Execute After:** All MOD4 and DOC-07a-d complete
+
+**Step 1: Build and install binary**
+```bash
+cargo build --release
+./bin/deploy.sh
+```
+
+**Step 2: Verify CLI help output**
+```bash
+cage --help
+cage lock --help
+cage unlock --help
+cage status --help
+cage verify --help
+cage keygen --help
+cage config --help
+```
+
+**Step 3: Check for any module path leaks in output**
+```bash
+# Run commands and grep for old module names
+cage --help 2>&1 | rg -i "adapter|manager|operations|chunker"
+```
+
+**Step 4: Update src/bin/cli_age.rs if needed**
+- Check for hardcoded module paths in error messages
+- Update any help text that references module structure
+
+**Step 5: Verify smoke tests pass**
+```bash
+./bin/test.sh run smoke
+```
+
+**Step 6: Commit if changes needed**
+```bash
+git add src/bin/
+git commit -m "cli: clean module path references in help output (DOC-07e)"
+```
+
+---
+
+### DOC-07f: Final Verification and Cleanup [0 pts] 🔴
+**Execute After:** All DOC-07a-e complete
+
+**Step 1: Run comprehensive grep audit**
+```bash
+# Check for any remaining old module references
+rg "cage::(adapter[^:]|manager[^:]|operations|chunker|security[^:])" src/ tests/ docs/ examples/ --files-with-matches
+```
+
+**Step 2: Check .analysis/ and .eggs/ files**
+```bash
+# These can be outdated, but document if they reference old structure
+ls .analysis/ .eggs/ 2>/dev/null
+```
+
+**Step 3: Verify documentation table of contents**
+- Update START.txt if it references module structure
+- Check docs/procs/ROADMAP.md for outdated references
+
+**Step 4: Run full build and test suite**
+```bash
+cargo clean
+cargo build --release
+cargo test --lib
+cargo test --test '*'
+./bin/test.sh run all
+```
+
+**Step 5: Update CONTINUE.md handoff**
+```bash
+# Document completion of MOD4 refactor
+# Update "Current Phase" and "Files Modified" sections
+```
+
+**Step 6: Final commit**
+```bash
+git add -A
+git commit -m "docs: complete MOD4 documentation sync (DOC-07 series)"
+```
+
+---
+
 ## Known Issues & Bug Tracking
 
 ### BUG-06: Flaky Streaming Test (test_shell_adapter_v2_stream_round_trip) [1 pt] 🔴
