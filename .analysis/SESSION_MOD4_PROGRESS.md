@@ -5,8 +5,8 @@ The MOD4 series represents a comprehensive module reorganization effort for the 
 
 ## Progress Snapshot
 - **Total Phases:** 6
-- **Completed Phases:** 3/6 (50% complete)
-- **Story Points Completed:** 8/15 (53% of total effort)
+- **Completed Phases:** 5/6 (83% complete)
+- **Story Points Completed:** 13/15 (87% of total effort)
 - **Current Branch:** main
 - **Date:** 2025-10-01
 
@@ -47,22 +47,31 @@ The MOD4 series represents a comprehensive module reorganization effort for the 
 
 ## Remaining Phases
 
-### MOD4-04: Core Primitives (Pending) 🕒
+### MOD4-04: Core Primitives ✅
 - **Story Points:** 3/15
-- **Planned Actions:**
-  * Create `src/cage/core/` directory structure
-  * Move config, requests, engine, recovery files
-  * Update all import paths
-  * Verify all tests pass
+- **Context Hash:** fddc703
+- **Key Achievements:**
+  * Created `src/cage/core/` directory structure
+  * Moved config.rs → core/config.rs
+  * Moved requests.rs → core/requests.rs
+  * Moved age_engine.rs → core/engine.rs
+  * Moved in_place.rs → core/recovery.rs
+  * Created core/mod.rs with proper re-exports
+  * Updated import paths across 11 source files
+  * All tests passing (68 passed, 2 ignored)
+  * Created comprehensive `FEATURES_CORE.md` documentation
 
-### MOD4-05: Directory Renames (Pending) 🕒
+### MOD4-05: Directory Renames ✅
 - **Story Points:** 2/15
-- **Planned Actions:**
-  * Rename `manager/` → `mgr/`
-  * Rename `operations/` → `forge/`
-  * Rename `chunker/` → `buff/`
-  * Update all import paths
-  * Verify all tests pass
+- **Context Hash:** 6b362ac
+- **Key Achievements:**
+  * Renamed `manager/` → `mgr/`
+  * Renamed `operations/` → `forge/`
+  * Renamed `chunker/` → `buff/`
+  * Updated all import paths across codebase
+  * Verified all tests continue passing
+  * Minimal git history disruption
+  * Renamed modules follow terse naming convention
 
 ### MOD4-06: Lang Module (Pending) 🕒
 - **Story Points:** 2/15
@@ -86,11 +95,12 @@ The MOD4 series represents a comprehensive module reorganization effort for the 
 5. Modular design follows RSB MODULE_SPEC v3
 
 ## Next Steps
-1. Complete MOD4-04: Core Primitives
-2. Proceed with MOD4-05: Directory Renames
-3. Finalize MOD4-06: Lang Module
-4. Review overall architecture post-consolidation
-5. Update project documentation
+1. Finalize MOD4-06: Lang Module (in progress by #repairman)
+2. Review overall architecture post-consolidation
+3. Update project documentation
+4. Prepare migration guide for library users
+5. Perform comprehensive integration testing
+6. Consider starting MOD5 module enhancement series
 
 ## Risks & Mitigations
 - Minimal risk of breaking changes due to careful import management

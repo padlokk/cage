@@ -50,22 +50,30 @@ Status legend: ✅ complete · 🟡 partial/in progress · 🔴 not started · �
 - Created `docs/feats/FEATURES_AUDIT.md` (221 lines)
 - All tests passing (68 passed, 2 ignored)
 
-### MOD4-04: Core Primitives → core/ [3 pts] 🔴
-**Priority:** Next up
-**Next Steps:**
-1. Create `src/cage/core/` directory
-2. Move config.rs, requests.rs, age_engine.rs, in_place.rs to core/
-3. Update imports and `mod.rs`
-4. Verify tests continue passing
+### MOD4-04: Core Primitives → core/ [3 pts] ✅
+**Status:** COMPLETE
+**Commit:** fddc703
+**Details:**
+- Created `src/cage/core/` directory structure
+- Moved config.rs → core/config.rs
+- Moved requests.rs → core/requests.rs
+- Moved age_engine.rs → core/engine.rs
+- Moved in_place.rs → core/recovery.rs
+- Created core/mod.rs with proper re-exports
+- Updated imports across 11 source files
+- Created comprehensive `FEATURES_CORE.md`
+- All 68 tests passing, 2 ignored
 
-### MOD4-05: Directory Renames [2 pts] 🔴
-**Priority:** After MOD4-04
-**Next Steps:**
-1. Rename `manager/` → `mgr/`
-2. Rename `operations/` → `forge/`
-3. Rename `chunker/` → `buff/`
-4. Update all imports
-5. Verify tests continue passing
+### MOD4-05: Directory Renames [2 pts] ✅
+**Status:** COMPLETE
+**Commit:** 6b362ac
+**Details:**
+- Renamed `manager/` → `mgr/`
+- Renamed `operations/` → `forge/`
+- Renamed `chunker/` → `buff/`
+- Updated all import paths across codebase
+- Followed terse naming convention
+- All tests continue passing
 
 ### MOD4-06: Lang Module → src/lang.rs [2 pts] 🔴
 **Priority:** After MOD4-05

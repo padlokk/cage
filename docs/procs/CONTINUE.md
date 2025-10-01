@@ -1,33 +1,67 @@
      # Continue Log – Bug Slate Progress
 
-## HANDOFF-2025-10-01 (MOD4-03 Audit Module Consolidation) ✅
+## HANDOFF-2025-10-01 (MOD4-05 Directory Renames) ✅
+
+### Session Duration: ~45 mins
+### Branch: main
+### Phase: MOD4 MODULE_SPEC Refactor
+### Completed: MOD4-05 (Directory Renames, 2 pts)
+
+### Consolidation Details:
+- Renamed `manager/` → `mgr/`
+- Renamed `operations/` → `forge/`
+- Renamed `chunker/` → `buff/`
+- Updated all import paths across codebase
+- Minimal git history disruption
+- Follows terse naming convention from RSB MODULE_SPEC v3
+
+### Context Hash: 6b362ac
+### Files Modified: ~15 (import paths updated across modules)
+
+### Next Agent MUST:
+1. Continue with MOD4-06: Lang Module (currently in progress)
+2. Review updated `.analysis/SESSION_MOD4_PROGRESS.md`
+3. Update any remaining documentation references
+4. Verify no breaking changes introduced by module renaming
+
+### Risks & Considerations:
+- Careful import path management prevents breaking changes
+- Module renaming follows consistent terse naming strategy
+- No regressions detected in test suite
+
+---
+
+## HANDOFF-2025-10-01 (MOD4-04: Core Primitives Consolidation) ✅
 
 ### Session Duration: ~1 hour
 ### Branch: main
 ### Phase: MOD4 MODULE_SPEC Refactor
-### Completed: MOD4-03 (audit/ consolidation, 2 pts)
+### Completed: MOD4-04 (core/ module consolidation, 3 pts)
 
 ### Consolidation Details:
-- Consolidated `security.rs` into `src/cage/audit/` module
-- Created `mod.rs` for comprehensive audit logging
-- Updated import paths from `cage::security` to `cage::audit`
-- Created `docs/feats/FEATURES_AUDIT.md` with comprehensive documentation
-- Maintained existing functionality and test coverage
-- Implemented security logging and validation strategies
+- Created `src/cage/core/` directory structure
+- Moved config.rs → core/config.rs
+- Moved requests.rs → core/requests.rs
+- Moved age_engine.rs → core/engine.rs
+- Moved in_place.rs → core/recovery.rs
+- Created core/mod.rs with proper re-exports
+- Updated import paths across 11 source files
+- All tests passing (68 passed, 2 ignored)
+- Created comprehensive `FEATURES_CORE.md` documentation
 
-### Context Hash: 3ccbe76
-### Files Modified: 6 (security files consolidated into audit/)
+### Context Hash: fddc703
+### Files Modified: 11 (core primitive files)
 
 ### Next Agent MUST:
-1. Begin MOD4-04: Core Primitives module consolidation
-2. Review `.analysis/SESSION_MOD4_PROGRESS.md` for complete overview
-3. Continue implementing MOD4 series tasks
-4. Address any remaining integration or import path concerns
+1. Continue with MOD4-06: Lang Module
+2. Review updated documentation in `.analysis/SESSION_MOD4_PROGRESS.md`
+3. Verify comprehensive test coverage for core module
+4. Begin preparing migration documentation
 
 ### Risks & Considerations:
-- Comprehensive audit logging implemented
-- Security validation strategies in place
-- No regressions in security module functionality
+- Core primitives centralized into single module
+- Maintained existing type and trait implementations
+- No regressions in core type functionality
 - Follows established MOD4 consolidation patterns
 
 ---
